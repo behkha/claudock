@@ -7,7 +7,8 @@
  *   npm run shot -- --out ./.shots/mine    other output folder (parallel workers: use your own)
  *
  * Builds into a private temp folder (so parallel runs never overwrite each other's ./out), launches Electron with
- * CLAUDE_CONFIG_DIR=./.fixture/claude and CLAUDOCK_SHOT=1, prints "SHOT <file>" per image and "CONSOLE_ERROR ..." for
+ * CLAUDOCK_SHOT=1 and a temp HOME holding a copy of ./.fixture/claude as .claude (so shots show "~/.claude", like a
+ * real install, instead of the fixture path), prints "SHOT <file>" per image and "CONSOLE_ERROR ..." for
  * renderer console errors. Exit code 0 = clean, 1 = console errors or failure.
  */
 import { spawn, spawnSync } from 'node:child_process'
@@ -40,6 +41,25 @@ fs.mkdirSync(outDir, { recursive: true })
 if (!only) for (const f of fs.readdirSync(outDir)) if (f.endsWith('.png')) fs.rmSync(path.join(outDir, f))
 fs.mkdirSync(tmp, { recursive: true })
 
+// Fixture shots: a copy of the fixture as HOME/.claude, so the app shows "~/.claude" (USERPROFILE is home on Windows).
+// A copy, not a link: the app sizes a linked folder as the link itself. File times and the fixture's own links are kept.
+const home = path.join(tmp, 'home')
+if (!real) {
+  const copy = path.join(home, '.claude')
+  fs.cpSync(fixture, copy, { recursive: true, preserveTimestamps: true, verbatimSymlinks: true, mode: fs.constants.COPYFILE_FICLONE })
+  // Plugin and marketplace records hold absolute paths (as Claude Code writes them); point them at the copy.
+  const [from, to] = [fixture, copy].map((p) => JSON.stringify(p).slice(1, -1))
+  for (const rel of fs.readdirSync(copy, { recursive: true })) {
+    const f = path.join(copy, String(rel))
+    if (!f.endsWith('.json') || !fs.statSync(f).isFile()) continue
+    const text = fs.readFileSync(f, 'utf8')
+    if (!text.includes(from)) continue
+    const { atime, mtime } = fs.statSync(f)
+    fs.writeFileSync(f, text.replaceAll(from, to))
+    fs.utimesSync(f, atime, mtime)
+  }
+}
+
 const cleanEnv = { ...process.env }
 delete cleanEnv.ELECTRON_RUN_AS_NODE // would turn Electron into plain Node
 if (real) delete cleanEnv.CLAUDE_CONFIG_DIR
@@ -62,7 +82,7 @@ const child = spawn(electronPath, [path.join(buildDir, 'main', 'index.js')], {
   stdio: ['ignore', 'pipe', 'pipe'],
   env: {
     ...cleanEnv,
-    ...(real ? { CLAUDOCK_READONLY: '1' } : { CLAUDE_CONFIG_DIR: fixture }),
+    ...(real ? { CLAUDOCK_READONLY: '1' } : { HOME: home, USERPROFILE: home, CLAUDE_CONFIG_DIR: path.join(home, '.claude') }),
     CLAUDOCK_SHOT: '1',
     CLAUDOCK_SHOT_DIR: outDir,
     CLAUDOCK_SHOT_ONLY: only,
