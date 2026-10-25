@@ -45,8 +45,17 @@ export function formatRelative(ms: number | string | Date, now = Date.now()): st
   return `${Math.round(mo / 12)} y ago`
 }
 
-/** Replace the home directory prefix with "~". */
+/**
+ * Replace the home directory prefix with "~" (display only: never pass the result to the file system).
+ * A Windows home (`C:\Users\me`, `\\server\share`) matches case-insensitively and with either separator.
+ */
 export function tildify(p: string, home: string): string {
-  if (home && (p === home || p.startsWith(home + '/') || p.startsWith(home + '\\'))) return '~' + p.slice(home.length)
-  return p
+  const h = home.replace(/(?<=.)[\\/]+$/, '')
+  if (!h || !p) return p
+  const win = /^[a-zA-Z]:|^\\\\/.test(h)
+  const norm = (s: string): string => (win ? s.replace(/\\/g, '/').toLowerCase() : s)
+  // compare the prefix only, so lower-casing can never shift where the rest of the path starts
+  if (norm(p.slice(0, h.length)) !== norm(h)) return p
+  const rest = p.slice(h.length)
+  return rest === '' || rest[0] === '/' || rest[0] === '\\' ? '~' + rest : p
 }

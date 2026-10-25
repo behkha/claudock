@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { api } from './api'
 import { useNav } from './nav'
 
 export function useDebounced<T>(value: T, ms = 150): T {
@@ -35,4 +36,29 @@ export function useDelayed(active: boolean, ms = 200): boolean {
     return () => clearTimeout(t)
   }, [active, ms])
   return on
+}
+
+// the home folder never changes while the app runs: ask main once and share the answer
+let home: string | undefined
+let homeAsk: Promise<string> | undefined
+
+/** The user's home folder ('' until known), for `tildify(path, home)`. One IPC call for the whole app. */
+export function useHome(): string {
+  const [h, setH] = useState(home ?? '')
+  useEffect(() => {
+    if (home !== undefined) return
+    let alive = true
+    homeAsk ??= api.system.configInfo().then(
+      (i) => (home = i.home),
+      () => {
+        homeAsk = undefined // try again next time
+        return ''
+      }
+    )
+    void homeAsk.then((v) => alive && setH(v))
+    return () => {
+      alive = false
+    }
+  }, [])
+  return h
 }

@@ -99,7 +99,7 @@ export default function McpScreen({ selectId }: ScreenProps): JSX.Element {
           <EmptyState title="No servers match" description="Try another filter or clear the search." />
         )
       }
-      footer={data ? <span className="ext-mono ext-ellipsis" title={data.stateFile}>{tildify(data.stateFile, home)}</span> : undefined}
+      footer={data ? <span className="ext-mono ext-ellipsis" title={tildify(data.stateFile, home)}>{tildify(data.stateFile, home)}</span> : undefined}
     >
       {data
         ? [

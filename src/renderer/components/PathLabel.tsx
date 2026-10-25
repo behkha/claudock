@@ -1,12 +1,14 @@
 import { Folder } from 'lucide-react'
+import { tildify } from '@shared/format'
 import { api, isMac } from '@/lib/api'
 import { cx } from '@/lib/cx'
+import { useHome } from '@/lib/hooks'
 import { useToast } from './Toast'
 
 export interface PathLabelProps {
-  /** Path to display (absolute or config-relative). */
+  /** Path to display (absolute or config-relative). Shown with the home folder as `~`. */
   path: string
-  /** Path to reveal on click, if different. `false` = plain text, not clickable. */
+  /** Path to reveal on click, if different (default: `path`, unshortened). `false` = plain text, not clickable. */
   reveal?: string | false
   className?: string
 }
@@ -22,10 +24,11 @@ function split(p: string): [string, string] {
 
 const fm = (): string => (isMac() ? 'Finder' : window.claudock.platform === 'win32' ? 'Explorer' : 'file manager')
 
-/** Mono path with middle truncation. Click = reveal in Finder / Explorer. */
+/** Mono path with middle truncation, home folder shown as `~`. Click = reveal in Finder / Explorer. */
 export function PathLabel({ path, reveal, className }: PathLabelProps): JSX.Element {
   const toast = useToast()
-  const [head, tail] = split(path)
+  const shown = tildify(path, useHome())
+  const [head, tail] = split(shown)
   const text = (
     <span className="path__text">
       <span className="path__head">{head}</span>
@@ -34,7 +37,7 @@ export function PathLabel({ path, reveal, className }: PathLabelProps): JSX.Elem
   )
   if (reveal === false) {
     return (
-      <span className={cx('path', className)} title={path}>
+      <span className={cx('path', className)} title={shown}>
         {text}
       </span>
     )
@@ -43,8 +46,8 @@ export function PathLabel({ path, reveal, className }: PathLabelProps): JSX.Elem
     <button
       type="button"
       className={cx('path', 'path--link', className)}
-      title={`${path}\nReveal in ${fm()}`}
-      aria-label={`Reveal ${path} in ${fm()}`}
+      title={`${shown}\nReveal in ${fm()}`}
+      aria-label={`Reveal ${shown} in ${fm()}`}
       onClick={() => api.system.reveal(reveal ?? path).catch((e: Error) => toast(e.message, { kind: 'error' }))}
     >
       <Folder size={13} strokeWidth={1.8} aria-hidden className="path__icon" />
