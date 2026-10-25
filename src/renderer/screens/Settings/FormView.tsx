@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ChevronRight, Eye, EyeOff, Plus, X } from 'lucide-react'
 import type { ScreenId } from '@shared/nav'
 import type { SettingsSummary } from '@shared/api/settings'
-import { Button, Card, IconButton, Segmented, Select, TextField, Toggle } from '@/components'
+import { Button, Card, IconButton, Segmented, Select, TextField, Toggle, type SelectOption } from '@/components'
 import { api } from '@/lib/api'
 import { useDebounced } from '@/lib/hooks'
 import type { JsonObject } from './json'
@@ -33,7 +33,7 @@ function ChoiceField({
 }: {
   label: string
   value: string
-  presets: Array<{ value: string; label: string }>
+  presets: SelectOption[]
   defaultLabel: string
   hint?: ReactNode
   otherLabel: string
@@ -66,15 +66,36 @@ function ChoiceField({
 
 /* ------------------------------------------------------------------ known keys */
 
-const MODEL_PRESETS = ['opus', 'sonnet', 'haiku', 'fable'].map((v) => ({ value: v, label: v }))
-/** The values the effortLevel key accepts. "max" works only per session (/effort max or CLAUDE_CODE_EFFORT_LEVEL). */
-const EFFORTS = ['low', 'medium', 'high', 'xhigh']
-const EFFORT_HINT = 'How hard Claude thinks before answering. Higher is slower and uses more of your limit. A level /effort saves for a model wins over this.'
+/** From code.claude.com/docs/en/model-config. Anything else goes through "Other…". */
+const MODEL_PRESETS: SelectOption[] = [
+  ...['best', 'fable', 'opus', 'sonnet', 'haiku', 'opusplan', 'opus[1m]', 'sonnet[1m]'].map((v) => ({ value: v, label: v, group: 'Aliases' })),
+  ...(
+    [
+      ['claude-fable-5-1', 'Fable 5.1'],
+      ['claude-fable-5', 'Fable 5'],
+      ['claude-opus-5-5', 'Opus 5.5'],
+      ['claude-opus-5', 'Opus 5'],
+      ['claude-opus-4-8', 'Opus 4.8'],
+      ['claude-opus-4-7', 'Opus 4.7'],
+      ['claude-opus-4-6', 'Opus 4.6'],
+      ['claude-sonnet-5-5', 'Sonnet 5.5'],
+      ['claude-sonnet-5', 'Sonnet 5'],
+      ['claude-sonnet-4-6', 'Sonnet 4.6'],
+      ['claude-sonnet-4-5', 'Sonnet 4.5'],
+      ['claude-haiku-5-5', 'Haiku 5.5'],
+      ['claude-haiku-4-5', 'Haiku 4.5']
+    ] as const
+  ).map(([value, name]) => ({ value, label: `${name} · ${value}`, group: 'Models' }))
+]
+/** effortLevel takes low to xhigh. max is kept only in CLAUDE_CODE_EFFORT_LEVEL, so the form saves it there. */
+const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max']
+const EFFORT_ENV = 'CLAUDE_CODE_EFFORT_LEVEL'
 
-function effortHint(effort: string): string {
-  if (effort === 'max') return 'max works only for one session, set with /effort max or CLAUDE_CODE_EFFORT_LEVEL, so Claude Code ignores it here. Choose Default to clear it, or pick a level.'
-  if (effort && !EFFORTS.includes(effort)) return `Claude Code does not accept "${effort}" here. Choose Default to clear it, or pick a level.`
-  return EFFORT_HINT
+function effortHint(effort: string, misplacedMax: boolean): string | undefined {
+  if (misplacedMax) return 'Claude Code ignores max in effortLevel. Click max to save it where it works.'
+  if (effort === 'max') return `Saved as ${EFFORT_ENV} in env.`
+  if (effort && !EFFORTS.includes(effort)) return `Claude Code does not accept "${effort}". Pick a level or Default.`
+  return undefined
 }
 const THEMES = ['auto', 'dark', 'light', 'dark-daltonized', 'light-daltonized', 'dark-ansi', 'light-ansi'].map((v) => ({ value: v, label: v }))
 
@@ -112,7 +133,7 @@ const SCALARS: ScalarDef[] = [
 ]
 
 /** Keys the form edits itself or hands to another screen. Everything else is listed under "Other keys". */
-const HANDLED = new Set(['model', 'effortLevel', 'theme', 'statusLine', 'env', 'hooks', 'permissions', 'skillOverrides', 'enabledPlugins', ...SCALARS.map((s) => s.key)])
+const HANDLED = new Set(['model', 'effortLevel', 'ultracode', 'theme', 'statusLine', 'env', 'hooks', 'permissions', 'skillOverrides', 'enabledPlugins', ...SCALARS.map((s) => s.key)])
 
 const isScalar = (v: unknown): v is string | number | boolean => ['string', 'number', 'boolean'].includes(typeof v)
 
@@ -240,10 +261,27 @@ export function FormView({ obj, onChange, summary, onOpen, onEditJson, focusKey 
   }
 
   const model = typeof obj.model === 'string' ? obj.model : ''
-  const effort = typeof obj.effortLevel === 'string' ? obj.effortLevel : ''
   const theme = typeof obj.theme === 'string' ? obj.theme : ''
+
+  /* effort: CLAUDE_CODE_EFFORT_LEVEL wins over effortLevel, and is the only place max is kept */
+  const envObj = obj.env !== null && typeof obj.env === 'object' && !Array.isArray(obj.env) ? (obj.env as JsonObject) : {}
+  const envEffort = typeof envObj[EFFORT_ENV] === 'string' ? (envObj[EFFORT_ENV] as string) : ''
+  const levelEffort = typeof obj.effortLevel === 'string' ? obj.effortLevel : ''
+  const effort = envEffort || levelEffort
+  const misplacedMax = !envEffort && levelEffort === 'max'
   const effortOptions = [{ value: '', label: 'Default' }, ...EFFORTS.map((v) => ({ value: v, label: v }))]
   if (effort && !EFFORTS.includes(effort)) effortOptions.push({ value: effort, label: effort })
+  const setEffort = (v: string): void => {
+    const next: JsonObject = { ...obj }
+    const nextEnv: JsonObject = { ...envObj }
+    delete nextEnv[EFFORT_ENV]
+    delete next.effortLevel
+    if (v === 'max') nextEnv[EFFORT_ENV] = 'max'
+    else if (v) next.effortLevel = v
+    if (Object.keys(nextEnv).length) next.env = nextEnv
+    else delete next.env
+    onChange(next)
+  }
 
   /* scalars present / addable */
   const presentScalars = SCALARS.filter((s) => s.key in obj && isScalar(obj[s.key]))
@@ -299,19 +337,17 @@ export function FormView({ obj, onChange, summary, onOpen, onEditJson, focusKey 
                 presets={MODEL_PRESETS}
                 defaultLabel="Default (not set)"
                 otherLabel="Full model id"
-                hint="Pick an alias, or choose Other… to enter a full model id."
                 onChange={(v) => set('model', v === '' ? undefined : v)}
               />
             </div>
             <div data-st-key="effortLevel">
-              <Field label="Effort" hint={effortHint(effort)}>
-                <Segmented
-                  aria-label="Effort"
-                  options={effortOptions}
-                  value={effort}
-                  onChange={(v) => set('effortLevel', v === '' ? undefined : v)}
-                />
+              <Field label="Effort" hint={effortHint(effort, misplacedMax)}>
+                <Segmented aria-label="Effort" options={effortOptions} value={effort} onChange={setEffort} />
               </Field>
+            </div>
+            <div className="st-toggle-row" data-st-key="ultracode">
+              <div className="st-toggle-row__label">Ultracode</div>
+              <Toggle aria-label="Ultracode" checked={obj.ultracode === true} onChange={(c) => set('ultracode', c ? true : undefined)} />
             </div>
             <div data-st-key="theme">
               <ChoiceField

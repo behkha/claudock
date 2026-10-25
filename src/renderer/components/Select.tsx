@@ -6,6 +6,27 @@ export interface SelectOption {
   value: string
   label: string
   disabled?: boolean
+  /** Options with the same group are listed under that heading, in the order the groups first appear. */
+  group?: string
+}
+
+function renderOptions(options: SelectOption[]): JSX.Element[] {
+  const option = (o: SelectOption): JSX.Element => (
+    <option key={o.value} value={o.value} disabled={o.disabled}>
+      {o.label}
+    </option>
+  )
+  const seen = new Set<string>()
+  return options.flatMap((o) => {
+    if (!o.group) return [option(o)]
+    if (seen.has(o.group)) return []
+    seen.add(o.group)
+    return [
+      <optgroup key={`group:${o.group}`} label={o.group}>
+        {options.filter((x) => x.group === o.group).map(option)}
+      </optgroup>
+    ]
+  })
 }
 
 export interface SelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>, 'onChange' | 'value'> {
@@ -35,11 +56,7 @@ export function Select({ label, hint, options, value, onChange, className, ...re
           aria-describedby={hint ? `${id}-hint` : undefined}
           {...rest}
         >
-          {options.map((o) => (
-            <option key={o.value} value={o.value} disabled={o.disabled}>
-              {o.label}
-            </option>
-          ))}
+          {renderOptions(options)}
         </select>
         <ChevronDown className="field__chevron" size={16} strokeWidth={1.8} aria-hidden />
       </div>

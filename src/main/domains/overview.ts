@@ -355,7 +355,8 @@ async function summary(): Promise<OverviewSummary> {
     },
     glance: {
       model: str(settings.model),
-      effort: str(settings.effortLevel),
+      // CLAUDE_CODE_EFFORT_LEVEL wins over effortLevel and is the only place max is kept
+      effort: str((settings.env as Record<string, unknown> | undefined)?.CLAUDE_CODE_EFFORT_LEVEL) ?? str(settings.effortLevel),
       theme: str(settings.theme) ?? str(global?.theme),
       statusLine: str(statusLine?.command)
     }
