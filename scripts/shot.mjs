@@ -42,7 +42,8 @@ if (!only) for (const f of fs.readdirSync(outDir)) if (f.endsWith('.png')) fs.rm
 fs.mkdirSync(tmp, { recursive: true })
 
 // Fixture shots: a copy of the fixture as HOME/.claude, so the app shows "~/.claude" (USERPROFILE is home on Windows).
-// A copy, not a link: the app sizes a linked folder as the link itself. File times and the fixture's own links are kept.
+// A copy, not a link, so the plugin records below can point at it without touching the fixture. File times and the
+// fixture's own links are kept.
 const home = path.join(tmp, 'home')
 if (!real) {
   const copy = path.join(home, '.claude')

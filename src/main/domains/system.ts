@@ -34,6 +34,7 @@ const impl: SystemApi = {
     const scanId = opts?.scanId ?? 'config'
     const result = await dirSize(configDir(), {
       force: opts?.force,
+      followRoot: true,
       onProgress: (p) => emit('system:sizeProgress', { scanId, ...p, done: false })
     })
     emit('system:sizeProgress', { scanId, bytes: result.bytes, files: result.files, done: true })

@@ -174,12 +174,18 @@ export interface DirSizeOptions {
   /** Called at most every ~150 ms with running totals. */
   onProgress?: (p: { bytes: number; files: number }) => void
   signal?: AbortSignal
+  /**
+   * When `abs` itself is a symlink to a folder, measure the folder (for the config dir, which users often link to a
+   * dotfiles repo). Links below it are still not followed.
+   */
+  followRoot?: boolean
 }
 
 /**
  * Recursive size of a folder. Async, concurrency-limited (32 fs ops), never follows symlinks (a symlink counts as
- * its own tiny entry), skips secrets. Cached per directory by path + mtime for 60 s (directory mtime alone does not
- * change when a file is appended to, hence the TTL). A file path returns its own size.
+ * its own tiny entry; see `followRoot` for the root itself), skips secrets. Cached per directory by path + mtime for
+ * 60 s (directory mtime alone does not change when a file is appended to, hence the TTL). A file path returns its own
+ * size.
  */
 export async function dirSize(abs: string, opts: DirSizeOptions = {}): Promise<DirSize> {
   const running = { bytes: 0, files: 0 }
@@ -193,9 +199,13 @@ export async function dirSize(abs: string, opts: DirSizeOptions = {}): Promise<D
     }
   }
 
-  async function walk(dir: string): Promise<DirSize> {
+  async function walk(dir: string, root = false): Promise<DirSize> {
     if (opts.signal?.aborted) throw new Error('aborted')
-    const st = await withSlot(() => fsp.lstat(dir).catch(() => null))
+    let st = await withSlot(() => fsp.lstat(dir).catch(() => null))
+    if (root && opts.followRoot && st?.isSymbolicLink()) {
+      const target = await withSlot(() => fsp.stat(dir).catch(() => null))
+      if (target?.isDirectory()) st = target
+    }
     if (!st) return { bytes: 0, files: 0, dirs: 0, at: Date.now() }
     if (!st.isDirectory()) {
       if (isSecret(dir)) return { bytes: 0, files: 0, dirs: 0, at: Date.now() }
@@ -223,7 +233,7 @@ export async function dirSize(abs: string, opts: DirSizeOptions = {}): Promise<D
     return total
   }
 
-  const result = await walk(abs)
+  const result = await walk(abs, true)
   opts.onProgress?.({ ...running })
   return result
 }
