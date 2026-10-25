@@ -48,3 +48,7 @@ src/renderer   shell, components, lib, screens/<Screen>/index.tsx
 3. Call it from the screen: `const { data, error, loading, reload } = useApi(() => api.skills.list(), [])`.
 
 Events from main to renderer: add `'<domain>:<name>': Payload` to `<Domain>Events`, send with `emit(...)` from `src/main/ipcx.ts`, receive with `useEvent(...)`.
+
+## License
+
+Claudock is source-available, not open source. You may use it under your choice of the [PolyForm Strict License 1.0.0](https://polyformproject.org/licenses/strict/1.0.0) (personal and noncommercial use) or the [PolyForm Internal Use License 1.0.0](https://polyformproject.org/licenses/internal-use/1.0.0) (use inside your company). Neither allows distributing, reselling or rebranding it. See [LICENSE.md](LICENSE.md).
