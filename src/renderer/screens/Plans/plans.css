@@ -1,0 +1,44 @@
+/* Plans screen. Tokens only. */
+.pln-tabs {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.pln-tabs__hint {
+  font-size: var(--fs-caption);
+  color: var(--text-3);
+}
+.pln-editor {
+  border: var(--hair) solid var(--border);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+.pln-preview {
+  max-width: 780px;
+}
+.pln-dirty {
+  align-self: center;
+  font-size: var(--fs-caption);
+  color: var(--text-3);
+}
+.pln-banner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  border-radius: var(--radius-control);
+  border: var(--hair) solid var(--border-strong);
+  background: var(--surface);
+  font-size: var(--fs-small);
+}
+.pln-banner svg {
+  flex: none;
+  color: var(--danger);
+}
+.pln-banner__text {
+  flex: 1;
+  min-width: 200px;
+}

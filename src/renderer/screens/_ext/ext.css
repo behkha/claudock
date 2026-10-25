@@ -1,0 +1,451 @@
+/* Shared styles for the Extend screens (skills, agents, commands, plugins, MCP). Tokens only. */
+
+.ext-dot {
+  display: inline-block;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+.ext-dot--on {
+  background: var(--accent);
+}
+.ext-dot--off {
+  border: 1.5px solid var(--border-strong);
+  background: transparent;
+}
+
+.ext-spacer {
+  flex: 1;
+  min-width: 8px;
+}
+
+.ext-body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 920px;
+}
+.ext-metaline {
+  font-family: var(--font-mono);
+  font-size: var(--fs-caption);
+  color: var(--text-3);
+  overflow-wrap: anywhere;
+}
+.ext-toggle-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+.ext-hint {
+  font-size: var(--fs-small);
+  color: var(--text-3);
+}
+.ext-desc {
+  font-size: var(--fs-body-lg);
+  line-height: 1.55;
+  color: var(--text);
+  max-width: 78ch;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.ext-desc--muted {
+  color: var(--text-3);
+}
+.ext-foot {
+  font-size: var(--fs-caption);
+  color: var(--text-3);
+}
+.ext-error {
+  font-size: var(--fs-small);
+  color: var(--danger);
+}
+
+/* tabs inside a card */
+.ext-card {
+  background: var(--surface);
+  border: var(--hair) solid var(--border);
+  border-radius: var(--radius-card);
+  min-width: 0;
+  overflow: hidden;
+}
+.ext-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 12px;
+  border-bottom: var(--hair) solid var(--border);
+}
+.ext-tab {
+  position: relative;
+  height: 44px;
+  padding: 0 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  font-size: var(--fs-body);
+}
+.ext-tab:hover:not(:disabled) {
+  color: var(--text);
+}
+.ext-tab:disabled {
+  opacity: 0.45;
+}
+.ext-tab[aria-selected='true'] {
+  color: var(--text);
+  font-weight: 500;
+}
+.ext-tab[aria-selected='true']::after {
+  content: '';
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: -0.5px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--text);
+}
+.ext-card__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px 0;
+}
+.ext-card__content {
+  padding: 16px;
+  min-width: 0;
+}
+.ext-card__content--flush {
+  padding: 0;
+}
+
+/* frontmatter facts */
+.ext-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 16px;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border-radius: var(--radius-control);
+  background: var(--surface-sunken);
+  border: var(--hair) solid var(--border);
+  font-size: var(--fs-small);
+}
+.ext-facts dt {
+  font-family: var(--font-mono);
+  font-size: var(--fs-caption);
+  color: var(--text-3);
+  line-height: 1.8;
+}
+.ext-facts dd {
+  margin: 0;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+/* file tree */
+.ext-tree {
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+}
+.ext-tree__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 12px 0 0;
+}
+.ext-tree__row:hover {
+  background: var(--hover);
+}
+.ext-tree__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  font-size: var(--fs-small);
+}
+.ext-tree__icon {
+  flex: none;
+  display: inline-flex;
+  color: var(--text-3);
+}
+.ext-tree__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: var(--fs-caption);
+}
+.ext-tree__size {
+  flex: none;
+  min-width: 64px;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: var(--fs-caption);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.ext-tree__note {
+  padding: 6px 16px;
+  font-size: var(--fs-caption);
+  color: var(--text-3);
+}
+
+/* chips editor */
+.ext-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 4px 8px;
+  border-radius: var(--radius-control);
+  border: var(--hair) solid var(--border-strong);
+  background: var(--surface);
+}
+.ext-chips:focus-within {
+  outline: 2px solid var(--focus);
+  outline-offset: 0;
+}
+.ext-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 24px;
+  padding: 0 4px 0 10px;
+  border-radius: 12px;
+  background: var(--selected);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--fs-caption);
+}
+.ext-chip--static {
+  padding: 0 10px;
+}
+.ext-chip__x {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-2);
+}
+.ext-chip__x:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+.ext-chips__input {
+  flex: 1;
+  min-width: 120px;
+  height: 26px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  user-select: text;
+}
+.ext-chips__input::placeholder {
+  color: var(--text-3);
+}
+.ext-chiplist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* forms */
+.ext-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.ext-form__row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+.ext-savebar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: var(--hair) solid var(--border);
+  background: var(--surface);
+}
+.ext-savebar__status {
+  font-size: var(--fs-small);
+  color: var(--text-3);
+}
+.ext-label {
+  font-size: var(--fs-small);
+  font-weight: 500;
+  color: var(--text-2);
+}
+.ext-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* key/value editor + list editor */
+.ext-kv {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ext-kv__row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) 32px;
+  gap: 8px;
+  align-items: center;
+}
+.ext-kv__row--list {
+  grid-template-columns: minmax(0, 1fr) 32px;
+}
+.ext-kv__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ext-kv__empty {
+  font-size: var(--fs-small);
+  color: var(--text-3);
+}
+.ext-input {
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 10px;
+  border-radius: var(--radius-control);
+  border: var(--hair) solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  user-select: text;
+}
+.ext-input::placeholder {
+  color: var(--text-3);
+}
+.ext-input--error {
+  border-color: var(--danger);
+}
+
+/* grids of small facts (plugins) */
+.ext-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+.ext-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 14px 16px;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  border: var(--hair) solid var(--border);
+}
+.ext-stat__n {
+  font-family: var(--font-serif);
+  font-size: 28px;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.ext-stat__label {
+  font-size: var(--fs-small);
+  color: var(--text-2);
+}
+.ext-deflist {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 8px 20px;
+  margin: 0;
+  font-size: var(--fs-small);
+}
+.ext-deflist dt {
+  color: var(--text-3);
+}
+.ext-deflist dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.ext-deflist .mono {
+  font-family: var(--font-mono);
+  font-size: var(--fs-caption);
+}
+.ext-note {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: var(--radius-control);
+  background: var(--surface-sunken);
+  border: var(--hair) solid var(--border);
+  color: var(--text-2);
+  font-size: var(--fs-small);
+}
+.ext-note svg {
+  flex: none;
+  margin-top: 2px;
+}
+.ext-section-title {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  font-size: 20px;
+}
+.ext-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  font-size: inherit;
+}
+.ext-link:hover {
+  color: var(--text-2);
+}
+.ext-mono {
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+}
+
+.ext-size {
+  font-family: var(--font-mono);
+  font-size: var(--fs-caption);
+}
+
+/* action rows that push the destructive action to the right */
+.detail-pane__actions:has(.ext-spacer) {
+  align-self: stretch;
+}
+
+.ext-ellipsis {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-caption);
+}

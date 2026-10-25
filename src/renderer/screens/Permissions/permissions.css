@@ -1,0 +1,111 @@
+/* Permissions screen. Tokens only. */
+.pm-center {
+  display: grid;
+  place-items: center;
+  padding: 40px 0;
+}
+.pm-toolbar {
+  max-width: 360px;
+}
+.pm-note {
+  color: var(--text-3);
+  font-size: var(--fs-small);
+}
+.pm-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-control);
+  border: var(--hair) solid var(--border-strong);
+  background: var(--surface);
+  font-size: var(--fs-small);
+}
+.pm-banner svg {
+  flex: none;
+  color: var(--danger);
+}
+.pm-banner__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.pm-mode {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  align-items: center;
+  gap: 20px;
+}
+@media (max-width: 800px) {
+  .pm-mode {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.pm-mode__desc {
+  color: var(--text-2);
+  max-width: 62ch;
+}
+.pm-caution {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 10px 14px;
+  border-radius: var(--radius-control);
+  border: var(--hair) solid var(--danger);
+  color: var(--danger);
+  font-size: var(--fs-small);
+}
+.pm-caution svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.pm-lists {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 24px;
+  align-items: start;
+}
+
+.pm-add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.pm-add .btn {
+  height: 36px;
+}
+.pm-empty {
+  color: var(--text-3);
+  font-size: var(--fs-small);
+}
+.pm-rules {
+  display: flex;
+  flex-direction: column;
+}
+.pm-rule {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  border-top: var(--hair) solid var(--border);
+}
+.pm-rule__text {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-small);
+  overflow-wrap: anywhere;
+}
+.pm-move {
+  flex: none;
+  height: 28px;
+  max-width: 108px;
+  padding: 0 6px;
+  border: var(--hair) solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: var(--fs-caption);
+}

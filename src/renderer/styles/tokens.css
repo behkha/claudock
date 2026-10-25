@@ -1,0 +1,122 @@
+/*
+ * Design tokens (docs/SPEC.md "Design tokens"). Light is the default; dark applies for
+ * [data-theme='dark'] and, for [data-theme='system'], via prefers-color-scheme.
+ * Clay (--accent) is for indicators only: toggle on, active dot, biggest storage segment.
+ */
+
+:root {
+  /* fonts (no font files are shipped; the stacks fall back honestly) */
+  --font-sans: 'Anthropic Sans', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-serif: 'Anthropic Serif', Georgia, 'Times New Roman', Times, serif;
+  --font-mono: 'Anthropic Mono', 'JetBrains Mono', 'SF Mono', Menlo, Consolas, 'Courier New', monospace;
+
+  /* type scale */
+  --fs-display: 38px;
+  --fs-title: 28px;
+  --fs-heading: 24px;
+  --fs-body: 14px;
+  --fs-body-lg: 16px;
+  --fs-small: 13px;
+  --fs-caption: 12px;
+
+  /* shape */
+  --radius-control: 8px;
+  --radius-card: 12px;
+  --hair: 0.5px;
+  --control-h: 32px;
+  --control-h-lg: 44px;
+
+  /* layout */
+  --sidebar-w: 232px;
+  --titlebar-h: 48px;
+  --list-pane-w: 340px;
+
+  color-scheme: light;
+  --bg: #faf9f5;
+  --sidebar: #f5f4ed;
+  --surface: #ffffff;
+  --surface-sunken: #f0eee6;
+  --text: #141413;
+  --text-2: #5e5d59;
+  --text-3: #73726c;
+  --border: rgba(31, 30, 29, 0.15);
+  --border-strong: rgba(31, 30, 29, 0.3);
+  --hover: rgba(115, 114, 108, 0.1);
+  --selected: rgba(115, 114, 108, 0.14);
+  --accent: #d97757;
+  --oat: #e3dacc;
+  --primary-bg: #141413;
+  --primary-fg: #faf9f5;
+  --danger: #a13a2b;
+  --success: #558a42;
+  --focus: #2a78d6;
+
+  /* derived (not in SPEC table; built only from the tokens above) */
+  --scrim: rgba(20, 20, 19, 0.4);
+  --shadow-pop: 0 8px 32px rgba(20, 20, 19, 0.16), 0 1px 3px rgba(20, 20, 19, 0.08);
+  --diff-add-bg: rgba(85, 138, 66, 0.14);
+  --diff-del-bg: rgba(161, 58, 43, 0.12);
+  --diff-add-word: rgba(85, 138, 66, 0.28);
+  --diff-del-word: rgba(161, 58, 43, 0.24);
+  --accent-soft: rgba(217, 119, 87, 0.16);
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #262624;
+  --sidebar: #1f1e1d;
+  --surface: #30302e;
+  --surface-sunken: #1a1918;
+  --text: #faf9f5;
+  --text-2: #c2c0b6;
+  --text-3: #9c9a92;
+  --border: rgba(222, 220, 209, 0.15);
+  --border-strong: rgba(222, 220, 209, 0.3);
+  --hover: rgba(222, 220, 209, 0.08);
+  --selected: rgba(222, 220, 209, 0.12);
+  --accent: #d97757;
+  --oat: #3d3d3a;
+  --primary-bg: #faf9f5;
+  --primary-fg: #141413;
+  --danger: #e58d7c;
+  --success: #86b573;
+  --focus: #6a9bcc;
+
+  --scrim: rgba(0, 0, 0, 0.55);
+  --shadow-pop: 0 8px 32px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.3);
+  --diff-add-bg: rgba(134, 181, 115, 0.16);
+  --diff-del-bg: rgba(229, 141, 124, 0.14);
+  --diff-add-word: rgba(134, 181, 115, 0.32);
+  --diff-del-word: rgba(229, 141, 124, 0.28);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme='system'] {
+    color-scheme: dark;
+    --bg: #262624;
+    --sidebar: #1f1e1d;
+    --surface: #30302e;
+    --surface-sunken: #1a1918;
+    --text: #faf9f5;
+    --text-2: #c2c0b6;
+    --text-3: #9c9a92;
+    --border: rgba(222, 220, 209, 0.15);
+    --border-strong: rgba(222, 220, 209, 0.3);
+    --hover: rgba(222, 220, 209, 0.08);
+    --selected: rgba(222, 220, 209, 0.12);
+    --accent: #d97757;
+    --oat: #3d3d3a;
+    --primary-bg: #faf9f5;
+    --primary-fg: #141413;
+    --danger: #e58d7c;
+    --success: #86b573;
+    --focus: #6a9bcc;
+
+    --scrim: rgba(0, 0, 0, 0.55);
+    --shadow-pop: 0 8px 32px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.3);
+    --diff-add-bg: rgba(134, 181, 115, 0.16);
+    --diff-del-bg: rgba(229, 141, 124, 0.14);
+    --diff-add-word: rgba(134, 181, 115, 0.32);
+    --diff-del-word: rgba(229, 141, 124, 0.28);
+  }
+}

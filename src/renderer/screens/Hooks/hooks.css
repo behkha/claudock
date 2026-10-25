@@ -1,0 +1,30 @@
+/* Hooks screen. Tokens only. */
+.hk-filters {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+}
+.hk-filters .segmented {
+  align-self: flex-start;
+}
+.hk-matcher {
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+}
+.hk-command {
+  font-family: var(--font-mono);
+}
+.hk-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 720px;
+}
+.hk-scripts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: -8px;
+}

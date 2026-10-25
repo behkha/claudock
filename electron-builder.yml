@@ -1,0 +1,44 @@
+appId: app.claudock
+productName: Claudock
+directories:
+  output: dist
+  buildResources: build
+files:
+  - out/**/*
+  # runtime window icon, referenced from out/main as ../../resources/icon.png (electron-vite `?asset` import)
+  - resources/**/*
+  - package.json
+asar: true
+mac:
+  icon: build/icon.icns
+  category: public.app-category.developer-tools
+  # Ad-hoc signature: runs on this Mac without touching the Keychain. Set a Developer ID identity (and notarize)
+  # before distributing to other people.
+  identity: '-'
+  # Hardened runtime is only needed for notarization; with an ad-hoc signature it blocks Electron's own libraries.
+  hardenedRuntime: false
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+  artifactName: ${productName}-${version}-${arch}.${ext}
+win:
+  icon: build/icon.ico
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: ${productName}-Setup-${version}.${ext}
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+linux:
+  icon: build/icon.png
+  target:
+    - target: AppImage
+      arch: [x64, arm64]
+    - target: deb
+      arch: [x64, arm64]
+  category: Utility
+  # .desktop file name = desktopName in package.json, so desktops match running windows (WM_CLASS) to it
+  syncDesktopName: true
+  maintainer: Claudock
+  artifactName: ${productName}-${version}-${arch}.${ext}

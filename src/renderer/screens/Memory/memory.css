@@ -1,0 +1,77 @@
+/* Memory screen. Tokens only. */
+.mem-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 200px;
+  gap: 14px 16px;
+  margin-bottom: 20px;
+  padding: 16px;
+  border: var(--hair) solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+.mem-form__wide {
+  grid-column: 1 / -1;
+}
+.mem-note {
+  margin-bottom: 16px;
+  color: var(--text-2);
+  font-size: var(--fs-small);
+}
+.mem-tabs {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.mem-tabs__hint {
+  font-size: var(--fs-caption);
+  color: var(--text-3);
+}
+.mem-editor {
+  border: var(--hair) solid var(--border);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+.mem-preview {
+  max-width: 760px;
+  padding: 4px 2px;
+}
+.mem-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 12px;
+  color: var(--text);
+  font-size: var(--fs-small);
+}
+.mem-check input {
+  margin-top: 3px;
+}
+.mem-dirty {
+  align-self: center;
+  font-size: var(--fs-caption);
+  color: var(--text-3);
+}
+.mem-type {
+  flex: none;
+}
+.mem-banner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  border-radius: var(--radius-control);
+  border: var(--hair) solid var(--border-strong);
+  background: var(--surface);
+  font-size: var(--fs-small);
+}
+.mem-banner svg {
+  flex: none;
+  color: var(--danger);
+}
+.mem-banner__text {
+  flex: 1;
+  min-width: 200px;
+}

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Claudock app icon, macOS layout (824px body on the 1024 grid, with shadow). Slate tile, ivory tilde (~ = home,
+       where .claude lives), clay text cursor. Anthropic palette only; no Anthropic or Claude marks. -->
+  <defs><filter id="s" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#141413" flood-opacity="0.28"/></filter></defs>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="#141413" filter="url(#s)"/>
+  <path d="M 236 552 C 282 458, 372 452, 442 512 C 512 572, 602 568, 650 474" fill="none" stroke="#FAF9F5" stroke-width="80" stroke-linecap="round"/>
+  <rect x="716" y="372" width="100" height="284" rx="16" fill="#D97757"/>
+</svg>

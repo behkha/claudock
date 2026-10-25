@@ -1,0 +1,71 @@
+/* CLAUDE.md & rules screen. Tokens only. */
+.rl-center {
+  display: grid;
+  place-items: center;
+  height: 100%;
+}
+.rl-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: middle;
+}
+.rl-none {
+  padding: 12px 10px;
+  color: var(--text-3);
+  font-size: var(--fs-small);
+  list-style: none;
+}
+.rl-hint {
+  margin-bottom: 12px;
+  color: var(--text-2);
+  font-size: var(--fs-small);
+  max-width: 70ch;
+}
+.rl-editor {
+  display: flex;
+  flex-direction: column;
+}
+.rl-banner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  border-radius: var(--radius-control);
+  border: var(--hair) solid var(--border-strong);
+  background: var(--surface);
+  font-size: var(--fs-small);
+}
+.rl-banner svg {
+  flex: none;
+  color: var(--danger);
+}
+.rl-banner__text {
+  flex: 1;
+  min-width: 200px;
+}
+.rl-frontmatter {
+  margin-bottom: 20px;
+  max-width: 78ch;
+}
+.rl-frontmatter__label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text-3);
+  font-size: var(--fs-caption);
+}
+.rl-frontmatter__body {
+  margin: 0;
+  padding: 10px 14px;
+  overflow-x: auto;
+  border-radius: var(--radius-control);
+  border: var(--hair) solid var(--border);
+  background: var(--surface-sunken);
+  color: var(--text-2);
+  font-size: var(--fs-small);
+}

@@ -1,0 +1,7 @@
+node_modules
+out
+dist
+.fixture
+.shots
+*.log
+.DS_Store
