@@ -45,27 +45,27 @@ npm run dev
 
 ## Install
 
-Prebuilt downloads will be published on [GitHub Releases](https://github.com/behkha/claudock/releases). Until then, build the installer yourself from the clone above:
+Download the installer for your computer from the [latest release](https://github.com/behkha/claudock/releases/latest):
 
-```sh
-npm run dist:mac      # or dist:win, dist:linux
-```
-
-The output goes to `./dist`:
-
-| Platform | Files |
+| Platform | File |
 |---|---|
-| macOS | `Claudock-<version>-arm64.dmg`, `Claudock-<version>-x64.dmg` |
+| macOS, Apple silicon | `Claudock-<version>-arm64.dmg` |
+| macOS, Intel | `Claudock-<version>-x64.dmg` |
 | Windows | `Claudock-Setup-<version>.exe` |
-| Linux | `.AppImage` and `.deb`, for x64 and arm64 |
+| Linux | `.AppImage` or `.deb`, for x64 and arm64 |
 
-macOS builds are ad-hoc signed and not notarized. They open normally on the Mac that built them. On another Mac, Gatekeeper may block them.
+The builds are not notarized or code-signed yet, so the first launch needs one extra step:
+
+- **macOS:** open the app once, click Done when macOS says it can't verify it, then click **Open Anyway** in System Settings › Privacy & Security. If macOS says the app is damaged, run `xattr -dr com.apple.quarantine /Applications/Claudock.app`.
+- **Windows:** if SmartScreen shows "Windows protected your PC", click **More info**, then **Run anyway**.
+
+To build an installer yourself from the clone above, run `npm run dist:mac` (or `dist:win`, `dist:linux`). The output goes to `./dist`. Pushing a `v*` tag that matches `package.json`'s version builds all three platforms in GitHub Actions and attaches them to a draft release (`.github/workflows/release.yml`).
 
 The installed app reads and writes `~/.claude`, or the folder in `CLAUDE_CONFIG_DIR` if you set it.
 
 ## Status
 
-Beta (v0.1.0), actively maintained. There are no tagged releases yet. Bug reports are welcome in [Issues](https://github.com/behkha/claudock/issues).
+Beta (v0.1.0), actively maintained. Bug reports are welcome in [Issues](https://github.com/behkha/claudock/issues).
 
 ## License
 

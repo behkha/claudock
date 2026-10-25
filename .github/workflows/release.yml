@@ -44,6 +44,14 @@ jobs:
         env:
           # Keep the ad-hoc signature from electron-builder.yml; never look for a signing identity on the runner.
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      # A broken signature makes macOS call the download "damaged" instead of offering Open Anyway.
+      - name: Check the Mac signature
+        if: runner.os == 'macOS'
+        run: |
+          for app in dist/mac*/Claudock.app; do
+            codesign --verify --deep --strict --verbose=2 "$app"
+            codesign -dv "$app" 2>&1 | grep -E 'Signature|Identifier='
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: installers-${{ runner.os }}
