@@ -19,7 +19,8 @@ const inflight = new Map<string, Promise<DirSize>>()
 export function sizeOf(abs: string, opts: { force?: boolean; signal?: AbortSignal } = {}): Promise<DirSize> {
   let p = opts.force ? undefined : inflight.get(abs)
   if (!p) {
-    const mine = dirSize(abs, { force: opts.force })
+    // a symlinked config dir (~/.claude -> dotfiles) is measured as the folder it points at
+    const mine = dirSize(abs, { force: opts.force, followRoot: abs === configDir() })
     p = mine
     inflight.set(abs, mine)
     const clear = (): void => {
