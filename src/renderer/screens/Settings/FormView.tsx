@@ -67,7 +67,15 @@ function ChoiceField({
 /* ------------------------------------------------------------------ known keys */
 
 const MODEL_PRESETS = ['opus', 'sonnet', 'haiku', 'fable'].map((v) => ({ value: v, label: v }))
-const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max']
+/** The values the effortLevel key accepts. "max" works only per session (/effort max or CLAUDE_CODE_EFFORT_LEVEL). */
+const EFFORTS = ['low', 'medium', 'high', 'xhigh']
+const EFFORT_HINT = 'How hard Claude thinks before answering. Higher is slower and uses more of your limit. A level /effort saves for a model wins over this.'
+
+function effortHint(effort: string): string {
+  if (effort === 'max') return 'max works only for one session, set with /effort max or CLAUDE_CODE_EFFORT_LEVEL, so Claude Code ignores it here. Choose Default to clear it, or pick a level.'
+  if (effort && !EFFORTS.includes(effort)) return `Claude Code does not accept "${effort}" here. Choose Default to clear it, or pick a level.`
+  return EFFORT_HINT
+}
 const THEMES = ['auto', 'dark', 'light', 'dark-daltonized', 'light-daltonized', 'dark-ansi', 'light-ansi'].map((v) => ({ value: v, label: v }))
 
 interface ScalarDef {
@@ -76,21 +84,30 @@ interface ScalarDef {
   hint: string
   kind: 'boolean' | 'number' | 'text'
   initial: boolean | number | string
+  /** Kept editable when the file has it, but not offered under "Add a setting…". */
+  deprecated?: boolean
 }
 
 const SCALARS: ScalarDef[] = [
   { key: 'outputStyle', label: 'Output style', hint: 'Name of an output style.', kind: 'text', initial: 'default' },
   { key: 'language', label: 'Language', hint: 'Language Claude answers in.', kind: 'text', initial: 'english' },
-  { key: 'cleanupPeriodDays', label: 'Keep transcripts for (days)', hint: 'Older sessions are deleted at startup.', kind: 'number', initial: 30 },
-  { key: 'includeCoAuthoredBy', label: 'Co-authored-by line in commits', hint: 'Adds the Claude line to commit messages.', kind: 'boolean', initial: true },
-  { key: 'alwaysThinkingEnabled', label: 'Always think first', hint: 'Turns extended thinking on for every prompt.', kind: 'boolean', initial: true },
-  { key: 'verbose', label: 'Verbose output', hint: 'Shows full tool output in the terminal.', kind: 'boolean', initial: true },
+  { key: 'cleanupPeriodDays', label: 'Keep transcripts for (days)', hint: 'Older sessions are deleted at startup. At least 1.', kind: 'number', initial: 30 },
+  {
+    key: 'includeCoAuthoredBy',
+    label: 'Co-authored-by line in commits',
+    hint: 'Deprecated: set attribution in the JSON view instead. Off hides the commit trailer and the pull request text.',
+    kind: 'boolean',
+    initial: true,
+    deprecated: true
+  },
+  { key: 'alwaysThinkingEnabled', label: 'Extended thinking', hint: 'On by default for models that support it. Off turns it off in every session.', kind: 'boolean', initial: false },
+  { key: 'verbose', label: 'Verbose output', hint: 'Shows full tool output instead of summaries. viewMode wins when both are set.', kind: 'boolean', initial: true },
   { key: 'preferredNotifChannel', label: 'Notification channel', hint: 'For example auto, terminal_bell or iterm2.', kind: 'text', initial: 'auto' },
-  { key: 'voiceEnabled', label: 'Voice input', hint: 'Dictate prompts with your microphone.', kind: 'boolean', initial: true },
-  { key: 'agentPushNotifEnabled', label: 'Push notifications from agents', hint: 'Notify when a background agent needs you.', kind: 'boolean', initial: true },
-  { key: 'idleCompaction', label: 'Compact when idle', hint: 'Summarise long sessions while you are away.', kind: 'boolean', initial: false },
+  { key: 'voiceEnabled', label: 'Voice input', hint: 'Deprecated: voice.enabled replaces it and wins when both are set.', kind: 'boolean', initial: true, deprecated: true },
+  { key: 'agentPushNotifEnabled', label: 'Push notifications to your phone', hint: 'Claude sends one when it decides it is worth it.', kind: 'boolean', initial: true },
+  { key: 'idleCompaction', label: 'Compact when idle', hint: 'On by default. Summarises a long session you have stepped away from.', kind: 'boolean', initial: false },
   { key: 'skipWorkflowUsageWarning', label: 'Skip workflow usage warning', hint: 'Hides the cost warning before workflows run.', kind: 'boolean', initial: true },
-  { key: 'disableAllHooks', label: 'Turn off all hooks', hint: 'Hooks stay in the file but never run.', kind: 'boolean', initial: true },
+  { key: 'disableAllHooks', label: 'Turn off all hooks', hint: 'Hooks, a custom status line and the @ file suggestion command stay in the file but never run.', kind: 'boolean', initial: true },
   { key: 'apiKeyHelper', label: 'API key helper', hint: 'Script that prints an API key.', kind: 'text', initial: '' }
 ]
 
@@ -230,7 +247,7 @@ export function FormView({ obj, onChange, summary, onOpen, onEditJson, focusKey 
 
   /* scalars present / addable */
   const presentScalars = SCALARS.filter((s) => s.key in obj && isScalar(obj[s.key]))
-  const addable = SCALARS.filter((s) => !(s.key in obj))
+  const addable = SCALARS.filter((s) => !(s.key in obj) && !s.deprecated)
 
   /* status line */
   const sl = obj.statusLine !== null && typeof obj.statusLine === 'object' && !Array.isArray(obj.statusLine) ? (obj.statusLine as JsonObject) : null
@@ -287,7 +304,7 @@ export function FormView({ obj, onChange, summary, onOpen, onEditJson, focusKey 
               />
             </div>
             <div data-st-key="effortLevel">
-              <Field label="Effort" hint="How hard Claude thinks before answering. Higher is slower and uses more of your limit.">
+              <Field label="Effort" hint={effortHint(effort)}>
                 <Segmented
                   aria-label="Effort"
                   options={effortOptions}
@@ -324,7 +341,7 @@ export function FormView({ obj, onChange, summary, onOpen, onEditJson, focusKey 
                         label={s.label}
                         hint={s.hint}
                         type="number"
-                        min={0}
+                        min={1}
                         value={String(v)}
                         onChange={(e) => set(s.key, e.target.value === '' ? undefined : Number(e.target.value))}
                       />
