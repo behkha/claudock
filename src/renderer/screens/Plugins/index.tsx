@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react'
 import { Info, Puzzle, Store } from 'lucide-react'
 import type { MarketplaceInfo, PluginInfo } from '@shared/api/plugins'
-import { formatDate } from '@shared/format'
+import { formatDate, tildify } from '@shared/format'
 import { Badge, Button, Chip, DetailPane, EmptyState, ListDetailLayout, ListGroup, ListPane, ListRow, Spinner, Toggle } from '@/components'
 import { api, useApi } from '@/lib/api'
-import { useSelectId } from '@/lib/hooks'
+import { useHome, useSelectId } from '@/lib/hooks'
 import { useNav, type ScreenProps } from '@/lib/nav'
 import { ChipList, Dot, useNotify } from '../_ext/ui'
 
@@ -34,6 +34,7 @@ export default function PluginsScreen({ selectId }: ScreenProps): JSX.Element {
   const [query, setQuery] = useState('')
   const [busyKey, setBusyKey] = useState<string | null>(null)
   const notify = useNotify()
+  const home = useHome()
 
   const plugins = useMemo(() => data?.plugins ?? [], [data])
   const markets = useMemo(() => data?.marketplaces ?? [], [data])
@@ -137,7 +138,7 @@ export default function PluginsScreen({ selectId }: ScreenProps): JSX.Element {
                       key={marketId(m.name)}
                       leading={<Store size={16} strokeWidth={1.8} />}
                       title={m.name}
-                      subtitle={m.sourceText ? `${m.sourceKind}: ${m.sourceText}` : m.sourceKind}
+                      subtitle={m.sourceText ? `${m.sourceKind}: ${tildify(m.sourceText, home)}` : m.sourceKind}
                       meta={m.pluginCount !== null ? pluralize(m.pluginCount, 'plugin') : undefined}
                       selected={market?.name === m.name}
                       onSelect={() => setSelected(marketId(m.name))}
@@ -337,6 +338,7 @@ function NameBlock({ title, items }: { title: string; items: string[] }): JSX.El
 /* ------------------------------------------------------------------ marketplace */
 
 function MarketDetail({ market, plugins, onOpen }: { market: MarketplaceInfo; plugins: PluginInfo[]; onOpen: (key: string) => void }): JSX.Element {
+  const home = useHome()
   const installed = plugins.filter((p) => market.installed.includes(p.key))
   return (
     <DetailPane
@@ -350,7 +352,7 @@ function MarketDetail({ market, plugins, onOpen }: { market: MarketplaceInfo; pl
           <dt>Source</dt>
           <dd>
             {market.sourceKind}
-            {market.sourceText ? <span className="mono"> · {market.sourceText}</span> : null}
+            {market.sourceText ? <span className="mono"> · {tildify(market.sourceText, home)}</span> : null}
           </dd>
           <dt>Last updated</dt>
           <dd>{market.lastUpdated ? formatDate(market.lastUpdated) : '—'}</dd>
