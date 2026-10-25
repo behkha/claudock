@@ -5,7 +5,17 @@ declare global {
   interface Window {
     /** Generic bridge from the preload script. Use the typed `api` below instead. */
     claudock: ClaudockBridge
+    /** API calls still waiting for an answer. Screenshot mode (src/main/shot.ts) waits for 0 before capturing. */
+    __claudockPending?: number
   }
+}
+
+/** Count a call in `window.__claudockPending` until it settles. */
+function track<T>(p: Promise<T>): Promise<T> {
+  window.__claudockPending = (window.__claudockPending ?? 0) + 1
+  return p.finally(() => {
+    window.__claudockPending = (window.__claudockPending ?? 1) - 1
+  })
 }
 
 /** Strip Electron's "Error invoking remote method 'x': Error: " wrapper so messages are user-readable. */
@@ -21,7 +31,7 @@ function domainFacade(domain: string): unknown {
       get(_t, method) {
         // `then` must stay undefined or `await api.x` would treat the facade as a thenable.
         if (typeof method !== 'string' || method === 'then') return undefined
-        return (...args: unknown[]) => window.claudock.invoke(`${domain}:${method}`, ...args).catch((e) => Promise.reject(clean(e)))
+        return (...args: unknown[]) => track(window.claudock.invoke(`${domain}:${method}`, ...args)).catch((e) => Promise.reject(clean(e)))
       }
     }
   )

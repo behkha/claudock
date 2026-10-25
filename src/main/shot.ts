@@ -10,8 +10,9 @@ const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms
 
 /**
  * Screenshot mode (CLAUDOCK_SHOT=1, driven by scripts/shot.mjs): visits every screen in light then dark through the
- * normal `system:navigate` / `system:theme` events, saves `<dir>/<theme>-<screen>.png`, prints renderer console errors
- * as `CONSOLE_ERROR ...` and exits 0 (clean) or 1 (errors).
+ * normal `system:navigate` / `system:theme` events, waits until each is loaded and painted in that theme, saves
+ * `<dir>/<theme>-<screen>.png`, prints renderer console errors as `CONSOLE_ERROR ...` and failed shots as
+ * `SHOT_FAILED ...`, and exits 0 (clean) or 1 (errors).
  */
 export async function runShots(win: BrowserWindow, opts: { dir: string; only: string[] }): Promise<void> {
   const errors: string[] = []
@@ -30,50 +31,105 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
 
   const js = <T,>(code: string): Promise<T> => win.webContents.executeJavaScript(code) as Promise<T>
 
-  async function settle(): Promise<void> {
-    const deadline = Date.now() + 12_000
+  /**
+   * Wait until the screen is really ready: the requested theme is on <html> and in prefers-color-scheme, no API call
+   * is pending, nothing shows a spinner or aria-busy, and all of that has held for 300 ms. Then wait for two frames so
+   * the compositor has painted it. A cold first run can take seconds to answer, so fixed sleeps captured half-loaded
+   * screens in the previous theme.
+   */
+  async function settle(theme: 'light' | 'dark', what: string): Promise<void> {
+    const deadline = Date.now() + 30_000
+    let quietSince = 0
+    let last = ''
     while (Date.now() < deadline) {
-      const busy = await js<number>(`document.querySelectorAll('.spinner, [aria-busy="true"]').length`)
-      if (busy === 0) break
+      last = await js<string>(
+        `JSON.stringify({ theme: document.documentElement.dataset.theme, dark: matchMedia('(prefers-color-scheme: dark)').matches, ` +
+          `pending: window.__claudockPending ?? 0, busy: document.querySelectorAll('.spinner, [aria-busy="true"]').length })`
+      )
+      const st = JSON.parse(last) as { theme: string; dark: boolean; pending: number; busy: number }
+      const ready = st.theme === theme && st.dark === (theme === 'dark') && st.pending === 0 && st.busy === 0
+      if (!ready) quietSince = 0
+      else if (quietSince === 0) quietSince = Date.now()
+      else if (Date.now() - quietSince >= 300) {
+        // A hidden window can stop drawing (no vsync while the display sleeps or the machine is busy), and capturePage
+        // then returns its first frame. Force a repaint and wait two frames; the timeout keeps a stalled rAF from hanging.
+        win.webContents.invalidate()
+        await js(`new Promise((r) => { const t = setTimeout(r, 1000); requestAnimationFrame(() => requestAnimationFrame(() => { clearTimeout(t); r() })) })`)
+        return
+      }
       await sleep(100)
     }
-    await sleep(450)
+    throw new Error(`${theme}-${what} still not ready after 30 s: ${last}`)
   }
+
+  /**
+   * Capture and save `<theme>-<what>.png`. A pixel near the bottom-right corner must match the background the DOM has
+   * there, so a stale frame from before the theme switch is retried instead of saved. Skipped under a translucent
+   * overlay (the palette scrim), where the DOM colour is not what gets painted.
+   */
+  async function capture(theme: 'light' | 'dark', what: string): Promise<void> {
+    const want = await js<number[]>(`(() => {
+      for (let el = document.elementFromPoint(innerWidth - 4, innerHeight - 4); el; el = el.parentElement) {
+        const [r, g, b, a = 1] = (getComputedStyle(el).backgroundColor.match(/[\\d.]+/g) ?? []).map(Number)
+        if (a === 1) return [r, g, b]
+        if (a > 0) return []
+      }
+      return []
+    })()`)
+    for (let attempt = 1; ; attempt++) {
+      const img = await win.webContents.capturePage()
+      const { width, height } = img.getSize()
+      const scale = width / win.getContentSize()[0]
+      const o = ((height - Math.ceil(4 * scale)) * width + width - Math.ceil(4 * scale)) * 4
+      const bgra = img.toBitmap()
+      const got = [bgra[o + 2], bgra[o + 1], bgra[o]]
+      if (want.length !== 3 || want.every((c, i) => Math.abs(c - got[i]) <= 8)) {
+        const file = path.join(opts.dir, `${theme}-${what}.png`)
+        await fsp.writeFile(file, img.toPNG())
+        console.log(`SHOT ${file} ${width}x${height}`)
+        return
+      }
+      if (attempt === 20) throw new Error(`${theme}-${what}: captured pixel ${got.join(',')} never matched ${want.join(',')}`)
+      console.log(`SHOT_RETRY ${theme}-${what}: stale frame (pixel ${got.join(',')}, page ${want.join(',')})`)
+      win.webContents.invalidate()
+      await sleep(250)
+    }
+  }
+
+  const fail = (e: unknown): void => {
+    errors.push(`SHOT_FAILED ${(e as Error).message}`)
+    console.log(`SHOT_FAILED ${(e as Error).message}`)
+  }
+  const shoot = (theme: 'light' | 'dark', what: string): Promise<void> => settle(theme, what).then(() => capture(theme, what)).catch(fail)
 
   await fsp.mkdir(opts.dir, { recursive: true })
   const screens = SCREENS.filter((s) => opts.only.length === 0 || opts.only.includes(s.id))
 
   try {
     // wait for the shell
-    const deadline = Date.now() + 15_000
-    while (Date.now() < deadline && !(await js<boolean>(`!!document.querySelector('[data-app-ready]')`))) await sleep(100)
+    const deadline = Date.now() + 30_000
+    while (!(await js<boolean>(`!!document.querySelector('[data-app-ready]')`))) {
+      if (Date.now() > deadline) throw new Error('app not ready after 30 s')
+      await sleep(100)
+    }
 
     for (const theme of ['light', 'dark'] as const) {
       await setTheme(theme, false)
-      await sleep(200)
       for (const s of screens) {
         emit('system:navigate', { screen: s.id as ScreenId })
         await sleep(150)
-        await settle()
-        const img = await win.webContents.capturePage()
-        const file = path.join(opts.dir, `${theme}-${s.id}.png`)
-        await fsp.writeFile(file, img.toPNG())
-        console.log(`SHOT ${file} ${img.getSize().width}x${img.getSize().height}`)
+        await shoot(theme, s.id)
       }
       if (opts.only.length === 0 || opts.only.includes('palette')) {
         emit('system:openPalette', null)
-        await sleep(500)
-        const img = await win.webContents.capturePage()
-        const file = path.join(opts.dir, `${theme}-palette.png`)
-        await fsp.writeFile(file, img.toPNG())
-        console.log(`SHOT ${file} ${img.getSize().width}x${img.getSize().height}`)
+        await sleep(150)
+        await shoot(theme, 'palette')
         await js(`document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}))`)
         await sleep(200)
       }
     }
   } catch (e) {
-    errors.push(`SHOT_FAILED ${(e as Error).message}`)
-    console.log(`SHOT_FAILED ${(e as Error).message}`)
+    fail(e)
   }
 
   console.log(errors.length ? `SHOT_DONE with ${errors.length} error(s)` : 'SHOT_DONE ok')
