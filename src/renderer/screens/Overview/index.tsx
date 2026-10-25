@@ -129,7 +129,7 @@ export default function OverviewScreen(_props: ScreenProps): JSX.Element {
               <dl className="ov__glance">
                 <GlanceRow term="Model" value={g?.model} loading={summary.loading && !g} />
                 <GlanceRow term="Effort" value={g?.effort} loading={summary.loading && !g} />
-                <GlanceRow term="Theme" value={g?.theme} loading={summary.loading && !g} />
+                <GlanceRow term="Terminal theme" value={g?.theme} loading={summary.loading && !g} />
                 <GlanceRow term="Status line" value={g?.statusLine} mono loading={summary.loading && !g} />
               </dl>
               {summary.error ? (

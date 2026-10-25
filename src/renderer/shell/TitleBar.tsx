@@ -1,14 +1,21 @@
 import { useEffect, useRef } from 'react'
-import { Search } from 'lucide-react'
+import { Monitor, Moon, Search, Sun } from 'lucide-react'
+import { THEME_PREFS, type ThemePref } from '@shared/types'
 import { formatBytes, tildify } from '@shared/format'
-import { Kbd } from '@/components'
+import { IconButton, Kbd } from '@/components'
 import { api, isMac, useApi } from '@/lib/api'
 import { onRefreshCounts } from '@/lib/counts'
 import { useNav } from '@/lib/nav'
+import { useThemePref } from '@/lib/theme'
+
+const THEME_ICON: Record<ThemePref, JSX.Element> = { system: <Monitor aria-hidden />, light: <Sun aria-hidden />, dark: <Moon aria-hidden /> }
+const THEME_LABEL: Record<ThemePref, string> = { system: 'System', light: 'Light', dark: 'Dark' }
 
 export function TitleBar(): JSX.Element {
   const { setPaletteOpen } = useNav()
   const mac = isMac()
+  const theme = useThemePref()
+  const nextTheme = THEME_PREFS[(THEME_PREFS.indexOf(theme) + 1) % THEME_PREFS.length]
   const info = useApi(() => api.system.configInfo(), [])
   // after an in-app write (success toast) measure again, past the size cache: a cleanup can free a lot
   const force = useRef(false)
@@ -37,6 +44,12 @@ export function TitleBar(): JSX.Element {
         <span className="titlebar__search-text">Search skills, rules, sessions…</span>
         <Kbd>{mac ? '⌘K' : 'Ctrl K'}</Kbd>
       </button>
+      <IconButton
+        aria-label={`Theme: ${THEME_LABEL[theme]}`}
+        title={`Theme: ${THEME_LABEL[theme]}. Click for ${THEME_LABEL[nextTheme]}.`}
+        icon={THEME_ICON[theme]}
+        onClick={() => void api.system.setTheme(nextTheme)}
+      />
     </header>
   )
 }

@@ -315,7 +315,7 @@ export function FormView({ obj, onChange, summary, onOpen, onEditJson, focusKey 
             </div>
             <div data-st-key="theme">
               <ChoiceField
-                label="Theme"
+                label="Terminal theme"
                 value={theme}
                 presets={THEMES}
                 defaultLabel="Default (not set)"
