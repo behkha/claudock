@@ -96,6 +96,34 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
     }
   }
 
+  /**
+   * Settings -> JSON view with the completion popup and its docs card open: a half-typed key `"cle` goes into the
+   * file (not saved), Ctrl+Space opens the popup, and the warning underline for the fixture's unknown key is waited
+   * for. `restoreSettingsJson` puts the text back so the draft does not leak into the other shots.
+   */
+  const prepareSettingsJson = (): Promise<void> =>
+    js(`(async () => {
+      const wait = async (f, ms = 15000) => {
+        const t = Date.now()
+        while (Date.now() - t < ms) { const v = f(); if (v) return v; await new Promise((r) => setTimeout(r, 100)) }
+        throw new Error('settings-json: timed out waiting for ' + f)
+      }
+      const radio = await wait(() => [...document.querySelectorAll('[role=radiogroup][aria-label="View"] [role=radio]')].find((b) => b.textContent.trim() === 'JSON'))
+      radio.click()
+      const content = await wait(() => document.querySelector('.cm-content'))
+      await wait(() => document.querySelector('.st-assist-source'))
+      const tile = content.cmTile; const view = (tile && tile.root && tile.root.view) || (content.cmView && content.cmView.view)
+      window.__shotJson = { view, text: view.state.doc.toString() }
+      const at = 2
+      view.dispatch({ changes: { from: at, insert: '  "cle": "",\\n' }, selection: { anchor: at + 6 } })
+      view.focus()
+      content.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space', ctrlKey: true, bubbles: true, cancelable: true }))
+      await wait(() => document.querySelector('.cm-completionInfo'))
+      await wait(() => document.querySelector('.cm-lintRange-warning'))
+    })()`)
+  const restoreSettingsJson = (): Promise<void> =>
+    js(`(() => { const s = window.__shotJson; if (s) s.view.dispatch({ changes: { from: 0, to: s.view.state.doc.length, insert: s.text } }); window.__shotJson = undefined })()`)
+
   const fail = (e: unknown): void => {
     errors.push(`SHOT_FAILED ${(e as Error).message}`)
     console.log(`SHOT_FAILED ${(e as Error).message}`)
@@ -119,6 +147,18 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
         emit('system:navigate', { screen: s.id as ScreenId })
         await sleep(150)
         await shoot(theme, s.id)
+      }
+      if (opts.only.length === 0 || opts.only.includes('settings-json')) {
+        emit('system:navigate', { screen: 'settings' })
+        await sleep(150)
+        await prepareSettingsJson().then(() => shoot(theme, 'settings-json'), fail)
+        await restoreSettingsJson().catch(() => undefined)
+        // leave Settings so it remounts in the Form view, then return to where the loop ended (the start screen when it
+        // visited none): the palette shot below sits over that screen
+        emit('system:navigate', { screen: 'overview' })
+        await sleep(150)
+        emit('system:navigate', { screen: (screens[screens.length - 1]?.id ?? 'overview') as ScreenId })
+        await sleep(150)
       }
       if (opts.only.length === 0 || opts.only.includes('palette')) {
         emit('system:openPalette', null)

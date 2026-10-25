@@ -4,6 +4,7 @@ import { registerAll } from './domains'
 import { buildMenu } from './menu'
 import { initTheme, onThemeChanged } from './theme'
 import { runShots } from './shot'
+import { startSettingsDocsFetch } from './settingsDocs'
 import icon from '../../resources/icon.png?asset'
 
 // Keep app data separate from the Electron default and from other apps. CLAUDOCK_USER_DATA lets tests/screenshots isolate it.
@@ -70,6 +71,7 @@ void app.whenReady().then(async () => {
   })
   await initTheme()
   registerAll(ipcMain)
+  startSettingsDocsFetch()
   onThemeChanged(buildMenu)
   buildMenu()
   // A packaged app gets its Dock icon from the bundle; `npm run dev` would show Electron's.

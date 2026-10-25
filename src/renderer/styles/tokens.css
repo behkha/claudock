@@ -48,6 +48,7 @@
   --primary-bg: #141413;
   --primary-fg: #faf9f5;
   --danger: #a13a2b;
+  --warning: #9a6a12;
   --success: #558a42;
   --focus: #2a78d6;
 
@@ -79,6 +80,7 @@
   --primary-bg: #faf9f5;
   --primary-fg: #141413;
   --danger: #e58d7c;
+  --warning: #e0b45a;
   --success: #86b573;
   --focus: #6a9bcc;
 
@@ -109,6 +111,7 @@
     --primary-bg: #faf9f5;
     --primary-fg: #141413;
     --danger: #e58d7c;
+    --warning: #e0b45a;
     --success: #86b573;
     --focus: #6a9bcc;
 

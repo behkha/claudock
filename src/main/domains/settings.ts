@@ -5,6 +5,7 @@ import { SETTINGS_FILES } from '@shared/api/settings'
 import { listDir, readText, stat } from '../fsx'
 import { defineDomain } from '../ipcx'
 import { assertWritable, configDir, resolveInside } from '../paths'
+import { getSettingsDocs } from '../settingsDocs'
 import { listSnapshots, readSnapshotText, restoreSnapshot, safeWriteJson, safeWriteText, withFileLock as sharedFileLock } from '../safeWrite'
 
 /* ------------------------------------------------------------------ shared helpers (also used by hooks + permissions) */
@@ -327,6 +328,10 @@ const impl: SettingsApi = {
 
   scripts(command) {
     return configScripts(command)
+  },
+
+  docs() {
+    return getSettingsDocs()
   }
 }
 

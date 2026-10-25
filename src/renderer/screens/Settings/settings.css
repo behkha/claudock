@@ -243,6 +243,9 @@
   flex-direction: column;
   gap: 8px;
 }
+.st-assist-source {
+  font-size: var(--fs-caption);
+}
 
 /* history */
 .st-history {

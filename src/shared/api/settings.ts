@@ -3,6 +3,8 @@
  * write keys of the same two files).
  */
 
+import type { SettingsDocs } from '../settingsDocs'
+
 /** The two user-level settings files Claudock edits. Anything else is refused. */
 export type SettingsFileName = 'settings.json' | 'settings.local.json'
 export const SETTINGS_FILES: SettingsFileName[] = ['settings.json', 'settings.local.json']
@@ -77,6 +79,17 @@ export interface SettingsApi {
    * `$CLAUDE_CONFIG_DIR/...`, absolute paths). Returns config-dir-relative paths of files that exist.
    */
   scripts(command: string): Promise<string[]>
+  /**
+   * Key docs for the JSON editor's completion, hover and checks: this launch's fetch of Anthropic's docs when it is
+   * done, else the cached copy, else the bundled one. Waits a few seconds for a fetch still in flight.
+   */
+  docs(): Promise<SettingsDocs>
 }
 
-export interface SettingsEvents {}
+export interface SettingsEvents {
+  /**
+   * Sent when this launch's docs fetch ends after `docs()` already answered with an older copy: the new docs, or, when
+   * the fetch failed, that same older copy with `fetchError` set.
+   */
+  'settings:docs': SettingsDocs
+}

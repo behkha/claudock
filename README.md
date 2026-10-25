@@ -28,6 +28,8 @@ Claude Code keeps its config in dozens of JSON, JSONL and Markdown files, and re
 
 What it doesn't do: it doesn't run, update or sign in to Claude Code, and it doesn't sync settings between machines. It only works on the config folder and `~/.claude.json`, not on the `.claude/` folders inside your repositories. If you only change a setting now and then, Claude Code's own `/config` and `/permissions` commands are enough.
 
+At launch Claudock downloads Anthropic's public settings docs (code.claude.com) and the Claude Code JSON schema to power the JSON editor's suggestions. It asks json.schemastore.org and the schema's GitHub mirror (raw.githubusercontent.com) at the same time and uses whichever answers first. It sends nothing about your config.
+
 ## Try it without touching your config
 
 Requires Node.js 22.12 or later (Electron 45 and Vite 8 need it) and git.

@@ -23,6 +23,8 @@ export interface CodeEditorProps {
   lineNumbers?: boolean
   /** Moves the cursor to this character offset and scrolls it into view when it changes (e.g. from a palette result). */
   revealOffset?: number | null
+  /** Extra CodeMirror extensions (completion, hover, lint). Memoize them: a new array reconfigures the editor. */
+  extensions?: Extension[]
   'aria-label': string
   className?: string
 }
@@ -52,9 +54,47 @@ const theme = EditorView.theme({
   '.cm-gutters': { backgroundColor: 'var(--surface)', color: 'var(--text-3)', border: 'none' },
   '.cm-lineNumbers .cm-gutterElement': { padding: '0 10px 0 14px' },
   '.cm-matchingBracket, .cm-nonmatchingBracket': { backgroundColor: 'var(--selected)', outline: 'none' },
+  // panels (search, Ctrl-Shift-M warning list): the editor has no dark flag, so CodeMirror's light base colours would stay
+  '.cm-panels': { backgroundColor: 'var(--surface-sunken)', color: 'var(--text)' },
+  '.cm-panels.cm-panels-top': { borderBottom: '0.5px solid var(--border)' },
+  '.cm-panels.cm-panels-bottom': { borderTop: '0.5px solid var(--border)' },
+  '.cm-panel.cm-panel-lint ul [aria-selected]': { backgroundColor: 'var(--selected)' },
+  '.cm-panel.cm-panel-lint ul:focus [aria-selected]': { backgroundColor: 'var(--selected)', color: 'var(--text)' },
+  '.cm-panel input, .cm-panel button': { color: 'var(--text)', backgroundColor: 'var(--surface)', border: '0.5px solid var(--border-strong)', borderRadius: '6px' },
   '.cm-tooltip': { backgroundColor: 'var(--surface)', border: '0.5px solid var(--border-strong)', borderRadius: '8px', color: 'var(--text)' },
   '.cm-lintRange-error': { backgroundImage: 'none', textDecoration: 'underline wavy var(--danger)' },
   '.cm-diagnostic-error': { borderLeft: 'none', color: 'var(--danger)' },
+  '.cm-lintRange-warning': { backgroundImage: 'none', textDecoration: 'underline wavy var(--warning)', textUnderlineOffset: '2px' },
+  '.cm-diagnostic-warning': { borderLeft: 'none', color: 'var(--warning)' },
+  '.cm-lint-marker-warning': { content: 'none', backgroundColor: 'var(--warning)', clipPath: 'polygon(50% 8%, 96% 92%, 4% 92%)' },
+  // completion popup and docs cards (the assist extension in screens/Settings/assist.ts)
+  '.cm-tooltip.cm-tooltip-autocomplete > ul': { fontFamily: 'var(--font-mono)', fontSize: '12px', maxHeight: '15em' },
+  '.cm-tooltip.cm-tooltip-autocomplete > ul > li': { padding: '2px 10px', display: 'flex', alignItems: 'baseline', gap: '14px', lineHeight: '1.6' },
+  '.cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected]': { backgroundColor: 'var(--selected)', color: 'var(--text)' },
+  '.cm-completionLabel': { flex: '1 1 auto' },
+  '.cm-completionDetail': { color: 'var(--text-3)', fontStyle: 'normal', margin: '0' },
+  '.cm-completionMatchedText': { textDecoration: 'none', fontWeight: '600' },
+  '.cm-completionInfo': {
+    fontFamily: 'var(--font-sans)',
+    fontSize: '13px',
+    lineHeight: '1.5',
+    padding: '10px 12px',
+    maxWidth: '320px',
+    width: 'max-content',
+    boxSizing: 'border-box',
+    color: 'var(--text-2)'
+  },
+  '.cm-completionInfo.cm-completionInfo-right': { marginLeft: '6px' },
+  '.cm-completionInfo.cm-completionInfo-left': { marginRight: '6px' },
+  '.cm-tooltip-hover > .cm-doc': { maxWidth: '340px', padding: '10px 12px', fontFamily: 'var(--font-sans)', fontSize: '13px', lineHeight: '1.5', color: 'var(--text-2)' },
+  '.cm-doc-key': { fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: '600', color: 'var(--text)', overflowWrap: 'anywhere' },
+  '.cm-doc-summary': { margin: '4px 0 0' },
+  '.cm-doc-meta': { display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '2px 12px', margin: '8px 0 0', fontSize: '12px' },
+  '.cm-doc-meta dt': { color: 'var(--text-3)' },
+  '.cm-doc-meta dd': { margin: '0', color: 'var(--text)', overflowWrap: 'anywhere' },
+  '.cm-doc-link': { display: 'inline-block', marginTop: '8px', fontSize: '12px', color: 'var(--focus)', textDecoration: 'none' },
+  '.cm-doc-link:hover': { textDecoration: 'underline' },
+  '.cm-doc-hint': { margin: '2px 0 0', fontSize: '11px', color: 'var(--text-3)' },
   '.cm-placeholder': { color: 'var(--text-3)' }
 })
 
@@ -86,6 +126,7 @@ export function CodeEditor({
   onSave,
   lineNumbers = true,
   revealOffset,
+  extensions: extra,
   className,
   ...rest
 }: CodeEditorProps): JSX.Element {
@@ -124,8 +165,9 @@ export function CodeEditor({
         )
       )
     }
+    if (extra) ext.push(...extra)
     return ext
-  }, [language, hasSave, rest['aria-label']]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [language, hasSave, extra, rest['aria-label']]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className={cx('code-editor selectable', className)}>

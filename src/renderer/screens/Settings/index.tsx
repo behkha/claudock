@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { AlertTriangle, FilePlus } from 'lucide-react'
 import { SETTINGS_FILES, type SettingsDoc, type SettingsFileName, type SettingsSummary } from '@shared/api/settings'
+import { formatDate } from '@shared/format'
+import type { SettingsDocs } from '@shared/settingsDocs'
 import type { ScreenId } from '@shared/nav'
 import { Button, CodeEditor, ConfirmDialog, EmptyState, PageLayout, PathLabel, Segmented, Spinner, useToast } from '@/components'
-import { api } from '@/lib/api'
+import { api, useEvent } from '@/lib/api'
 import { useNav, type ScreenProps } from '@/lib/nav'
+import { settingsAssist } from './assist'
 import { FormView, formShowsKey } from './FormView'
 import { HistoryView } from './HistoryView'
 import { checkSettingsJson, describeProblem, parseObject, type JsonObject } from './json'
@@ -27,6 +30,36 @@ function parseTarget(id: string | undefined): { file?: SettingsFileName; key?: s
   const file = SETTINGS_FILES.find((f) => id === f || id.startsWith(`${f}:`))
   if (!file) return {}
   return { file, key: id.length > file.length ? id.slice(file.length + 1) : undefined }
+}
+
+/** The freshest docs seen so far, kept across visits to this screen. */
+let latestDocs: SettingsDocs | undefined
+
+/**
+ * True when `next` should replace `prev`: a fetch from this launch beats a saved copy, then newer beats older. The same
+ * copy with a different `fetchError` also counts: a failed fetch re-sends the fallback copy to say why it stays on it.
+ */
+function fresher(next: SettingsDocs, prev: SettingsDocs | undefined): boolean {
+  if (!prev) return true
+  if ((next.origin === 'live') !== (prev.origin === 'live')) return next.origin === 'live'
+  if (next.builtAt === prev.builtAt) return next.fetchError !== prev.fetchError
+  return next.builtAt > prev.builtAt
+}
+
+/** Where the editor's suggestions come from, in a short sentence for the line under the editor. */
+function describeDocsSource(docs: SettingsDocs, now = new Date()): string {
+  const built = new Date(docs.builtAt)
+  const valid = !Number.isNaN(built.getTime())
+  const day = valid ? formatDate(built) : 'an unknown date'
+  // main writes the error as a clause that reads right after "because", e.g. "code.claude.com could not be reached"
+  const why = docs.fetchError ? `, because ${docs.fetchError.replace(/[.\s]+$/, '')}` : ''
+  if (docs.origin === 'live') {
+    const time = valid ? built.toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }) : ''
+    const today = valid && built.toDateString() === now.toDateString()
+    return `Suggestions from the Claude Code docs, fetched ${today ? `today at ${time}` : valid ? `${day} at ${time}` : 'at an unknown time'}`
+  }
+  if (docs.origin === 'cache') return `Suggestions from a saved copy of the Claude Code docs (${day})${why}`
+  return `Suggestions from the copy of the Claude Code docs shipped with Claudock (${day})${why}`
 }
 
 function Banner({ tone = 'info', children, actions }: { tone?: 'info' | 'warn'; children: ReactNode; actions?: ReactNode }): JSX.Element {
@@ -59,6 +92,7 @@ export default function SettingsScreen({ selectId }: ScreenProps): JSX.Element {
   const [saving, setSaving] = useState(false)
   const [leaveTo, setLeaveTo] = useState<ScreenId | null>(null)
   const seq = useRef(0)
+  const [docs, setDocs] = useState<SettingsDocs | undefined>(latestDocs)
 
   useEffect(() => {
     const t = parseTarget(selectId)
@@ -90,6 +124,19 @@ export default function SettingsScreen({ selectId }: ScreenProps): JSX.Element {
     setSummary(undefined)
     void load(file)
   }, [file, load])
+
+  // key docs for the JSON editor: ask once per visit unless this launch's fetch is already in; a fresher copy arrives as an event
+  const takeDocs = useCallback((next: SettingsDocs): void => {
+    if (!fresher(next, latestDocs)) return
+    latestDocs = next
+    setDocs(next)
+  }, [])
+  useEffect(() => {
+    if (latestDocs?.origin === 'live') return
+    api.settings.docs().then(takeDocs, () => undefined)
+  }, [takeDocs])
+  useEvent('settings:docs', takeDocs)
+  const assist = useMemo(() => (docs ? settingsAssist(docs) : undefined), [docs])
 
   /* ---------------------------------------------------------------- derived state */
   const ready = !!doc && doc.file === file
@@ -337,6 +384,7 @@ export default function SettingsScreen({ selectId }: ScreenProps): JSX.Element {
             onChange={applyText}
             onSave={editorSave}
             revealOffset={revealOffset}
+            extensions={assist}
             height="calc(100vh - 380px)"
             minHeight={320}
           />
@@ -347,6 +395,11 @@ export default function SettingsScreen({ selectId }: ScreenProps): JSX.Element {
           ) : (
             <p className="st-muted">Valid JSON. Comments and trailing commas are not allowed.</p>
           )}
+          {docs ? (
+            <p className="st-muted st-assist-source">
+              {describeDocsSource(docs)} · {window.claudock.platform === 'darwin' ? '⌃Space or ⌥`' : 'Ctrl+Space'} for suggestions · {window.claudock.platform === 'darwin' ? 'F1 or ⌘⇧D' : 'F1 or Ctrl+Shift+D'} opens the docs
+            </p>
+          ) : null}
         </div>
       ) : null}
 

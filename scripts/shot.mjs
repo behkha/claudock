@@ -3,7 +3,7 @@
  * Screenshot every screen (light then dark) on the synthetic fixture, headlessly.
  *
  *   npm run shot                       all screens + palette -> ./.shots/<theme>-<screen>.png
- *   npm run shot -- --only skills,agents   only those screens (use "palette" for the command palette)
+ *   npm run shot -- --only skills,agents   only those screens (use "palette" for the command palette, "settings-json" for the Settings JSON view with the completion popup)
  *   npm run shot -- --out ./.shots/mine    other output folder (parallel workers: use your own)
  *
  * Builds into a private temp folder (so parallel runs never overwrite each other's ./out), launches Electron with
