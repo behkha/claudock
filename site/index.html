@@ -27,89 +27,123 @@
 <meta name="twitter:image:alt" content="Claudock: your ~/.claude, in one window, next to the app's Overview screen">
 
 <link rel="stylesheet" href="style.css">
+<script>
+  // Turn on the scroll scenes before first paint. motion.js adds .motion-ready once they are set up; if it or GSAP never
+  // loads, the plain page comes back after 4 s.
+  (function (r) {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    r.classList.add('motion')
+    setTimeout(function () { if (!r.classList.contains('motion-ready')) r.classList.remove('motion') }, 4000)
+  })(document.documentElement)
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/gsap.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/ScrollTrigger.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/SplitText.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/MorphSVGPlugin.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/DrawSVGPlugin.min.js" defer></script>
 <script src="app.js" defer></script>
+<script src="motion.js" defer></script>
 </head>
 <body>
 
 <header class="bar">
   <a class="brand" href="./" aria-label="Claudock">
-    <img src="favicon.svg" alt="" width="28" height="28">
+    <svg class="mark" viewBox="0 0 1024 1024" width="28" height="28" aria-hidden="true">
+      <rect x="32" y="32" width="960" height="960" rx="216" fill="#141413"/>
+      <g transform="translate(512 512) scale(1.165) translate(-512 -512)">
+        <path class="mark-wave" d="M 236 552 C 282 458, 372 452, 442 512 C 512 572, 602 568, 650 474" fill="none" stroke="#FAF9F5" stroke-width="80" stroke-linecap="round"/>
+        <rect class="mark-bar" x="716" y="372" width="100" height="284" rx="16" fill="#D97757"/>
+      </g>
+    </svg>
     <span>Claudock</span>
   </a>
   <a class="bar-link" href="https://github.com/behkha/claudock">GitHub</a>
 </header>
 
 <main>
-  <section class="hero">
+  <section class="hero" id="hero">
     <div class="hero-copy">
-      <h1><span class="ln">Your <span class="path">~/.claude,</span></span> <span class="ln">in one window.</span></h1>
-      <div class="get">
-        <a class="btn" id="download" href="https://github.com/behkha/claudock/releases/latest">
-          <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3v10m0 0-4-4m4 4 4-4M4 17h12"/></svg>
-          <span id="download-label">Download</span>
-        </a>
-        <p class="note" id="note" hidden><a href="https://github.com/behkha/claudock#install">Not signed yet: first-launch steps</a></p>
-        <p class="others" id="others">
-          <a href="https://github.com/behkha/claudock/releases/latest">Mac</a>
-          <a href="https://github.com/behkha/claudock/releases/latest">Windows</a>
-          <a href="https://github.com/behkha/claudock/releases/latest">Linux</a>
-          <a href="https://github.com/behkha/claudock">GitHub</a>
-        </p>
+      <div class="hero-intro">
+        <h1><span class="ln">Your <span class="path">~/.claude,</span></span> <span class="ln">in one window.</span></h1>
+        <div class="get">
+          <a class="btn" id="download" href="https://github.com/behkha/claudock/releases/latest">
+            <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3v10m0 0-4-4m4 4 4-4M4 17h12"/></svg>
+            <span id="download-label">Download</span>
+          </a>
+          <p class="note" id="note" hidden><a href="https://github.com/behkha/claudock#install">Not signed yet: first-launch steps</a></p>
+          <p class="others" id="others">
+            <a href="https://github.com/behkha/claudock/releases/latest">Mac</a>
+            <a href="https://github.com/behkha/claudock/releases/latest">Windows</a>
+            <a href="https://github.com/behkha/claudock/releases/latest">Linux</a>
+            <a href="https://github.com/behkha/claudock">GitHub</a>
+          </p>
+        </div>
+      </div>
+      <div class="caps" aria-hidden="true">
+        <p class="cap">Overview</p>
+        <p class="cap">Skills</p>
+        <p class="cap">Settings</p>
+        <p class="cap">Storage</p>
       </div>
     </div>
 
-    <div class="film">
-      <!-- To swap in the launch film: replace assets/demo.mp4 and assets/demo-poster.jpg (1600x1024, H.264, no audio). -->
-      <video id="demo" muted loop playsinline controls preload="metadata" width="1600" height="1024"
-             poster="assets/demo-poster.jpg" aria-label="Claudock walking through Overview, Skills, Settings, Hooks, Storage and Backups">
-        <source src="assets/demo.mp4" type="video/mp4">
-      </video>
-      <button class="toggle" id="toggle" type="button" aria-label="Pause demo" hidden>
-        <svg class="i-pause" viewBox="0 0 20 20" width="16" height="16" fill="currentColor" aria-hidden="true"><rect x="5" y="4" width="3.4" height="12" rx="1"/><rect x="11.6" y="4" width="3.4" height="12" rx="1"/></svg>
-        <svg class="i-play" viewBox="0 0 20 20" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M6 4.2v11.6a.8.8 0 0 0 1.2.7l9-5.8a.8.8 0 0 0 0-1.4l-9-5.8A.8.8 0 0 0 6 4.2Z"/></svg>
-      </button>
+    <div class="win" id="win">
+      <div class="cam" id="cam">
+        <picture class="screen">
+          <source media="(prefers-color-scheme: dark)" srcset="assets/shot-overview-dark.webp">
+          <img src="assets/shot-overview-light.webp" alt="Overview: disk use per folder, cleanup suggestions and counts of skills, hooks, plugins and rules" width="1600" height="1025">
+        </picture>
+        <picture class="screen">
+          <source media="(prefers-color-scheme: dark)" srcset="assets/shot-skills-dark.webp">
+          <img src="assets/shot-skills-light.webp" alt="Skills: a list with on and off states and the selected skill's SKILL.md" width="1600" height="1025">
+        </picture>
+        <picture class="screen">
+          <source media="(prefers-color-scheme: dark)" srcset="assets/shot-settings-dark.webp">
+          <img src="assets/shot-settings-light.webp" alt="Settings: settings.json as a form, with JSON and History tabs" width="1600" height="1025">
+        </picture>
+        <picture class="screen">
+          <source media="(prefers-color-scheme: dark)" srcset="assets/shot-storage-dark.webp">
+          <img src="assets/shot-storage-light.webp" alt="Storage: what takes space in ~/.claude, with cleanup suggestions" width="1600" height="1025">
+        </picture>
+      </div>
+      <div class="term" aria-hidden="true">
+        <div class="dots"><i></i><i></i><i></i></div>
+        <div class="prompt" id="prompt"><b>~</b> $ <span class="cmd">ls ~/.claude</span><span class="caret"></span></div>
+      </div>
+      <div class="lines" id="lines" aria-hidden="true"></div>
     </div>
   </section>
 
-  <section class="shots" aria-label="Screenshots">
-    <figure>
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="assets/shot-overview-dark.webp">
-        <img src="assets/shot-overview-light.webp" alt="Overview: disk use per folder, cleanup suggestions and counts of skills, hooks, plugins and rules" width="1600" height="1025" loading="lazy">
-      </picture>
-      <figcaption>Overview</figcaption>
-    </figure>
-    <figure>
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="assets/shot-skills-dark.webp">
-        <img src="assets/shot-skills-light.webp" alt="Skills: a list with on and off states and the selected skill's SKILL.md" width="1600" height="1025" loading="lazy">
-      </picture>
-      <figcaption>Skills</figcaption>
-    </figure>
-    <figure>
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="assets/shot-settings-dark.webp">
-        <img src="assets/shot-settings-light.webp" alt="Settings: settings.json as a form, with JSON and History tabs" width="1600" height="1025" loading="lazy">
-      </picture>
-      <figcaption>Settings</figcaption>
-    </figure>
-    <figure>
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="assets/shot-storage-dark.webp">
-        <img src="assets/shot-storage-light.webp" alt="Storage: what takes space in ~/.claude, with cleanup suggestions" width="1600" height="1025" loading="lazy">
-      </picture>
-      <figcaption>Storage</figcaption>
-    </figure>
+  <div class="marquee" aria-hidden="true">
+    <div class="track" id="track-1"></div>
+    <div class="track" id="track-2"></div>
+  </div>
+
+  <section class="film">
+    <!-- To swap in the launch film: replace assets/demo.mp4 and assets/demo-poster.jpg (1600x1024, H.264, no audio). -->
+    <video id="demo" muted loop playsinline controls preload="metadata" width="1600" height="1024"
+           poster="assets/demo-poster.jpg" aria-label="Claudock walking through Overview, Skills, Settings, Hooks, Storage and Backups">
+      <source src="assets/demo.mp4" type="video/mp4">
+    </video>
+    <button class="toggle" id="toggle" type="button" aria-label="Pause demo" hidden>
+      <svg class="i-pause" viewBox="0 0 20 20" width="16" height="16" fill="currentColor" aria-hidden="true"><rect x="5" y="4" width="3.4" height="12" rx="1"/><rect x="11.6" y="4" width="3.4" height="12" rx="1"/></svg>
+      <svg class="i-play" viewBox="0 0 20 20" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M6 4.2v11.6a.8.8 0 0 0 1.2.7l9-5.8a.8.8 0 0 0 0-1.4l-9-5.8A.8.8 0 0 0 6 4.2Z"/></svg>
+    </button>
   </section>
 
   <section class="safe">
     <h2>Safe by design</h2>
-    <ul>
-      <li><strong>Snapshot before every write</strong><span>Saved outside <code>~/.claude</code>. Diff and restore from Backups.</span></li>
-      <li><strong>Atomic writes</strong><span>Temp file, then rename. JSON is validated first.</span></li>
-      <li><strong>Trash, not delete</strong><span>Deletes go to the OS Trash.</span></li>
-      <li><strong>Never reads credentials</strong><span><code>.credentials.json</code> and <code>sessions/*.key</code> show as locked rows.</span></li>
-    </ul>
+    <div class="safe-body">
+      <div class="safe-icon" aria-hidden="true">
+        <svg viewBox="0 0 100 100"><path class="glyph" id="glyph" d="M18 30 H36 L42 20 H58 L64 30 H82 Q90 30 90 38 V74 Q90 82 82 82 H18 Q10 82 10 74 V38 Q10 30 18 30 Z"/><circle class="spark" cx="50" cy="56" r="7"/></svg>
+      </div>
+      <ul>
+        <li><strong>Snapshot before every write</strong><span>Saved outside <code>~/.claude</code>. Diff and restore from Backups.</span></li>
+        <li><strong>Atomic writes</strong><span>Temp file, then rename. JSON is validated first.</span></li>
+        <li><strong>Trash, not delete</strong><span>Deletes go to the OS Trash.</span></li>
+        <li><strong>Never reads credentials</strong><span><code>.credentials.json</code> and <code>sessions/*.key</code> show as locked rows.</span></li>
+      </ul>
+    </div>
   </section>
 
   <section class="try">
