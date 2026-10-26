@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claudock</title>
+<meta name="description" content="Claudock is a free desktop app for macOS, Windows and Linux that manages your Claude Code config folder, ~/.claude: settings, CLAUDE.md, hooks, skills, MCP servers, sessions and more.">
+<link rel="canonical" href="https://behkha.github.io/claudock/">
+<meta name="theme-color" content="#faf9f5" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#262624" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Claudock">
+<meta property="og:title" content="Claudock">
+<meta property="og:description" content="Your ~/.claude, in one window. A free desktop app for macOS, Windows and Linux.">
+<meta property="og:url" content="https://behkha.github.io/claudock/">
+<meta property="og:image" content="https://behkha.github.io/claudock/og.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="Claudock: your ~/.claude, in one window, next to the app's Overview screen">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Claudock">
+<meta name="twitter:description" content="Your ~/.claude, in one window. A free desktop app for macOS, Windows and Linux.">
+<meta name="twitter:image" content="https://behkha.github.io/claudock/og.png">
+<meta name="twitter:image:alt" content="Claudock: your ~/.claude, in one window, next to the app's Overview screen">
+
+<link rel="stylesheet" href="style.css">
+<script src="app.js" defer></script>
+</head>
+<body>
+
+<header class="bar">
+  <a class="brand" href="./" aria-label="Claudock">
+    <img src="favicon.svg" alt="" width="28" height="28">
+    <span>Claudock</span>
+  </a>
+  <a class="bar-link" href="https://github.com/behkha/claudock">GitHub</a>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="hero-copy">
+      <h1><span class="ln">Your <span class="path">~/.claude,</span></span> <span class="ln">in one window.</span></h1>
+      <div class="get">
+        <a class="btn" id="download" href="https://github.com/behkha/claudock/releases/latest">
+          <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3v10m0 0-4-4m4 4 4-4M4 17h12"/></svg>
+          <span id="download-label">Download</span>
+        </a>
+        <p class="note" id="note" hidden><a href="https://github.com/behkha/claudock#install">Not signed yet: first-launch steps</a></p>
+        <p class="others" id="others">
+          <a href="https://github.com/behkha/claudock/releases/latest">Mac</a>
+          <a href="https://github.com/behkha/claudock/releases/latest">Windows</a>
+          <a href="https://github.com/behkha/claudock/releases/latest">Linux</a>
+          <a href="https://github.com/behkha/claudock">GitHub</a>
+        </p>
+      </div>
+    </div>
+
+    <div class="film">
+      <!-- To swap in the launch film: replace assets/demo.mp4 and assets/demo-poster.jpg (1600x1024, H.264, no audio). -->
+      <video id="demo" muted loop playsinline controls preload="metadata" width="1600" height="1024"
+             poster="assets/demo-poster.jpg" aria-label="Claudock walking through Overview, Skills, Settings, Hooks, Storage and Backups">
+        <source src="assets/demo.mp4" type="video/mp4">
+      </video>
+      <button class="toggle" id="toggle" type="button" aria-label="Pause demo" hidden>
+        <svg class="i-pause" viewBox="0 0 20 20" width="16" height="16" fill="currentColor" aria-hidden="true"><rect x="5" y="4" width="3.4" height="12" rx="1"/><rect x="11.6" y="4" width="3.4" height="12" rx="1"/></svg>
+        <svg class="i-play" viewBox="0 0 20 20" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M6 4.2v11.6a.8.8 0 0 0 1.2.7l9-5.8a.8.8 0 0 0 0-1.4l-9-5.8A.8.8 0 0 0 6 4.2Z"/></svg>
+      </button>
+    </div>
+  </section>
+
+  <section class="shots" aria-label="Screenshots">
+    <figure>
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="assets/shot-overview-dark.webp">
+        <img src="assets/shot-overview-light.webp" alt="Overview: disk use per folder, cleanup suggestions and counts of skills, hooks, plugins and rules" width="1600" height="1025" loading="lazy">
+      </picture>
+      <figcaption>Overview</figcaption>
+    </figure>
+    <figure>
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="assets/shot-skills-dark.webp">
+        <img src="assets/shot-skills-light.webp" alt="Skills: a list with on and off states and the selected skill's SKILL.md" width="1600" height="1025" loading="lazy">
+      </picture>
+      <figcaption>Skills</figcaption>
+    </figure>
+    <figure>
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="assets/shot-settings-dark.webp">
+        <img src="assets/shot-settings-light.webp" alt="Settings: settings.json as a form, with JSON and History tabs" width="1600" height="1025" loading="lazy">
+      </picture>
+      <figcaption>Settings</figcaption>
+    </figure>
+    <figure>
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="assets/shot-storage-dark.webp">
+        <img src="assets/shot-storage-light.webp" alt="Storage: what takes space in ~/.claude, with cleanup suggestions" width="1600" height="1025" loading="lazy">
+      </picture>
+      <figcaption>Storage</figcaption>
+    </figure>
+  </section>
+
+  <section class="safe">
+    <h2>Safe by design</h2>
+    <ul>
+      <li><strong>Snapshot before every write</strong><span>Saved outside <code>~/.claude</code>. Diff and restore from Backups.</span></li>
+      <li><strong>Atomic writes</strong><span>Temp file, then rename. JSON is validated first.</span></li>
+      <li><strong>Trash, not delete</strong><span>Deletes go to the OS Trash.</span></li>
+      <li><strong>Never reads credentials</strong><span><code>.credentials.json</code> and <code>sessions/*.key</code> show as locked rows.</span></li>
+    </ul>
+  </section>
+
+  <section class="try">
+    <div class="try-head">
+      <h2>Try it on a fake config first</h2>
+      <p class="req">Node 22.12+ and git</p>
+    </div>
+    <div class="code">
+<pre id="cmds"><code>git clone https://github.com/behkha/claudock.git
+cd claudock
+npm install
+npm run dev</code></pre>
+      <button class="copy" id="copy" type="button" hidden>Copy</button>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <nav aria-label="Project">
+    <a href="https://github.com/behkha/claudock">GitHub</a>
+    <a href="https://github.com/behkha/claudock/blob/main/LICENSE.md">MIT</a>
+  </nav>
+  <p>Unofficial, not affiliated with Anthropic</p>
+</footer>
+
+</body>
+</html>
