@@ -6,7 +6,7 @@ Manage your Claude Code setup (settings, hooks, skills, MCP servers, memory and 
 
 **[Download](https://github.com/behkha/claudock/releases/latest)** · [Website](https://behkha.github.io/claudock/)
 
-![Claudock walking through Overview, Skills, Settings and Storage on the bundled test config](docs/demo.gif)
+![Claudock walking through Overview, Mods, Skills, Settings, Hooks, Storage and Backups on the bundled test config](docs/demo.gif)
 
 ## What it does
 
