@@ -1,0 +1,38 @@
+name: Feature
+description: Something you'd like Claudock to do
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you're trying to do
+      description: The task in your Claude Code setup, and how you do it today.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help
+  - type: dropdown
+    id: area
+    attributes:
+      label: Screen
+      options:
+        - Overview
+        - Settings
+        - CLAUDE.md & rules
+        - Hooks
+        - Permissions
+        - Skills
+        - Agents
+        - Commands
+        - Plugins
+        - Mods
+        - MCP servers
+        - Projects
+        - Memory
+        - Plans
+        - History
+        - Storage
+        - Backups
+        - Something new

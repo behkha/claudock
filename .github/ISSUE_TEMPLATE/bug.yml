@@ -1,0 +1,64 @@
+name: Bug
+description: Something in Claudock doesn't work as it should
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: Leave out prompts, project names and anything from .credentials.json.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open Hooks
+        2. Click Add hook
+        3. …
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+  - type: input
+    id: version
+    attributes:
+      label: Claudock version
+      description: Shown at the bottom of the sidebar.
+      placeholder: v0.1.1
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How you installed it
+      options:
+        - npx claudock
+        - npm install -g claudock
+        - macOS .dmg
+        - Windows .exe
+        - Linux .AppImage
+        - Linux .deb
+        - From source (npm run dev)
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system and version
+      placeholder: macOS 15.5, Windows 11 24H2, Ubuntu 24.04…
+    validations:
+      required: true
+  - type: input
+    id: claude-code
+    attributes:
+      label: Claude Code version
+      description: Output of `claude --version`.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error text or screenshot
+      render: text

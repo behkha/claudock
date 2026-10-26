@@ -27,6 +27,27 @@
 <meta name="twitter:image:alt" content="Claudock: your ~/.claude, in one window, next to the app's Mods screen">
 
 <link rel="stylesheet" href="style.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Claudock",
+  "description": "A desktop app that opens the Claude Code config folder (~/.claude) and the MCP servers in ~/.claude.json, with one screen each for settings, CLAUDE.md and rules, hooks, permissions, skills, agents, commands, plugins, mods, MCP servers, projects, memory, plans, history, storage and backups. Every write is preceded by a snapshot.",
+  "url": "https://behkha.github.io/claudock/",
+  "image": "https://behkha.github.io/claudock/og.png",
+  "screenshot": "https://behkha.github.io/claudock/assets/shot-overview-light.webp",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": "macOS, Windows, Linux",
+  "softwareVersion": "0.1.1",
+  "installUrl": "https://www.npmjs.com/package/claudock",
+  "downloadUrl": "https://github.com/behkha/claudock/releases/latest",
+  "license": "https://opensource.org/license/mit",
+  "isAccessibleForFree": true,
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "author": { "@type": "Person", "name": "behkha", "url": "https://github.com/behkha" },
+  "sameAs": ["https://github.com/behkha/claudock", "https://www.npmjs.com/package/claudock"]
+}
+</script>
 <script>
   // Turn on the scroll scenes before first paint. motion.js adds .motion-ready once they are set up; if it or GSAP never
   // loads, the plain page comes back after 4 s.
@@ -66,11 +87,14 @@
       <div class="hero-intro">
         <h1><span class="ln">See inside</span> <span class="ln">your <span class="path">~/.claude.</span></span></h1>
         <div class="get">
-          <a class="btn" id="download" href="https://github.com/behkha/claudock/releases/latest">
-            <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3v10m0 0-4-4m4 4 4-4M4 17h12"/></svg>
-            <span id="download-label">Download</span>
-          </a>
-          <p class="note" id="note" hidden><a href="https://github.com/behkha/claudock#install">Not signed yet: first-launch steps</a></p>
+          <div class="npx">
+            <code id="npx-cmd"><b aria-hidden="true">$ </b>npx claudock</code>
+            <button class="npx-copy" id="npx-copy" type="button" hidden>Copy</button>
+          </div>
+          <p class="inst" id="inst" hidden>
+            <a id="download" href="https://github.com/behkha/claudock/releases/latest">Download</a>
+            <a class="note" id="note" href="https://github.com/behkha/claudock#install" hidden>Not signed yet: first-launch steps</a>
+          </p>
           <p class="others" id="others">
             <a href="https://github.com/behkha/claudock/releases/latest">Mac</a>
             <a href="https://github.com/behkha/claudock/releases/latest">Windows</a>
@@ -169,7 +193,10 @@ npm run dev</code></pre>
 <footer class="foot">
   <nav aria-label="Project">
     <a href="https://github.com/behkha/claudock">GitHub</a>
-    <a href="https://github.com/behkha/claudock/blob/main/LICENSE.md">MIT</a>
+    <a href="alternatives/claude-code-gui/">Compare</a>
+    <a href="privacy/">Privacy</a>
+    <a href="terms/">Terms</a>
+    <a href="https://github.com/behkha/claudock/blob/main/LICENSE.md">Free and open source (MIT)</a>
   </nav>
   <p>Unofficial, not affiliated with Anthropic</p>
 </footer>

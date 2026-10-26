@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy · Claudock</title>
+<meta name="description" content="Claudock has no telemetry and no account. The three network requests the app makes, and what this website loads.">
+<link rel="canonical" href="https://behkha.github.io/claudock/privacy/">
+<meta name="theme-color" content="#faf9f5" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#262624" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Claudock">
+<meta property="og:title" content="Privacy · Claudock">
+<meta property="og:description" content="Claudock has no telemetry and no account. The three network requests the app makes, and what this website loads.">
+<meta property="og:url" content="https://behkha.github.io/claudock/privacy/">
+<meta property="og:image" content="https://behkha.github.io/claudock/og.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="stylesheet" href="../style.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": "Claudock",
+      "item": "https://behkha.github.io/claudock/"
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "name": "Privacy",
+      "item": "https://behkha.github.io/claudock/privacy/"
+    }
+  ]
+}
+</script>
+<script src="../app.js" defer></script>
+</head>
+<body>
+
+<header class="bar">
+  <a class="brand" href="../" aria-label="Claudock home">
+    <svg class="mark" viewBox="0 0 1024 1024" width="28" height="28" aria-hidden="true">
+      <rect x="32" y="32" width="960" height="960" rx="216" fill="#141413"/>
+      <g transform="translate(512 512) scale(1.165) translate(-512 -512)">
+        <path d="M 236 552 C 282 458, 372 452, 442 512 C 512 572, 602 568, 650 474" fill="none" stroke="#FAF9F5" stroke-width="80" stroke-linecap="round"/>
+        <rect x="716" y="372" width="100" height="284" rx="16" fill="#D97757"/>
+      </g>
+    </svg>
+    <span>Claudock</span>
+  </a>
+  <a class="bar-link" href="https://github.com/behkha/claudock">GitHub</a>
+</header>
+
+<main class="doc">
+<h1>Privacy</h1>
+<p>Claudock has no telemetry, no account and no server of its own. Your config stays on your computer.</p>
+
+<h2>What the app reads</h2>
+<p>The Claude Code config folder (<code>~/.claude</code>, or the folder in <code>CLAUDE_CONFIG_DIR</code>) and the MCP servers in <code>~/.claude.json</code>. It never reads <code>.credentials.json</code> or <code>sessions/*.key</code>. Snapshots of the files it changes, and its cache of the settings docs, are kept in Claudock's own app data folder on your computer.</p>
+
+<h2>Network requests the app makes</h2>
+<div class="tbl stack">
+  <table>
+    <thead><tr><th scope="col">Host</th><th scope="col">What for</th><th scope="col">When</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">code.claude.com</th><td data-col="What for"><span>Anthropic's public settings reference and environment variables pages, for the JSON editor's suggestions</span></td><td data-col="When"><span>At launch</span></td></tr>
+      <tr><th scope="row">json.schemastore.org and raw.githubusercontent.com</th><td data-col="What for"><span>The Claude Code settings JSON schema, asked of both at once; the first answer is used</span></td><td data-col="When"><span>At launch</span></td></tr>
+      <tr><th scope="row">api.github.com</th><td data-col="What for"><span>The latest Claudock release, to show a notice when a newer one is out</span></td><td data-col="When"><span>At launch, at most every six hours, in installed copies only</span></td></tr>
+    </tbody>
+  </table>
+</div>
+<p>These are ordinary downloads. They send nothing about your config, though like any web request they show the host your IP address. The request to api.github.com names the Claudock version in its user agent. Start the app with <code>CLAUDOCK_OFFLINE=1</code> to turn all three off; the editor then uses the copy of the docs bundled with the app.</p>
+<p>Links you click open in your browser. On the Share stats card, Post on X opens x.com's compose page in your browser with the post text filled in; nothing is posted until you post it there. Copy image and Save PNG keep the image on your computer.</p>
+
+<h2>Installing</h2>
+<p><code>npx claudock</code> downloads the package from the npm registry, and Electron's install step downloads Electron from GitHub. The installers download from GitHub Releases. Those services' own privacy terms apply.</p>
+
+<h2>This website</h2>
+<p>The site is hosted on GitHub Pages, which logs visitors' IP addresses (see <a href="https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement">GitHub's privacy statement</a>). It sets no cookies and has no analytics. The home page loads its animation library from cdnjs.cloudflare.com and asks api.github.com for the latest release's download links, which it keeps in your browser's session storage for ten minutes.</p>
+
+<h2>Questions</h2>
+<p>Open an <a href="https://github.com/behkha/claudock/issues">issue</a>, or for a security problem follow <a href="https://github.com/behkha/claudock/blob/main/SECURITY.md">SECURITY.md</a>.</p>
+
+<p class="fine">Last updated 27 October 2026.</p>
+</main>
+
+<footer class="foot">
+  <nav aria-label="Project">
+    <a href="https://github.com/behkha/claudock">GitHub</a>
+    <a href="../alternatives/claude-code-gui/">Compare</a>
+    <a href="../privacy/">Privacy</a>
+    <a href="../terms/">Terms</a>
+    <a href="https://github.com/behkha/claudock/blob/main/LICENSE.md">Free and open source (MIT)</a>
+  </nav>
+  <p>Unofficial, not affiliated with Anthropic</p>
+</footer>
+
+</body>
+</html>

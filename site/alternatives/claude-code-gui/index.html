@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claude Code GUIs in 2026: six options and what each does</title>
+<meta name="description" content="Desktop apps and tools for Claude Code compared: running sessions, managing ~/.claude, switching providers, tracking usage. What each one does and who it is for.">
+<link rel="canonical" href="https://behkha.github.io/claudock/alternatives/claude-code-gui/">
+<meta name="theme-color" content="#faf9f5" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#262624" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../../apple-touch-icon.png">
+
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Claudock">
+<meta property="og:title" content="Claude Code GUIs in 2026: six options and what each does">
+<meta property="og:description" content="Desktop apps and tools for Claude Code compared: running sessions, managing ~/.claude, switching providers, tracking usage. What each one does and who it is for.">
+<meta property="og:url" content="https://behkha.github.io/claudock/alternatives/claude-code-gui/">
+<meta property="og:image" content="https://behkha.github.io/claudock/og.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="stylesheet" href="../../style.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Is there an official Claude Code GUI?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. Claude Code runs in the Claude desktop app, on the web, and in VS Code and JetBrains. The other tools on this page are unofficial."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What happened to Claudia?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "It was renamed opcode in August 2025 (v0.2.0 release notes)."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Which Claude Code GUI is free?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "All of the third-party tools here are free and open source. Claude Code itself needs a Claude plan or an API key."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Which one edits hooks and permissions?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Of the tools here, Claudock has screens for both. Claude Code's /permissions command covers permission rules too."
+      }
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": "Claudock",
+      "item": "https://behkha.github.io/claudock/"
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "name": "Claude Code GUIs in 2026",
+      "item": "https://behkha.github.io/claudock/alternatives/claude-code-gui/"
+    }
+  ]
+}
+</script>
+<script src="../../app.js" defer></script>
+</head>
+<body>
+
+<header class="bar">
+  <a class="brand" href="../../" aria-label="Claudock home">
+    <svg class="mark" viewBox="0 0 1024 1024" width="28" height="28" aria-hidden="true">
+      <rect x="32" y="32" width="960" height="960" rx="216" fill="#141413"/>
+      <g transform="translate(512 512) scale(1.165) translate(-512 -512)">
+        <path d="M 236 552 C 282 458, 372 452, 442 512 C 512 572, 602 568, 650 474" fill="none" stroke="#FAF9F5" stroke-width="80" stroke-linecap="round"/>
+        <rect x="716" y="372" width="100" height="284" rx="16" fill="#D97757"/>
+      </g>
+    </svg>
+    <span>Claudock</span>
+  </a>
+  <a class="bar-link" href="https://github.com/behkha/claudock">GitHub</a>
+</header>
+
+<main class="doc">
+<h1>Claude Code GUIs in 2026</h1>
+<p>Claude Code runs in a terminal and keeps its setup in a hidden folder, <code>~/.claude</code>. People look for a GUI to run Claude Code in a window, to see and change its setup, to switch API providers, or to track usage. No single tool does all four well. Here's what each option does, as of October 2026.</p>
+
+<div class="tbl stack wide">
+  <table>
+    <caption>As of 27 October 2026</caption>
+    <thead><tr><th scope="col"><span class="visually-hidden">Tool</span></th><th scope="col">Main job</th><th scope="col">Runs sessions</th><th scope="col">Edits <code>~/.claude</code></th><th scope="col">Usage numbers</th><th scope="col">OS</th><th scope="col">Latest release</th><th scope="col">License</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">Claude Code's own apps</th><td data-col="Main job"><span>Run Claude Code</span></td><td data-col="Runs sessions"><span>Yes</span></td><td data-col="Edits ~/.claude"><span>Through Claude Code</span></td><td data-col="Usage numbers"><span><code>/usage</code></span></td><td data-col="OS"><span>macOS, Windows, web, IDEs</span></td><td data-col="Latest release"><span>Ships with Claude Code</span></td><td data-col="License"><span>Anthropic's terms</span></td></tr>
+      <tr><th scope="row">Claudock</th><td data-col="Main job"><span>Manage <code>~/.claude</code></span></td><td data-col="Runs sessions"><span>No</span></td><td data-col="Edits ~/.claude"><span>Every part of it</span></td><td data-col="Usage numbers"><span>Activity stats, share card</span></td><td data-col="OS"><span>macOS, Windows, Linux</span></td><td data-col="Latest release"><span>26 Oct 2026</span></td><td data-col="License"><span>MIT</span></td></tr>
+      <tr><th scope="row">CC Switch</th><td data-col="Main job"><span>Providers and config across 12 CLIs</span></td><td data-col="Runs sessions"><span>No</span></td><td data-col="Edits ~/.claude"><span>Providers, MCP, skills, prompts</span></td><td data-col="Usage numbers"><span>Tokens, cost, quota</span></td><td data-col="OS"><span>macOS, Windows, Linux</span></td><td data-col="Latest release"><span>26 Oct 2026</span></td><td data-col="License"><span>MIT</span></td></tr>
+      <tr><th scope="row">opcode</th><td data-col="Main job"><span>Run sessions and agents</span></td><td data-col="Runs sessions"><span>Yes</span></td><td data-col="Edits ~/.claude"><span>MCP, CLAUDE.md</span></td><td data-col="Usage numbers"><span>Tokens, cost</span></td><td data-col="OS"><span>macOS, Linux (Windows from source)</span></td><td data-col="Latest release"><span>31 Aug 2025</span></td><td data-col="License"><span>AGPL-3.0</span></td></tr>
+      <tr><th scope="row">ccusage</th><td data-col="Main job"><span>Usage reports (CLI)</span></td><td data-col="Runs sessions"><span>No</span></td><td data-col="Edits ~/.claude"><span>No</span></td><td data-col="Usage numbers"><span>Tokens, cost</span></td><td data-col="OS"><span>Any with Node, Bun or Nix</span></td><td data-col="Latest release"><span>26 Oct 2026</span></td><td data-col="License"><span>MIT</span></td></tr>
+      <tr><th scope="row">Claude Code Usage Monitor</th><td data-col="Main job"><span>Live usage (terminal)</span></td><td data-col="Runs sessions"><span>No</span></td><td data-col="Edits ~/.claude"><span>No</span></td><td data-col="Usage numbers"><span>Tokens, cost, official limits</span></td><td data-col="OS"><span>Any with Python 3.9+</span></td><td data-col="Latest release"><span>27 Jun 2026</span></td><td data-col="License"><span>MIT</span></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<h2>Which one, by what you want</h2>
+<div class="tbl stack">
+  <table>
+    <thead><tr><th scope="col">You want to</th><th scope="col">Use</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">Run Claude Code in a window</th><td data-col="Use"><span>Claude Code's own desktop app or IDE extension; opcode for checkpoints and background agents</span></td></tr>
+      <tr><th scope="row">See and change everything in <code>~/.claude</code></th><td data-col="Use"><span>Claudock</span></td></tr>
+      <tr><th scope="row">Switch API providers, or manage several CLIs</th><td data-col="Use"><span>CC Switch</span></td></tr>
+      <tr><th scope="row">Exact cost reports</th><td data-col="Use"><span>ccusage</span></td></tr>
+      <tr><th scope="row">Your 5-hour limit, live</th><td data-col="Use"><span>Claude Code Usage Monitor (terminal) or CC Switch (tray)</span></td></tr>
+      <tr><th scope="row">Post your Claude Code stats</th><td data-col="Use"><span>Claudock</span></td></tr>
+    </tbody>
+  </table>
+</div>
+<p>Most of these work together: they read the same local files and do different jobs.</p>
+
+<h2>What to look for</h2>
+<ul>
+  <li><strong>Which job it's built for.</strong> A tool built to run sessions treats config as a side panel, and the other way round.</li>
+  <li><strong>How it writes your files.</strong> Claude Code rewrites <code>~/.claude.json</code> while it runs. Check for backups, undo, and whether the tool writes the whole file or only what changed.</li>
+  <li><strong>Whether it's maintained.</strong> Claude Code changes every week. Look at the last release date, not the star count.</li>
+  <li><strong>Install friction.</strong> Signed builds or a warning-free install, an installer for your OS, updates.</li>
+  <li><strong>What it sends.</strong> Accounts, telemetry, and whether your config leaves your machine.</li>
+</ul>
+
+<h2>Claude Code's own apps</h2>
+<p>Before you install anything else: Anthropic ships Claude Code in more than a terminal. There's a Code tab in the Claude desktop app, Claude Code on the web, and extensions for VS Code and JetBrains. Inside Claude Code, <code>/config</code>, <code>/permissions</code>, <code>/mcp</code> and <code>/usage</code> cover the most common settings.</p>
+<p><strong>Best for</strong> running Claude Code in a window, from the people who make it. <strong>Not built for</strong> an overview of everything in <code>~/.claude</code>, bulk changes, or cleanup.</p>
+
+<h2>Claudock</h2>
+<p>A desktop app for the <code>~/.claude</code> folder, with one screen for each part: settings (as a form or raw JSON), CLAUDE.md and rules, hooks, permissions, skills, agents, commands, plugins, mods, MCP servers, projects and transcripts, memory, plans, history, storage and backups. ⌘K searches across all of them.</p>
+<p>Before every write, it saves a snapshot of the file outside <code>~/.claude</code>, then writes atomically. For <code>~/.claude.json</code> it changes only the key you edited. Deletes go to the OS Trash. It never reads credentials. A Share stats card turns Claude Code's own numbers into an image you can post.</p>
+<p>It's a v0.1 beta. It runs with <code>npx claudock</code>, with no installer and no security warning; the installers aren't signed. There's no auto-update, and it doesn't run sessions, switch providers, or track cost.</p>
+<p><strong>Best for</strong> people who've customised Claude Code and want to see and change all of it safely. <strong>Not built for</strong> running sessions, other CLIs, or cost tracking.</p>
+
+<h2>CC Switch</h2>
+<p>The most used tool here, with about 149K stars. It switches API providers for twelve coding CLIs in one click, from the app or the tray. It also manages MCP servers, skills (with a store) and prompt files across them, browses and exports sessions, and shows usage, cost and subscription quota. Signed builds, auto-update, and a release every day or two.</p>
+<p><strong>Best for</strong> people who switch providers or use Codex, Gemini CLI and others alongside Claude Code. <strong>Not built for</strong> Claude Code's hooks, permission rules, agents, commands or plugins. Its README says it leaves them alone when switching, and doesn't describe editing them.</p>
+
+<h2>opcode</h2>
+<p>Formerly Claudia. A desktop app that runs Claude Code for you. You start and resume sessions, run custom agents in the background with their own permissions, and rewind or fork sessions with checkpoints. It has a cost and token dashboard, an MCP manager and a CLAUDE.md editor.</p>
+<p>Its latest release is v0.2.0, from 31 August 2025, and its last code change was in October 2025. The release has macOS and Linux files but no Windows installer.</p>
+<p><strong>Best for</strong> running sessions and background agents from a GUI, with checkpoints. <strong>Not built for</strong> settings, hooks, permissions, skills or plugins (not in its README).</p>
+<p><a href="../../compare/opcode/">Claudock vs opcode</a></p>
+
+<h2>ccusage</h2>
+<p>Not a GUI, but most people asking about Claude Code usage end up here. A fast CLI that reads your local logs and prints daily, weekly, monthly, session and 5-hour reports with cost per model. It also has a status line mode, JSON output and offline pricing, and covers 17 other agent CLIs. Released almost daily.</p>
+<p><strong>Best for</strong> exact token and cost reports, and scripting. <strong>Not built for</strong> a window or a menu bar (its docs list third-party ones), or changing config.</p>
+
+<h2>Claude Code Usage Monitor</h2>
+<p>A Python terminal app with live progress bars for the 5-hour window, burn rate, reset countdown and forecasts. With its status line step added, it shows the official 5-hour and 7-day percentages from Claude Code itself, and it labels each number by source.</p>
+<p><strong>Best for</strong> a live terminal view of your limits. <strong>Not built for</strong> a GUI (its README points to separate companions), or config.</p>
+
+<h2>Coming to Claudock</h2>
+<p>Planned, not shipped, and not part of the comparison above.</p>
+<ul>
+  <li>Live 5-hour and weekly limits, and a menu bar glance</li>
+  <li>A Today screen and a first-launch numbers screen</li>
+  <li>Full-text session search, and a skills and MCP store</li>
+</ul>
+
+<h2>FAQ</h2>
+<h3>Is there an official Claude Code GUI?</h3>
+<p>Yes. Claude Code runs in the Claude desktop app, on the web, and in VS Code and JetBrains. The other tools on this page are unofficial.</p>
+<h3>What happened to Claudia?</h3>
+<p>It was renamed opcode in August 2025 (v0.2.0 release notes).</p>
+<h3>Which Claude Code GUI is free?</h3>
+<p>All of the third-party tools here are free and open source. Claude Code itself needs a Claude plan or an API key.</p>
+<h3>Which one edits hooks and permissions?</h3>
+<p>Of the tools here, Claudock has screens for both. Claude Code's <code>/permissions</code> command covers permission rules too.</p>
+
+
+<div class="get">
+  <div class="npx">
+    <code id="npx-cmd"><b aria-hidden="true">$ </b>npx claudock</code>
+    <button class="npx-copy" id="npx-copy" type="button" hidden>Copy</button>
+  </div>
+  <p class="inst">
+    <a href="https://github.com/behkha/claudock/releases/latest">Download an installer</a>
+    <a class="note" href="https://github.com/behkha/claudock#install">Not signed yet: first-launch steps</a>
+  </p>
+</div>
+
+
+<p class="fine">Facts come from each project's GitHub repo and docs, checked 27 October 2026. Claudock is one of the tools compared here; the others are described as their own READMEs describe them. If something is wrong or out of date, <a href="https://github.com/behkha/claudock/issues">open an issue</a>.</p>
+</main>
+
+<footer class="foot">
+  <nav aria-label="Project">
+    <a href="https://github.com/behkha/claudock">GitHub</a>
+    <a href="../../alternatives/claude-code-gui/">Compare</a>
+    <a href="../../privacy/">Privacy</a>
+    <a href="../../terms/">Terms</a>
+    <a href="https://github.com/behkha/claudock/blob/main/LICENSE.md">Free and open source (MIT)</a>
+  </nav>
+  <p>Unofficial, not affiliated with Anthropic</p>
+</footer>
+
+</body>
+</html>

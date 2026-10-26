@@ -62,6 +62,7 @@ a { color: inherit; text-decoration-color: var(--border-strong); text-underline-
 a:hover { text-decoration-color: currentColor; }
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; border-radius: 4px; }
 code, pre { font-family: var(--font-mono); }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 h1, h2 { font-family: var(--font-serif); font-weight: 400; margin: 0; letter-spacing: -0.015em; }
 
 .bar, main, .foot { width: 100%; max-width: var(--max); margin-inline: auto; padding-inline: var(--gutter); }
@@ -83,19 +84,26 @@ h1 { font-size: clamp(36px, 3.8vw, 56px); line-height: 1.08; letter-spacing: -0.
 .cap { position: absolute; left: 0; top: 50%; margin: 0; transform: translateY(-50%); font: clamp(44px, 5vw, 76px)/1 var(--font-serif); letter-spacing: -0.025em; visibility: hidden; }
 
 .get { margin-top: 36px; }
-.btn {
-  display: inline-flex; align-items: center; gap: 10px;
-  height: 52px; padding: 0 24px;
-  background: var(--primary-bg); color: var(--primary-fg);
-  border-radius: 10px; font-size: 17px; font-weight: 500; text-decoration: none;
-  transition: transform 0.12s ease, opacity 0.12s ease;
+/* npx claudock is the main install, in the place and size of a button; the installer link sits under it */
+.npx {
+  display: inline-flex; align-items: center; gap: 16px; max-width: 100%;
+  height: 52px; padding: 0 8px 0 20px;
+  background: var(--term); color: var(--term-text); border-radius: 10px;
 }
-.btn:hover { opacity: 0.88; }
-.btn:active { transform: translateY(1px); }
-.btn:focus-visible { outline-offset: 3px; border-radius: 10px; }
-.note { margin: 12px 0 0; font-size: 14px; color: var(--text-3); }
-.note a { text-decoration-color: var(--border-strong); }
-.others { margin: 14px 0 0; display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 14px; color: var(--text-2); }
+.npx code { background: none; padding: 0; font-size: 17px; white-space: nowrap; user-select: all; -webkit-user-select: all; }
+.npx code b { color: var(--accent); font-weight: 400; user-select: none; -webkit-user-select: none; }
+.npx-copy {
+  height: 36px; padding: 0 12px; font: 13px var(--font-sans); cursor: pointer;
+  color: var(--term-text); background: transparent; border: 1px solid rgba(232, 230, 220, 0.3); border-radius: 7px;
+}
+.npx-copy:hover { background: rgba(232, 230, 220, 0.1); }
+.npx-copy:focus-visible { outline-color: #6a9bcc; }
+.npx-copy[hidden] { display: none; }
+.inst { margin: 16px 0 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; font-size: 15px; }
+.inst a { padding: 4px 0; }
+.inst[hidden] { display: none; }
+.note { font-size: 14px; color: var(--text-3); }
+.others { margin: 8px 0 0; display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 14px; color: var(--text-2); }
 .others a { padding: 4px 0; }
 .note[hidden] { display: none; }
 
@@ -199,7 +207,7 @@ code { font-size: 0.9em; background: var(--surface-sunken); padding: 1px 6px; bo
 @media (max-width: 700px) {
   :root { --gutter: 16px; }
   .safe li { grid-template-columns: minmax(0, 1fr); gap: 4px; padding: 18px 0; }
-  .btn { width: 100%; justify-content: center; }
+  .npx { display: flex; width: 100%; justify-content: space-between; }
   .code pre { padding: 18px 16px; font-size: 13.5px; white-space: pre-wrap; overflow-wrap: anywhere; }
   .copy { position: static; margin: 0 16px 16px; }
   .code { display: flex; flex-direction: column; }
@@ -208,6 +216,51 @@ code { font-size: 0.9em; background: var(--surface-sunken); padding: 1px 6px; bo
   .motion .safe li { padding: 28px 0; }
   .marquee { margin-top: 40px; }
   .foot { margin-top: 72px; }
+}
+
+/* Text pages: comparisons, privacy, terms. One reading column; tables may run wider. */
+.doc { max-width: 1040px; margin-inline: auto; padding-block: 48px 0; }
+.doc > * { max-width: 68ch; }
+.doc > .tbl, .doc > .get { max-width: none; }
+.doc h1 { font-size: clamp(36px, 4.4vw, 52px); line-height: 1.08; letter-spacing: -0.02em; text-wrap: balance; }
+.doc h2 { margin-top: 64px; text-wrap: balance; }
+.doc h3 { margin: 36px 0 0; font: 22px/1.25 var(--font-serif); letter-spacing: -0.01em; font-weight: 400; }
+.doc p, .doc ul, .doc ol { margin: 16px 0 0; }
+.doc h1 + p { margin-top: 24px; font-size: 19px; line-height: 1.5; color: var(--text-2); }
+.doc ul, .doc ol { padding-left: 22px; display: grid; gap: 6px; }
+.doc li::marker { color: var(--text-3); }
+.doc .get { margin-top: 64px; }
+.doc .fine { margin-top: 48px; font-size: 14px; color: var(--text-3); }
+.doc .fine a { color: var(--text-2); }
+
+.tbl { margin-top: 24px; overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; -webkit-overflow-scrolling: touch; }
+.tbl table { width: 100%; border-collapse: collapse; font-size: 15px; font-variant-numeric: tabular-nums; }
+.tbl caption { caption-side: top; text-align: left; padding: 12px 16px; font-size: 13px; color: var(--text-3); border-bottom: 1px solid var(--border); }
+.tbl th, .tbl td { padding: 11px 16px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+.tbl tr:last-child > * { border-bottom: 0; }
+.tbl thead th { background: var(--surface-sunken); font-weight: 600; white-space: nowrap; }
+.tbl tbody th { min-width: 11em; font-weight: 500; color: var(--text-2); }
+.tbl .ns { color: var(--text-3); }
+.tbl.wide table { min-width: 880px; font-size: 14px; }
+
+@media (max-width: 1000px) {
+  .doc { padding-top: 32px; }
+  .doc h2 { margin-top: 56px; }
+}
+@media (max-width: 700px) {
+  .doc h1 + p { font-size: 17px; }
+  /* Two-column comparison tables become one block per row; each cell is labelled with its column */
+  .tbl.stack { border: 0; border-radius: 0; overflow: visible; }
+  .tbl.stack table { min-width: 0; }
+  .tbl.stack table, .tbl.stack tbody, .tbl.stack tr, .tbl.stack th, .tbl.stack td { display: block; }
+  .tbl.stack caption { display: block; padding: 0 0 8px; }
+  .tbl.stack thead { display: none; }
+  .tbl.stack tr { padding: 14px 0; border-top: 1px solid var(--border); }
+  .tbl.stack tr:last-child { border-bottom: 1px solid var(--border); }
+  .tbl.stack th, .tbl.stack td { padding: 0; border: 0; }
+  .tbl.stack tbody th { margin-bottom: 6px; color: var(--text); font-weight: 600; }
+  .tbl.stack td { display: grid; grid-template-columns: 7.5em minmax(0, 1fr); gap: 12px; padding: 3px 0; }
+  .tbl.stack td::before { content: attr(data-col); color: var(--text-3); }
 }
 
 @media (prefers-reduced-motion: reduce) {

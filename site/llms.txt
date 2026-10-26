@@ -1,0 +1,25 @@
+# Claudock
+
+> Claudock is a free, open-source (MIT) desktop app for macOS, Windows and Linux that opens the Claude Code config folder (~/.claude, or CLAUDE_CONFIG_DIR) and the MCP servers in ~/.claude.json, with one screen for each part. Run it with `npx claudock` (Node.js 22.12 or later). It is unofficial and not affiliated with Anthropic.
+
+Screens: Overview (disk use, what's installed, a Share stats card from Claude Code's stats-cache.json), Settings (settings.json and settings.local.json as a form or raw JSON, with history), CLAUDE.md & rules, Hooks, Permissions, Skills (turn on or off through skillOverrides, edit, duplicate), Agents, Commands, Plugins, Mods, MCP servers, Projects (session transcripts), Memory, Plans, History, Storage (disk use with cleanup suggestions) and Backups (diff and restore snapshots).
+
+Every write is preceded by a snapshot kept outside ~/.claude, then done with a temp file and a rename; JSON is validated first; deletes go to the OS Trash. It never reads .credentials.json or sessions/*.key. It doesn't run, update or sign in to Claude Code, doesn't sync between machines, and doesn't edit the .claude/ folders inside repositories. It has no telemetry and no account.
+
+## Docs
+
+- [README](https://github.com/behkha/claudock/blob/main/README.md): what it does, install, first-launch steps for the unsigned installers
+- [Security](https://github.com/behkha/claudock/blob/main/SECURITY.md): what it reads, never reads and sends, and how to report a problem
+- [Development](https://github.com/behkha/claudock/blob/main/docs/DEVELOPMENT.md): setup, the fixture rule, code layout
+- [Privacy](https://behkha.github.io/claudock/privacy/): network requests made by the app and the website
+
+## Comparisons
+
+- [Claude Code GUIs in 2026](https://behkha.github.io/claudock/alternatives/claude-code-gui/): Claudock, Claude Code's own apps, CC Switch, opcode, ccusage and Claude Code Usage Monitor
+- [Claudock vs opcode](https://behkha.github.io/claudock/compare/opcode/)
+
+## Optional
+
+- [Releases](https://github.com/behkha/claudock/releases): installers (.dmg, .exe, .AppImage, .deb)
+- [npm package](https://www.npmjs.com/package/claudock)
+- [Terms](https://behkha.github.io/claudock/terms/): MIT, provided as is

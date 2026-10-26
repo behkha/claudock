@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claudock vs opcode: two desktop apps for Claude Code</title>
+<meta name="description" content="opcode runs Claude Code sessions and agents in a window. Claudock edits the ~/.claude folder they use. What each does, as of October 2026.">
+<link rel="canonical" href="https://behkha.github.io/claudock/compare/opcode/">
+<meta name="theme-color" content="#faf9f5" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#262624" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../../apple-touch-icon.png">
+
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Claudock">
+<meta property="og:title" content="Claudock vs opcode: two desktop apps for Claude Code">
+<meta property="og:description" content="opcode runs Claude Code sessions and agents in a window. Claudock edits the ~/.claude folder they use. What each does, as of October 2026.">
+<meta property="og:url" content="https://behkha.github.io/claudock/compare/opcode/">
+<meta property="og:image" content="https://behkha.github.io/claudock/og.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="stylesheet" href="../../style.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Is Claudock a fork of opcode?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. They are separate projects with separate code. Claudock is built on Electron, opcode on Tauri."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Can Claudock run Claude Code sessions like opcode?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. Claudock manages the config folder. You keep running Claude Code where you run it now."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does opcode work on Windows?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Its README lists Windows 10 and 11 for building from source. Its latest release (v0.2.0) has no Windows installer."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Are either of them official?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. Both say they are not affiliated with Anthropic."
+      }
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": "Claudock",
+      "item": "https://behkha.github.io/claudock/"
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "name": "Compare",
+      "item": "https://behkha.github.io/claudock/alternatives/claude-code-gui/"
+    },
+    {
+      "@type": "ListItem",
+      "position": 3,
+      "name": "Claudock vs opcode",
+      "item": "https://behkha.github.io/claudock/compare/opcode/"
+    }
+  ]
+}
+</script>
+<script src="../../app.js" defer></script>
+</head>
+<body>
+
+<header class="bar">
+  <a class="brand" href="../../" aria-label="Claudock home">
+    <svg class="mark" viewBox="0 0 1024 1024" width="28" height="28" aria-hidden="true">
+      <rect x="32" y="32" width="960" height="960" rx="216" fill="#141413"/>
+      <g transform="translate(512 512) scale(1.165) translate(-512 -512)">
+        <path d="M 236 552 C 282 458, 372 452, 442 512 C 512 572, 602 568, 650 474" fill="none" stroke="#FAF9F5" stroke-width="80" stroke-linecap="round"/>
+        <rect x="716" y="372" width="100" height="284" rx="16" fill="#D97757"/>
+      </g>
+    </svg>
+    <span>Claudock</span>
+  </a>
+  <a class="bar-link" href="https://github.com/behkha/claudock">GitHub</a>
+</header>
+
+<main class="doc">
+<h1>Claudock vs opcode</h1>
+<p>Both are free, open-source desktop apps for Claude Code, and they do different jobs. opcode runs Claude Code sessions and agents in a window. Claudock edits the <code>~/.claude</code> folder they use, and you keep running Claude Code in your terminal.</p>
+
+<div class="tbl stack">
+  <table>
+    <caption>As of 27 October 2026</caption>
+    <thead><tr><th scope="col"><span class="visually-hidden">Topic</span></th><th scope="col">Claudock</th><th scope="col">opcode</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">Built for</th><td data-col="Claudock"><span>Managing <code>~/.claude</code> and <code>~/.claude.json</code></span></td><td data-col="opcode"><span>Running Claude Code sessions and agents</span></td></tr>
+      <tr><th scope="row">Runs Claude Code sessions</th><td data-col="Claudock"><span>No</span></td><td data-col="opcode"><span>Yes, start and resume</span></td></tr>
+      <tr><th scope="row">Custom agents</th><td data-col="Claudock"><span>Edit the agent files in <code>~/.claude/agents</code></span></td><td data-col="opcode"><span>Its own CC Agents with per-agent file and network permissions, run in the background</span></td></tr>
+      <tr><th scope="row">Session checkpoints</th><td data-col="Claudock"><span>No</span></td><td data-col="opcode"><span>Timeline, restore, fork, diff</span></td></tr>
+      <tr><th scope="row">Read past transcripts</th><td data-col="Claudock"><span>Yes</span></td><td data-col="opcode"><span>Yes</span></td></tr>
+      <tr><th scope="row">Settings (<code>settings.json</code>)</th><td data-col="Claudock"><span>Form or raw JSON, schema suggestions, history</span></td><td data-col="opcode"><span><span class="ns">Not in their README</span></span></td></tr>
+      <tr><th scope="row">Hooks</th><td data-col="Claudock"><span>Add, edit, remove, grouped by event</span></td><td data-col="opcode"><span><span class="ns">Not in their README</span></span></td></tr>
+      <tr><th scope="row">Permissions</th><td data-col="Claudock"><span>Allow, ask and deny rules, default mode</span></td><td data-col="opcode"><span><span class="ns">Not in their README</span></span></td></tr>
+      <tr><th scope="row">Skills</th><td data-col="Claudock"><span>Turn on or off, edit, duplicate, Trash</span></td><td data-col="opcode"><span><span class="ns">Not in their README</span></span></td></tr>
+      <tr><th scope="row">Slash commands, plugins</th><td data-col="Claudock"><span>Edit commands; turn plugins on or off</span></td><td data-col="opcode"><span><span class="ns">Not in their README</span></span></td></tr>
+      <tr><th scope="row">CLAUDE.md</th><td data-col="Claudock"><span>Edit <code>CLAUDE.md</code> and <code>rules/</code></span></td><td data-col="opcode"><span>Editor with preview; finds CLAUDE.md files across projects</span></td></tr>
+      <tr><th scope="row">MCP servers</th><td data-col="Claudock"><span>Add, edit, remove; writes only the changed key</span></td><td data-col="opcode"><span>Add, edit, test connection, import from Claude Desktop</span></td></tr>
+      <tr><th scope="row">Usage numbers</th><td data-col="Claudock"><span>Activity stats and a share card: messages, sessions, longest session, peak hour, top model</span></td><td data-col="opcode"><span>Cost and tokens by model, project and date; export</span></td></tr>
+      <tr><th scope="row">Disk use and cleanup</th><td data-col="Claudock"><span>Per folder, with cleanup suggestions</span></td><td data-col="opcode"><span><span class="ns">Not in their README</span></span></td></tr>
+      <tr><th scope="row">Undo for config edits</th><td data-col="Claudock"><span>Snapshot before every write; diff and restore</span></td><td data-col="opcode"><span><span class="ns">Not in their README</span></span></td></tr>
+      <tr><th scope="row">Windows</th><td data-col="Claudock"><span><code>npx claudock</code> or an <code>.exe</code></span></td><td data-col="opcode"><span>Build from source; no Windows file in the v0.2.0 release</span></td></tr>
+      <tr><th scope="row">Latest release</th><td data-col="Claudock"><span>v0.1.1, 26 Oct 2026</span></td><td data-col="opcode"><span>v0.2.0, 31 Aug 2025</span></td></tr>
+      <tr><th scope="row">License</th><td data-col="Claudock"><span>MIT</span></td><td data-col="opcode"><span>AGPL-3.0</span></td></tr>
+      <tr><th scope="row">Stack</th><td data-col="Claudock"><span>Electron</span></td><td data-col="opcode"><span>Tauri</span></td></tr>
+      <tr><th scope="row">Price</th><td data-col="Claudock"><span>Free</span></td><td data-col="opcode"><span>Free</span></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<h2>Running Claude Code</h2>
+<p>opcode wraps the Claude Code CLI. You pick a project, start a session or resume an old one, and work in opcode's window. Its checkpoints save the state of a session as you go, so you can jump back, branch off, or diff two points. Its CC Agents feature runs a custom agent in a background process with its own file and network permissions and keeps a log of each run.</p>
+<p>Claudock does none of this. You keep running <code>claude</code> in your terminal or editor. Claudock lists past sessions per project and lets you read them, Trash one, or clear out sessions older than a number of days you pick.</p>
+
+<h2>Changing your setup</h2>
+<p>Claude Code's behaviour comes from files in <code>~/.claude</code>: <code>settings.json</code>, hooks, permission rules, skills, agents, commands, plugins, and MCP servers in <code>~/.claude.json</code>. opcode's README covers two of them, CLAUDE.md and MCP servers. It doesn't mention settings, hooks, permissions, skills, commands or plugins.</p>
+<p>Claudock has a screen for each one. Settings open as a form, with the raw JSON one click away. Hooks are grouped by event, with the matcher and command visible. Skills turn on and off through <code>skillOverrides</code>, so you don't have to move folders. ⌘K searches across all of it.</p>
+
+<h2>Safety</h2>
+<p>Claudock saves a copy of each file outside <code>~/.claude</code> before it writes. Then it writes to a temp file and renames it over the original, so a crash can't leave a half-written file. For <code>~/.claude.json</code>, which Claude Code rewrites while it runs, Claudock re-reads the file just before writing and changes only the key you edited. Deletes go to the OS Trash. It never reads <code>.credentials.json</code>.</p>
+<p>opcode's checkpoints are about sessions: they undo what Claude did in your project. Its README doesn't describe how it writes config files.</p>
+
+<h2>Usage and cost</h2>
+<p>opcode has a usage dashboard: cost and tokens by model, project and date, with charts and export. Its README lists usage alerts as "coming soon".</p>
+<p>Claudock shows activity, not cost: messages, sessions, longest session, peak hour, top model and a heat map, read from Claude Code's own <code>stats-cache.json</code>. You can post them as an image. It doesn't count tokens or dollars yet. For cost reports today, use opcode or ccusage.</p>
+
+<h2>Install and updates</h2>
+<p>Claudock runs with <code>npx claudock</code> on macOS, Windows and Linux. npm downloads don't carry the macOS quarantine flag or the Windows Mark of the Web, so there's no security warning. There are also installers for macOS (Apple silicon and Intel), Windows and Linux. They aren't signed, so their first launch needs one extra click. There's no auto-update; the app tells you when a newer release is out.</p>
+<p>opcode's v0.2.0 release has a macOS <code>.dmg</code> and a Linux AppImage and <code>.deb</code>. It lists no Windows file, so on Windows you build it from source with Rust and Bun. Its README still says release executables "will be published soon".</p>
+<p>opcode's last release was v0.2.0 on 31 August 2025, and its last code change was on 13 October 2025. Claudock's first release was on 25 October 2026.</p>
+
+<h2>Who opcode is best for</h2>
+<ul>
+  <li>You want to run and resume Claude Code sessions from a window instead of a terminal.</li>
+  <li>You use checkpoints to rewind or fork a session.</li>
+  <li>You want background agents with their own permissions.</li>
+  <li>You want a cost dashboard in the same app.</li>
+</ul>
+
+<h2>Who Claudock is best for</h2>
+<ul>
+  <li>You run Claude Code in a terminal or editor and want a window for its setup.</li>
+  <li>You have many skills, hooks, MCP servers or permission rules and want to see them all and turn them on or off.</li>
+  <li>You've broken <code>settings.json</code> or <code>~/.claude.json</code> before and want undo.</li>
+  <li>You're on Windows.</li>
+  <li>Your <code>~/.claude</code> folder has grown to gigabytes.</li>
+</ul>
+
+<h2>Switching from opcode</h2>
+<p>There's nothing to import. Claudock reads <code>~/.claude</code> directly, so your settings, skills, MCP servers and transcripts show up on first launch. opcode's own data, such as its CC Agents and checkpoints, stays in opcode. They do different jobs, so you can keep both: they both read <code>~/.claude/projects</code>, and Claudock writes only when you change something.</p>
+<p>To look before you trust it with your real folder, clone the repo and run <code>npm run dev</code>. It opens on a generated fake config. <code>npm run dev:real</code> opens your real <code>~/.claude</code> with every write turned off.</p>
+
+<h2>Coming to Claudock</h2>
+<p>Planned, not shipped, and not part of the comparison above.</p>
+<ul>
+  <li>Live 5-hour and weekly limits, and a menu bar glance</li>
+  <li>Full-text session search</li>
+  <li>Session replay and export</li>
+</ul>
+
+<h2>FAQ</h2>
+<h3>Is Claudock a fork of opcode?</h3>
+<p>No. They are separate projects with separate code. Claudock is built on Electron, opcode on Tauri.</p>
+<h3>Can Claudock run Claude Code sessions like opcode?</h3>
+<p>No. Claudock manages the config folder. You keep running Claude Code where you run it now.</p>
+<h3>Does opcode work on Windows?</h3>
+<p>Its README lists Windows 10 and 11 for building from source. Its latest release (v0.2.0) has no Windows installer.</p>
+<h3>Are either of them official?</h3>
+<p>No. Both say they are not affiliated with Anthropic.</p>
+
+<p>See also <a href="../../alternatives/claude-code-gui/">Claude Code GUIs in 2026</a>, which covers CC Switch, ccusage and Claude Code's own apps too.</p>
+
+
+<div class="get">
+  <div class="npx">
+    <code id="npx-cmd"><b aria-hidden="true">$ </b>npx claudock</code>
+    <button class="npx-copy" id="npx-copy" type="button" hidden>Copy</button>
+  </div>
+  <p class="inst">
+    <a href="https://github.com/behkha/claudock/releases/latest">Download an installer</a>
+    <a class="note" href="https://github.com/behkha/claudock#install">Not signed yet: first-launch steps</a>
+  </p>
+</div>
+
+
+<p class="fine">Facts about opcode come from <a href="https://github.com/winfunc/opcode">github.com/winfunc/opcode</a> (README and releases), checked 27 October 2026. If something here is wrong or out of date, <a href="https://github.com/behkha/claudock/issues">open an issue</a> and it will be fixed.</p>
+</main>
+
+<footer class="foot">
+  <nav aria-label="Project">
+    <a href="https://github.com/behkha/claudock">GitHub</a>
+    <a href="../../alternatives/claude-code-gui/">Compare</a>
+    <a href="../../privacy/">Privacy</a>
+    <a href="../../terms/">Terms</a>
+    <a href="https://github.com/behkha/claudock/blob/main/LICENSE.md">Free and open source (MIT)</a>
+  </nav>
+  <p>Unofficial, not affiliated with Anthropic</p>
+</footer>
+
+</body>
+</html>

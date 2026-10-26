@@ -1,4 +1,4 @@
-/* Claudock site: OS-aware download button, demo video controls, copy button. No dependencies. */
+/* Claudock site: npx command with Copy, OS-aware installer link, demo video controls. No dependencies. */
 (function () {
   'use strict'
 
@@ -47,14 +47,16 @@
 
   function render(os, urls) {
     var button = document.getElementById('download')
-    var label = document.getElementById('download-label')
+    var inst = document.getElementById('inst')
     var others = document.getElementById('others')
     var note = document.getElementById('note')
-    if (!button || !label || !others) return
+    if (!button || !inst || !others) return
 
+    // npx claudock is the main install; this line is the installer for this OS, with the unsigned note beside it
     var primary = TARGETS.filter(function (t) { return t.os && t.os === os })[0]
+    inst.hidden = !primary
     button.href = (primary && urls[primary.key]) || FALLBACK
-    label.textContent = primary ? primary.primary : 'Download'
+    button.textContent = primary ? primary.primary : 'Download'
     if (note) note.hidden = !(os === 'mac' || os === 'win')
 
     others.textContent = ''
@@ -84,6 +86,7 @@
   }
 
   function downloads() {
+    if (!document.getElementById('download')) return // only the home page has the download links
     var os = detectOS()
     render(os, {}) // right away: OS-specific wording, every link on the releases page
     var hit = cached()
@@ -133,14 +136,16 @@
     if (!reduce.matches) play()
   }
 
-  function copy() {
-    var btn = document.getElementById('copy')
-    var code = document.getElementById('cmds')
+  // A Copy button for a block of commands. Without clipboard access the button stays hidden and the text stays selectable.
+  function copy(buttonId, codeId) {
+    var btn = document.getElementById(buttonId)
+    var code = document.getElementById(codeId)
     if (!btn || !code || !navigator.clipboard) return
     btn.hidden = false
     var timer
     btn.addEventListener('click', function () {
-      navigator.clipboard.writeText(code.textContent.trim() + '\n').then(function () {
+      var text = code.textContent.replace(/^\$ /, '').trim()
+      navigator.clipboard.writeText(text + '\n').then(function () {
         btn.textContent = 'Copied'
         clearTimeout(timer)
         timer = setTimeout(function () { btn.textContent = 'Copy' }, 1600)
@@ -152,5 +157,6 @@
   if (typeof document === 'undefined') return
   downloads()
   video()
-  copy()
+  copy('npx-copy', 'npx-cmd')
+  copy('copy', 'cmds')
 })()
