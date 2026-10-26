@@ -2,6 +2,7 @@ import { app } from 'electron'
 import fsp from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
+import type { InstallKind } from '@shared/types'
 
 /**
  * CLAUDE_CONFIG_DIR, trimmed, or null when unset or blank. On Windows `set CLAUDE_CONFIG_DIR="C:\x"` keeps the quotes in
@@ -39,13 +40,22 @@ export function snapshotsDir(): string {
 }
 
 /**
- * Development safety (SPEC rule 7): an unpackaged build refuses to write unless CLAUDE_CONFIG_DIR is set
- * (point it at ./.fixture/claude) or CLAUDOCK_ALLOW_REAL_WRITES=1 is set explicitly. CLAUDOCK_READONLY=1 refuses every
- * write, packaged or not.
+ * How this copy was installed. `npx claudock` runs the plain app folder with npm's Electron, so `app.isPackaged` is false
+ * there too; that folder sits directly in a node_modules folder, a git clone does not.
+ */
+export function installKind(): InstallKind {
+  if (app.isPackaged) return 'installer'
+  return path.basename(path.dirname(app.getAppPath())) === 'node_modules' ? 'npm' : 'dev'
+}
+
+/**
+ * Development safety (SPEC rule 7): a development build (not an installer, not from npm) refuses to write unless
+ * CLAUDE_CONFIG_DIR is set (point it at ./.fixture/claude) or CLAUDOCK_ALLOW_REAL_WRITES=1 is set explicitly.
+ * CLAUDOCK_READONLY=1 refuses every write, however it was installed.
  */
 export function writesAllowed(): boolean {
   if (process.env.CLAUDOCK_READONLY === '1') return false
-  if (app.isPackaged) return true
+  if (installKind() !== 'dev') return true
   return isCustomConfigDir() || process.env.CLAUDOCK_ALLOW_REAL_WRITES === '1'
 }
 

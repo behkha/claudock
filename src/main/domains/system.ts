@@ -6,7 +6,8 @@ import type { SystemApi } from '@shared/api/system'
 import type { Platform } from '@shared/types'
 import { dirSize, exists } from '../fsx'
 import { defineDomain, emit } from '../ipcx'
-import { configDir, globalStateFile, assertNotSecretReal, isCustomConfigDir, isSecret, resolveInside, userDataDir, writesAllowed } from '../paths'
+import { configDir, globalStateFile, assertNotSecretReal, installKind, isCustomConfigDir, isSecret, resolveInside, userDataDir, writesAllowed } from '../paths'
+import { checkUpdate } from '../update'
 import { currentTheme, setTheme } from '../theme'
 import { collectCounts } from './index'
 
@@ -48,8 +49,13 @@ const impl: SystemApi = {
       electron: process.versions.electron,
       platform: process.platform as Platform,
       arch: process.arch,
-      packaged: app.isPackaged
+      packaged: app.isPackaged,
+      install: installKind()
     }
+  },
+
+  async checkUpdate() {
+    return checkUpdate()
   },
 
   async reveal(p) {

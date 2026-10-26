@@ -4,11 +4,11 @@ import { api, useApi } from '@/lib/api'
 import { onRefreshCounts } from '@/lib/counts'
 import { useNav } from '@/lib/nav'
 import { SCREEN_ICONS } from './icons'
+import { SidebarFooter } from './SidebarFooter'
 
 export function Sidebar(): JSX.Element {
   const { screen, navigate } = useNav()
   const counts = useApi(() => api.system.sidebarCounts(), [])
-  const info = useApi(() => api.system.appInfo(), [])
 
   // counts can change while the app is in the background (Claude Code keeps writing): refresh on focus
   const reloadCounts = counts.reload // stable across renders
@@ -49,7 +49,7 @@ export function Sidebar(): JSX.Element {
           </div>
         ))}
       </nav>
-      <footer className="sidebar__footer">Unofficial · v{info.data?.version ?? ''}</footer>
+      <SidebarFooter />
     </aside>
   )
 }

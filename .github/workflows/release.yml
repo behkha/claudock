@@ -1,6 +1,8 @@
 # Builds the installers on each platform's own runner.
 # Pushing a v* tag (matching package.json's version) attaches them to a draft release for that tag;
-# publish it on GitHub by hand. Running the workflow by hand only builds, and leaves the files as run artifacts.
+# publish it on GitHub by hand. The same tag publishes the package to npm (`npx claudock`) once every installer built;
+# that needs an npm automation token in the NPM_TOKEN repository secret.
+# Running the workflow by hand only builds, and leaves the files as run artifacts.
 name: Release
 
 on:
@@ -85,3 +87,27 @@ jobs:
             gh release create "$GITHUB_REF_NAME" installers/* --draft --title "Claudock $GITHUB_REF_NAME" \
               --notes-file .github/release-notes.md --generate-notes
           fi
+
+  npm:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # npm provenance: the package page links back to this run and commit
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://registry.npmjs.org
+      - run: npm ci
+      # prepack runs the build. A pre-release version (1.2.0-beta.1) goes to the `next` tag, so `npx claudock@latest` skips it.
+      - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          version=$(node -p "require('./package.json').version")
+          case "$version" in *-*) tag=next ;; *) tag=latest ;; esac
+          npm publish --provenance --access public --tag "$tag"
