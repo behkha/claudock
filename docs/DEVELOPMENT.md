@@ -16,7 +16,7 @@ npm run dev       # runs the app on the fixture
 
 **Development and tests never write to the real `~/.claude`.** `npm run dev` and `npm run shot` set `CLAUDE_CONFIG_DIR=./.fixture/claude`. A build run from the git clone also refuses every write unless `CLAUDE_CONFIG_DIR` is set (or `CLAUDOCK_ALLOW_REAL_WRITES=1`), so `npm run dev:real` is a read-only look at your own folder. Installers and the npm copy (`npx claudock`, app folder inside a `node_modules`) write normally (`installKind()` in `src/main/paths.ts`). The fixture is generated from scratch; nothing is copied from a real config. `.credentials.json` there contains `FAKE-DO-NOT-READ` on purpose.
 
-All writes to the user's config go through `src/main/safeWrite.ts` (snapshot to `<userData>/snapshots`, temp file + atomic rename, JSON validated, deletes to the OS Trash). The one other file the app writes is its own cache of the settings docs, `<userData>/settings-docs.json`: app data, not config, so it is written directly (temp file + rename) and never snapshotted. `.credentials.json` and `sessions/*.key` are never read.
+All writes to the user's config go through `src/main/safeWrite.ts` (snapshot to `<userData>/snapshots`, temp file + atomic rename, JSON validated, deletes to the OS Trash). Claudock's own data is written directly (temp file + rename) and never snapshotted: `<userData>/prefs.json`, the cache of the settings docs, `<userData>/settings-docs.json`, and the live limits step, `<userData>/live-limits/<config dir hash>/` (`statusline.sh`, which Claude Code runs as the status line once the step is on, `state.json` with the previous `statusLine` value, and `limits.json` with the last `rate_limits` Claude Code sent; `src/main/domains/limits.ts`). Turning the step on or off changes only `statusLine` in settings.json, through `updateSettings`. `.credentials.json` and `sessions/*.key` are never read.
 
 At launch the main process downloads Anthropic's settings docs for the Settings JSON editor (`src/main/settingsDocs.ts`). `CLAUDOCK_OFFLINE=1` skips that fetch, so the editor uses the cache or the copy bundled with the app (screenshots skip it too). Installed copies also ask GitHub for the latest release to show a new-version notice (`src/main/update.ts`); `CLAUDOCK_OFFLINE=1` skips that too. `CLAUDOCK_LATEST_VERSION=9.9.9 npm run dev` shows the notice without asking GitHub.
 
@@ -29,6 +29,7 @@ At launch the main process downloads Anthropic's settings docs for the Settings 
 | `npm run build` | Production build into `./out` |
 | `npm run typecheck` / `npm run lint` | tsc (main + renderer) / ESLint |
 | `npm run fixture` | Rebuild `./.fixture/claude` |
+| `npm run fixture:status` | Plays Claude Code calling the fixture's status line once with sample `rate_limits` (`-- --five 80`, `--week`, `--no-limits`, `--expired`) |
 | `npm run shot` | Headless screenshots of every screen, light and dark, into `./.shots`. `-- --only skills,palette`, `-- --out <dir>` |
 | `npm run settings-docs` | Re-downloads Anthropic's settings docs and JSON schema and rebuilds `src/main/settingsDocs.bundled.json`, the offline fallback for the JSON editor's suggestions. Run it before a release |
 | `npm run dist:mac` / `dist:win` / `dist:linux` | electron-builder packages into `./dist` |

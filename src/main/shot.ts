@@ -3,7 +3,9 @@ import fsp from 'node:fs/promises'
 import path from 'node:path'
 import { SCREENS, type ScreenId } from '@shared/nav'
 import { app } from 'electron'
+import { spawn } from 'node:child_process'
 import { emit } from './ipcx'
+import { configDir } from './paths'
 import { setTheme } from './theme'
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
@@ -11,7 +13,7 @@ const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms
 /**
  * Screenshot mode (CLAUDOCK_SHOT=1, driven by scripts/shot.mjs): visits every screen in light then dark through the
  * normal `system:navigate` / `system:theme` events, waits until each is loaded and painted in that theme, saves
- * `<dir>/<theme>-<screen>.png` (plus `palette`, `settings-json`, `mods-draft`, the Mods screen with the fixture's draft selected, and `share`, the Overview share dialog, and `card.png`, the card itself), prints renderer console errors as `CONSOLE_ERROR ...` and failed shots as
+ * `<dir>/<theme>-<screen>.png` (plus `limits-confirm` and `limits`, live limits turned on through the Overview card with one played status line run and turned off again, which must leave settings.json byte for byte as it was, `palette`, `settings-json`, `mods-draft`, the Mods screen with the fixture's draft selected, and `share`, the Overview share dialog, and `card.png`, the card itself), prints renderer console errors as `CONSOLE_ERROR ...` and failed shots as
  * `SHOT_FAILED ...`, and exits 0 (clean) or 1 (errors).
  */
 export async function runShots(win: BrowserWindow, opts: { dir: string; only: string[] }): Promise<void> {
@@ -157,6 +159,74 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
     console.log(`SHOT ${file} 2400x1350`)
   }
 
+  /** Click the first enabled button whose text is `label`, waiting up to 15 s for it. */
+  const click = (label: string, scope = 'document'): Promise<void> =>
+    js(`(async () => {
+      const t = Date.now()
+      while (Date.now() - t < 15000) {
+        const b = [...((${scope})?.querySelectorAll('button') ?? [])].find((x) => x.textContent.trim() === ${JSON.stringify(label)} && !x.disabled)
+        if (b) { b.click(); return }
+        await new Promise((r) => setTimeout(r, 100))
+      }
+      throw new Error('timed out waiting for the button ' + ${JSON.stringify(label)})
+    })()`)
+  const waitFor = (cond: string, what: string): Promise<void> =>
+    js(`(async () => {
+      const t = Date.now()
+      while (Date.now() - t < 15000) { if (${cond}) return; await new Promise((r) => setTimeout(r, 100)) }
+      throw new Error('timed out waiting for ' + ${JSON.stringify(what)})
+    })()`)
+
+  /** Play Claude Code: run the configured statusLine command once with a status JSON that carries rate_limits. */
+  async function playStatusLine(): Promise<void> {
+    const settings = JSON.parse(await fsp.readFile(path.join(configDir(), 'settings.json'), 'utf8')) as { statusLine?: { command?: string } }
+    const command = settings.statusLine?.command
+    if (!command) throw new Error('limits: no statusLine command after turning on')
+    const now = Date.now()
+    const monday = new Date(now)
+    monday.setDate(monday.getDate() + ((8 - monday.getDay()) % 7 || 7))
+    monday.setHours(9, 0, 0, 0)
+    const input = JSON.stringify({
+      session_id: 'shot',
+      model: { id: 'claude-opus-5-5', display_name: 'Opus 5.5' },
+      workspace: { current_dir: '/tmp/"rate_limits": {}', project_dir: '/tmp' },
+      rate_limits: {
+        five_hour: { used_percentage: 42, resets_at: Math.floor((now + 148 * 60_000) / 1000) },
+        seven_day: { used_percentage: 61.4, resets_at: Math.floor(monday.getTime() / 1000) }
+      }
+    })
+    const out = await new Promise<string>((resolve, reject) => {
+      const child = spawn('/bin/sh', ['-c', command], { stdio: ['pipe', 'pipe', 'pipe'] })
+      let text = ''
+      child.stdout.on('data', (b: Buffer) => (text += b.toString()))
+      child.on('error', reject)
+      child.on('close', (code) => (code === 0 ? resolve(text) : reject(new Error(`limits: status line exited ${code}`))))
+      child.stdin.end(input)
+    })
+    // the fixture's own status line must still run, with its output passed through
+    if (out.trim() !== 'fixture status') throw new Error(`limits: status line printed ${JSON.stringify(out)}, not the fixture's own line`)
+  }
+
+  /** Overview -> Show live limits -> confirm (shot) -> on -> one status line run (shot) -> Turn off -> settings.json as before. */
+  async function limitsFlow(theme: 'light' | 'dark'): Promise<void> {
+    const file = path.join(configDir(), 'settings.json')
+    const before = await fsp.readFile(file)
+    await click('Show live limits')
+    await waitFor(`document.querySelector('dialog[open] .diff')`, 'the confirm dialog')
+    await shoot(theme, 'limits-confirm')
+    await click('Turn on', `document.querySelector('dialog[open]')`)
+    await waitFor(`!document.querySelector('dialog[open]') && [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Turn off')`, 'the step to turn on')
+    await js(`document.querySelectorAll('.toast__close').forEach((b) => b.click())`)
+    await playStatusLine()
+    await waitFor(`[...document.querySelectorAll('.lim__top b')].map((b) => b.textContent).join(' ') === '42% 61%'`, 'the limits to show')
+    await shoot(theme, 'limits')
+    await click('Turn off')
+    await click('Turn off', `document.querySelector('dialog[open]')`)
+    await waitFor(`!document.querySelector('dialog[open]') && [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Show live limits')`, 'the step to turn off')
+    await js(`document.querySelectorAll('.toast__close').forEach((b) => b.click())`)
+    if (!before.equals(await fsp.readFile(file))) throw new Error('limits: settings.json is not byte for byte what it was before turning live limits on')
+  }
+
   const fail = (e: unknown): void => {
     errors.push(`SHOT_FAILED ${(e as Error).message}`)
     console.log(`SHOT_FAILED ${(e as Error).message}`)
@@ -192,6 +262,11 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
         await sleep(150)
         emit('system:navigate', { screen: (screens[screens.length - 1]?.id ?? 'overview') as ScreenId })
         await sleep(150)
+      }
+      if (process.platform !== 'win32' && (opts.only.length === 0 || opts.only.includes('limits'))) {
+        emit('system:navigate', { screen: 'overview' })
+        await sleep(150)
+        await limitsFlow(theme).catch(fail)
       }
       if (opts.only.length === 0 || opts.only.includes('mods') || opts.only.includes('mods-draft')) {
         emit('system:navigate', { screen: 'mods' })

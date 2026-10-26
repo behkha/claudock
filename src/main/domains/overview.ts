@@ -11,6 +11,7 @@ import { assertWritable, configDir, globalStateFile, isInside, isSecret, resolve
 import { safeWriteText, trash } from '../safeWrite'
 import { scanLoose } from './backups'
 import { scanUser } from './skills'
+import { displayedStatusLine } from './limits'
 import { computeWrapped } from './overviewWrapped'
 import { sizeOf } from './storage'
 
@@ -341,7 +342,7 @@ async function summary(): Promise<OverviewSummary> {
     readJson<Record<string, unknown>>(globalStateFile())
   ])
 
-  const statusLine = settings.statusLine as { command?: unknown } | undefined
+  const statusLine = await displayedStatusLine(settings.statusLine)
   return {
     configDir: configDir(),
     counts: {
@@ -360,7 +361,7 @@ async function summary(): Promise<OverviewSummary> {
       // CLAUDE_CODE_EFFORT_LEVEL wins over effortLevel and is the only place max is kept
       effort: str((settings.env as Record<string, unknown> | undefined)?.CLAUDE_CODE_EFFORT_LEVEL) ?? str(settings.effortLevel),
       theme: str(settings.theme) ?? str(global?.theme),
-      statusLine: str(statusLine?.command)
+      statusLine
     }
   }
 }

@@ -22,6 +22,7 @@ import type { MemoryApi, MemoryEvents } from './api/memory'
 import type { PlansApi, PlansEvents } from './api/plans'
 import type { HistoryApi, HistoryEvents } from './api/history'
 import type { SearchApi, SearchEvents } from './api/search'
+import type { LimitsApi, LimitsEvents } from './api/limits'
 
 export const DOMAINS = [
   'system',
@@ -42,7 +43,8 @@ export const DOMAINS = [
   'memory',
   'plans',
   'history',
-  'search'
+  'search',
+  'limits'
 ] as const
 
 export type DomainName = (typeof DOMAINS)[number]
@@ -67,6 +69,7 @@ export interface ClaudockApi {
   plans: PlansApi
   history: HistoryApi
   search: SearchApi
+  limits: LimitsApi
 }
 
 /** Main -> renderer events. Each event name starts with `<domain>:`; the payload type is the value. */
@@ -88,7 +91,8 @@ export type ClaudockEvents = SystemEvents &
   MemoryEvents &
   PlansEvents &
   HistoryEvents &
-  SearchEvents
+  SearchEvents &
+  LimitsEvents
 
 /** Compile-time check that DOMAINS and ClaudockApi list exactly the same names. */
 type _Same = [DomainName] extends [keyof ClaudockApi] ? ([keyof ClaudockApi] extends [DomainName] ? true : never) : never

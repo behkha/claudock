@@ -263,3 +263,85 @@
   font-size: var(--fs-small);
   margin-bottom: 8px;
 }
+
+/* limits card (Decision 2 C of the daily loop design) */
+.lim__body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.lim__meters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+.lim__meter {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.lim__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.lim__top b {
+  font-family: var(--font-serif);
+  font-size: var(--fs-heading);
+  font-weight: 400;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.lim__none {
+  color: var(--text-3);
+}
+.lim__track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+.lim__fill {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--accent);
+}
+.lim__fill--stale {
+  background: var(--text-3);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .lim__fill {
+    transition: width 0.6s ease;
+  }
+}
+.lim__foot {
+  font-size: var(--fs-caption);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.lim__show {
+  align-self: flex-start;
+}
+.lim__today {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: var(--fs-small);
+  color: var(--text-2);
+}
+.lim__mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+/* the step's path is long: wrap it inside the confirm dialog instead of scrolling sideways */
+.lim__diff .diff__row {
+  min-width: 0;
+}
+.lim__diff .diff__text {
+  flex: 1;
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

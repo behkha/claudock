@@ -241,6 +241,147 @@ for (const p of projects) {
   }
 }
 
+/* ------------------------------------------------------------------ recent sessions (token usage for the live limits) */
+{
+  // 17 sessions with Claude Code's real usage shape: 4 in the last 5 hours (one still running), 3 earlier today, 10 over the previous 6 days.
+  // Own random stream, so adding or changing these does not move anything else in the fixture.
+  const savedSeed = seed
+  seed = 20261027
+  const MIN = 60_000
+  const HOUR = 3_600_000
+  const hex = (n) => Array.from({ length: n }, () => int(0, 15).toString(16)).join('')
+  const recentPrompts = [
+    'Fix token refresh race in the auth middleware',
+    'Add rate limiting to the public API routes',
+    'Why does the CSV export drop the last row?',
+    'Split the billing module into smaller services',
+    'Make the webhook retries idempotent',
+    'Add an index for the slow orders query',
+    'Replace moment with date-fns across the repo',
+    'Cache the permissions lookup per request',
+    'Write an integration test for the checkout flow',
+    'Debug the memory leak in the file watcher',
+    'Upgrade React Router and fix the type errors',
+    'Add structured logging to the job runner',
+    'Handle expired sessions on the websocket reconnect',
+    'Move feature flags to a typed config object'
+  ]
+  const followups = ['Looks good, now do the same for the other endpoints', 'Run the tests again', 'Can you also update the docs?', 'That fails on CI, please look at the log', 'Keep going', 'Use the existing helper instead']
+  const results = [' M src/auth/refresh.ts\n?? notes.md', 'Test Files  12 passed (12)\n     Tests  96 passed (96)', 'src/api/users.ts:41:  const page = Number(req.query.page ?? 1)', 'ok  \tgithub.com/me/api-server/internal/auth\t0.412s', 'added 3 packages in 2s']
+  const answers2 = ['I read the middleware and the race is in how two requests refresh at once.', 'Patched the handler and added a lock around the refresh call.', 'Tests pass locally. Summary of the change is below.', 'That call site also needs the new argument, updating it now.']
+  const branches = ['main', 'main', 'feat/token-refresh', 'fix/pagination']
+  const modelFor = () => {
+    const r = rnd()
+    return r < 0.62 ? 'claude-opus-5-5' : r < 0.9 ? 'claude-sonnet-5-5' : 'claude-haiku-5-5'
+  }
+  const midnight = new Date(now)
+  midnight.setHours(0, 0, 0, 0)
+  const today0 = midnight.getTime()
+
+  // one assistant message becomes 1-3 JSONL lines, one per content block, sharing id, requestId and usage
+  const assistantLines = (model, usage, blocks) => {
+    const id = 'msg_' + hex(20)
+    const requestId = 'req_' + hex(16)
+    return blocks.map((block, i) => ({
+      type: 'assistant',
+      message: { model, id, type: 'message', role: 'assistant', content: [block], stop_reason: i === blocks.length - 1 ? (block.type === 'tool_use' ? 'tool_use' : 'end_turn') : null, stop_sequence: null, usage },
+      extra: { requestId },
+      gap: i === 0 ? (rnd() < 0.08 ? int(90, 240) : int(3, 60)) : int(1, 4)
+    }))
+  }
+  const usageAt = (i, n, crStart, crEnd) => ({
+    input_tokens: int(2, 40),
+    cache_creation_input_tokens: i === 0 || rnd() < 0.1 ? int(6000, 12000) : int(500, 5000),
+    cache_read_input_tokens: Math.min(180_000, Math.max(20_000, Math.round(crStart + (crEnd - crStart) * (n > 1 ? i / (n - 1) : 1) * (0.95 + rnd() * 0.05)))),
+    output_tokens: rnd() < 0.7 ? int(80, 700) : int(700, 2500)
+  })
+  const toolBlock = () => ({ type: 'tool_use', id: 'toolu_' + hex(24), name: pick(['Bash', 'Read', 'Edit', 'Grep']), input: { command: 'git status --short', description: 'Show working tree changes' } })
+
+  // turns the planned specs (gaps in seconds) into JSONL lines whose last timestamp is endMs
+  const stamp = (specs, endMs, maxMs) => {
+    const total = specs.reduce((n, s) => n + s.gap * 1000, 0)
+    const k = total > maxMs ? maxMs / total : 1
+    const ts = new Array(specs.length)
+    ts[specs.length - 1] = endMs
+    for (let i = specs.length - 1; i > 0; i--) ts[i - 1] = ts[i] - Math.max(1000, Math.round(specs[i].gap * 1000 * k))
+    return ts
+  }
+  const serialize = (specs, ts, ctx) => {
+    let parent = null
+    return specs.map((s, i) => {
+      const id = uuid()
+      const line = JSON.stringify({ parentUuid: parent, isSidechain: ctx.sidechain, type: s.type, message: s.message, uuid: id, timestamp: iso(ts[i]), cwd: ctx.cwd, sessionId: ctx.sessionId, version: '2.1.80', gitBranch: ctx.branch, userType: 'external', ...(ctx.sidechain ? { agentId: ctx.agentId } : {}), ...s.extra })
+      parent = id
+      return line
+    })
+  }
+
+  function recentSession(project, endMs, { running = false, subagent = false, minStart }) {
+    const sessionId = uuid()
+    const model = modelFor()
+    const n = int(8, 40)
+    const crStart = int(20_000, 40_000)
+    const crEnd = Math.min(180_000, int(Math.max(crStart + 20_000, 90_000), 180_000))
+    const specs = [{ type: 'user', message: { role: 'user', content: pick(recentPrompts) }, extra: {}, gap: 0 }]
+    for (let i = 0; i < n; i++) {
+      const last = i === n - 1
+      const usage = usageAt(i, n, crStart, crEnd)
+      const blocks = []
+      if (rnd() < 0.34) {
+        if (rnd() < 0.4) blocks.push({ type: 'thinking', thinking: 'Working out where the change belongs.', signature: hex(32) })
+        blocks.push({ type: 'text', text: pick(answers2) })
+      } else if (rnd() < 0.3) blocks.push({ type: 'text', text: pick(answers2) })
+      if (last ? running : blocks.length === 0 || rnd() < 0.8) blocks.push(toolBlock())
+      if (blocks.length === 0) blocks.push({ type: 'text', text: pick(answers2) })
+      specs.push(...assistantLines(model, usage, blocks))
+      const tool = blocks[blocks.length - 1]
+      if (tool.type === 'tool_use' && !last) specs.push({ type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: tool.id, content: pick(results) }] }, extra: { toolUseResult: { stdout: 'ok', stderr: '' } }, gap: int(1, 40) })
+      else if (tool.type !== 'tool_use' && !last) specs.push({ type: 'user', message: { role: 'user', content: pick(followups) }, extra: {}, gap: int(20, 300) })
+    }
+    const maxMs = Math.min(90 * MIN, endMs - minStart)
+    const ts = stamp(specs, endMs, maxMs)
+    const ctx = { cwd: project.cwd, sessionId, branch: pick(branches), sidechain: false }
+    w(`projects/${project.folder}/${sessionId}.jsonl`, serialize(specs, ts, ctx).join('\n') + '\n', endMs)
+
+    if (subagent) {
+      // what a Task tool call leaves behind: same session id, isSidechain, its own small Haiku conversation
+      const agentId = hex(7)
+      const sub = [{ type: 'user', message: { role: 'user', content: 'Find every caller of refreshToken and list the file and line.' }, extra: {}, gap: 0 }]
+      const m = 6
+      for (let i = 0; i < m; i++) {
+        const usage = { input_tokens: int(2, 12), cache_creation_input_tokens: i === 0 ? int(4000, 9000) : int(500, 3000), cache_read_input_tokens: 8000 + i * int(3000, 6500), output_tokens: int(80, 600) }
+        const blocks = i === m - 1 ? [{ type: 'text', text: 'Found four callers, listed below.' }] : i === 2 ? [{ type: 'text', text: 'Searching the middleware first.' }, toolBlock()] : [toolBlock()]
+        sub.push(...assistantLines('claude-haiku-5-5', usage, blocks))
+        const tool = blocks[blocks.length - 1]
+        if (tool.type === 'tool_use') sub.push({ type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: tool.id, content: pick(results) }] }, extra: { toolUseResult: { stdout: 'ok', stderr: '' } }, gap: int(1, 20) })
+      }
+      const subEnd = ts[Math.floor(specs.length / 2)] + 6 * MIN
+      const subTs = stamp(sub, subEnd, 5 * MIN)
+      w(`projects/${project.folder}/${sessionId}/subagents/agent-${agentId}.jsonl`, serialize(sub, subTs, { ...ctx, sidechain: true, agentId }).join('\n') + '\n', subEnd)
+    }
+    return sessionId
+  }
+
+  const plan = []
+  // last 5 hours: one running (last line ~2 minutes ago), three finished
+  plan.push({ end: now - 2 * MIN, running: true, minStart: now - 5 * HOUR + 5 * MIN })
+  plan.push({ end: now - int(25, 45) * MIN, subagent: true, minStart: now - 5 * HOUR + 5 * MIN })
+  plan.push({ end: now - int(80, 120) * MIN, minStart: now - 5 * HOUR + 5 * MIN })
+  plan.push({ end: now - int(190, 230) * MIN, minStart: now - 5 * HOUR + 5 * MIN })
+  // earlier today, more than 5 hours ago; in the small hours there is no room, so they sit a few hours back
+  const latest = now - 5 * HOUR - 15 * MIN
+  const earliest = today0 + 75 * MIN
+  const earlier = latest - earliest >= 2 * HOUR ? [0, 0.4, 0.85].map((f) => Math.round(latest - (latest - earliest) * f)) : [5.5, 6.7, 8.2].map((h) => now - Math.round(h * HOUR))
+  for (const end of earlier) plan.push({ end, minStart: end - 3 * HOUR })
+  // the previous 6 days, a working-hours session each
+  for (const back of [1, 1, 2, 3, 3, 4, 5, 6]) {
+    const end = new Date(midnight.getFullYear(), midnight.getMonth(), midnight.getDate() - back, int(9, 19), int(0, 59)).getTime()
+    plan.push({ end, minStart: end - 3 * HOUR })
+  }
+  plan.forEach((p, i) => recentSession(projects[i % projects.length], p.end, p))
+  seed = savedSeed
+}
+
 /* ------------------------------------------------------------------ history.jsonl */
 {
   const lines = []
