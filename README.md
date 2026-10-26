@@ -1,6 +1,6 @@
 # Claudock
 
-Manage your Claude Code setup (settings, hooks, skills, MCP servers, memory and more) in one window, without hand-editing the JSON and Markdown in `~/.claude`.
+See inside your `~/.claude`. Claudock is a free desktop app that lists every skill, hook, MCP server and session, and charts six months of your Claude Code use. Every edit starts with a snapshot.
 
 **Beta, actively maintained** · macOS, Windows, Linux · [MIT license](LICENSE.md) · Unofficial, not affiliated with Anthropic
 
@@ -8,15 +8,17 @@ Manage your Claude Code setup (settings, hooks, skills, MCP servers, memory and 
 
 ![Claudock walking through Overview, Mods, Skills, Settings, Hooks, Storage and Backups on the bundled test config](docs/demo.gif)
 
+![A Share stats card from the bundled test config: messages, sessions, longest session, peak hour, top model and 26 weeks of activity](docs/share-card.png)
+
 ## What it does
 
-Claudock is a desktop app for the Claude Code config folder (`~/.claude`, or wherever `CLAUDE_CONFIG_DIR` points) and the MCP servers in `~/.claude.json`. It has one screen for each part of the folder:
+Claudock opens the Claude Code config folder (`~/.claude`, or wherever `CLAUDE_CONFIG_DIR` points) and the MCP servers in `~/.claude.json`, with one screen for each part:
 
+- **Overview:** how much disk `~/.claude` takes, what's installed, and **Share stats**: your messages, sessions, longest session, peak hour, top model and 26 weeks of activity from Claude Code's own `stats-cache.json`, as a card to copy, save or post on X. It never shows project names or prompts.
 - **Configure:** `settings.json` and `settings.local.json` as a form or raw JSON with history, `CLAUDE.md` and `rules/`, hooks, permissions
 - **Extend:** skills (turn on or off, edit, duplicate), agents, commands, plugins, mods (what each one draws, hooks and reaches; keep the ones Claude drafts), MCP servers
 - **Your data:** projects and their session transcripts, memory, plans, prompt history
 - **Maintain:** disk use per folder with cleanup suggestions, plus snapshots and `.bak` files you can diff and restore
-- **Share stats:** a card of your Claude Code numbers (messages, sessions, longest session, peak hour, top model, activity) from Claude Code's own `stats-cache.json`, to copy, save or post on X. It never shows project names or prompts.
 
 ⌘K (Ctrl+K on Windows and Linux) searches skills, agents, rules, hooks, sessions, memory and settings keys.
 
