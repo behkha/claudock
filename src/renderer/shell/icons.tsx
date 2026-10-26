@@ -1,5 +1,6 @@
 import {
   Archive,
+  Blocks,
   Bot,
   ClipboardList,
   FileText,
@@ -29,6 +30,7 @@ export const SCREEN_ICONS: Record<ScreenId, LucideIcon> = {
   agents: Bot,
   commands: Terminal,
   plugins: Puzzle,
+  mods: Blocks,
   mcp: Plug,
   projects: FolderOpen,
   memory: Brain,

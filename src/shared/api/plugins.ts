@@ -11,6 +11,8 @@ export interface PluginContents {
   hooks: number
   hookEvents: string[]
   mcpServers: string[]
+  /** hooks/hooks.json has a `modules` key: the plugin is a mod (shown on the Mods screen). */
+  mod: boolean
 }
 
 export interface PluginInfo {

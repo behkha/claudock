@@ -15,6 +15,7 @@ import * as skills from './skills'
 import * as agents from './agents'
 import * as commands from './commands'
 import * as plugins from './plugins'
+import * as mods from './mods'
 import * as mcp from './mcp'
 import * as projects from './projects'
 import * as memory from './memory'
@@ -36,6 +37,7 @@ export const domainModules: Record<DomainName, DomainModule> = {
   agents,
   commands,
   plugins,
+  mods,
   mcp,
   projects,
   memory,

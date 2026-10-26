@@ -30,6 +30,11 @@ export default tseslint.config(
     rules: { '@typescript-eslint/no-empty-object-type': 'off' }
   },
   {
+    // the website (GitHub Pages): a plain browser script; `module` is checked before use for its tests
+    files: ['site/**/*.js'],
+    languageOptions: { globals: { ...globals.browser, module: 'readonly' } }
+  },
+  {
     files: ['scripts/**/*.mjs'],
     languageOptions: { globals: globals.node }
   },

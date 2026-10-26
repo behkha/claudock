@@ -11,7 +11,7 @@ const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms
 /**
  * Screenshot mode (CLAUDOCK_SHOT=1, driven by scripts/shot.mjs): visits every screen in light then dark through the
  * normal `system:navigate` / `system:theme` events, waits until each is loaded and painted in that theme, saves
- * `<dir>/<theme>-<screen>.png` (plus `palette`, `settings-json` and `share`, the Overview share dialog, and `card.png`, the card itself), prints renderer console errors as `CONSOLE_ERROR ...` and failed shots as
+ * `<dir>/<theme>-<screen>.png` (plus `palette`, `settings-json`, `mods-draft`, the Mods screen with the fixture's draft selected, and `share`, the Overview share dialog, and `card.png`, the card itself), prints renderer console errors as `CONSOLE_ERROR ...` and failed shots as
  * `SHOT_FAILED ...`, and exits 0 (clean) or 1 (errors).
  */
 export async function runShots(win: BrowserWindow, opts: { dir: string; only: string[] }): Promise<void> {
@@ -137,6 +137,17 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
       button.click()
       await wait(() => document.querySelector('.share__canvas[data-ready="true"]'))
     })()`)
+  /** Mods -> the fixture's draft (git-branch), to show Keep and the session it came from. */
+  const selectDraft = (): Promise<void> =>
+    js(`(async () => {
+      const t = Date.now()
+      while (Date.now() - t < 15000) {
+        const row = [...document.querySelectorAll('.list-row button')].find((b) => b.textContent.includes('git-branch'))
+        if (row) { row.click(); return }
+        await new Promise((r) => setTimeout(r, 100))
+      }
+      throw new Error('mods-draft: the draft row never appeared')
+    })()`)
   const closeShare = (): Promise<unknown> => js(`document.querySelector('.share [aria-label="Close"]')?.click()`)
   /** The card as the dialog sends it (the same canvas), for review. It does not depend on the app theme. */
   async function saveCard(): Promise<void> {
@@ -181,6 +192,11 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
         await sleep(150)
         emit('system:navigate', { screen: (screens[screens.length - 1]?.id ?? 'overview') as ScreenId })
         await sleep(150)
+      }
+      if (opts.only.length === 0 || opts.only.includes('mods') || opts.only.includes('mods-draft')) {
+        emit('system:navigate', { screen: 'mods' })
+        await sleep(150)
+        await selectDraft().then(() => shoot(theme, 'mods-draft'), fail)
       }
       if (opts.only.length === 0 || opts.only.includes('palette')) {
         emit('system:openPalette', null)

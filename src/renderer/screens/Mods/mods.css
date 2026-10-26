@@ -1,0 +1,25 @@
+/* Mods screen. Builds on _ext/ext.css. Tokens only. */
+
+.mods-uses dd {
+  min-width: 0;
+}
+
+.mods-chip--risky {
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+  color: var(--warning);
+}
+
+.mods-store {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.mods-readme {
+  padding: 16px 20px;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  border: var(--hair) solid var(--border);
+  min-width: 0;
+  overflow-x: auto;
+}

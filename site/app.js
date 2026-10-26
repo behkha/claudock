@@ -75,12 +75,12 @@
     try {
       var c = JSON.parse(sessionStorage.getItem('claudock-release') || 'null')
       if (c && Date.now() - c.t < 10 * 60 * 1000) return c.urls
-    } catch (e) { /* storage blocked */ }
+    } catch { /* storage blocked */ }
     return null
   }
 
   function remember(urls) {
-    try { sessionStorage.setItem('claudock-release', JSON.stringify({ t: Date.now(), urls: urls })) } catch (e) { /* ignore */ }
+    try { sessionStorage.setItem('claudock-release', JSON.stringify({ t: Date.now(), urls: urls })) } catch { /* ignore */ }
   }
 
   function downloads() {

@@ -204,15 +204,25 @@ function PluginDetail({ plugin, busy, onToggle, onOpenMarket }: { plugin: Plugin
       badges={
         <>
           {plugin.version ? <Badge>v{plugin.version}</Badge> : null}
+          {c?.mod ? <Badge tone="oat">mod</Badge> : null}
           {!plugin.installed ? <Badge tone="oat">{plugin.marketplace === 'builtin' ? 'built in' : 'not installed'}</Badge> : null}
           {plugin.state === 'unset' ? <Badge tone="oat">not in enabledPlugins</Badge> : null}
         </>
       }
       actions={
-        plugin.rel ? (
-          <Button variant="secondary" onClick={() => void api.system.reveal(plugin.rel as string).catch(notify.failed)}>
-            Reveal
-          </Button>
+        plugin.rel || c?.mod ? (
+          <>
+            {c?.mod ? (
+              <Button variant="secondary" onClick={() => navigate('mods', plugin.key)}>
+                Open in Mods
+              </Button>
+            ) : null}
+            {plugin.rel ? (
+              <Button variant="secondary" onClick={() => void api.system.reveal(plugin.rel as string).catch(notify.failed)}>
+                Reveal
+              </Button>
+            ) : null}
+          </>
         ) : undefined
       }
     >

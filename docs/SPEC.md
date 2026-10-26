@@ -42,7 +42,7 @@ src/
     safeWrite.ts     snapshot + atomic write + JSON validation
     domains/         ONE file per domain; each exports `register(ipcMain)`
       overview.ts storage.ts backups.ts settings.ts rules.ts hooks.ts
-      permissions.ts skills.ts agents.ts commands.ts plugins.ts mcp.ts
+      permissions.ts skills.ts agents.ts commands.ts plugins.ts mods.ts mcp.ts
       projects.ts memory.ts plans.ts history.ts search.ts system.ts
     domains/index.ts registers all of them (already lists every domain)
   preload/index.ts   exposes `window.claudock` built from the domain list
@@ -63,7 +63,7 @@ Each domain owns: `src/main/domains/<domain>.ts`, its slice of types in `src/sha
 
 - **Home**: Overview
 - **Configure**: Settings, CLAUDE.md & rules, Hooks, Permissions
-- **Extend**: Skills, Agents, Commands, Plugins, MCP servers
+- **Extend**: Skills, Agents, Commands, Plugins, Mods, MCP servers
 - **Your data**: Projects, Memory, Plans, History
 - **Maintain**: Storage, Backups
 
@@ -81,6 +81,7 @@ Layout for every list-type screen: sidebar (220–240px) · list pane (300–360
 - **Skills**: user skills (`skills/*/SKILL.md`), synced skills, and plugin skills (read-only). On/off toggle writes `skillOverrides`. Detail: frontmatter, SKILL.md (editable for user skills), file list, size, Reveal, Open in editor, Duplicate, Move to Trash.
 - **Agents** / **Commands**: `agents/*.md` and `commands/**/*.md`; list, edit with frontmatter form + body, new from template, Trash.
 - **Plugins**: installed plugins, marketplaces, enable / disable (writes `enabledPlugins`).
+- **Mods**: plugins whose `hooks/hooks.json` has `modules`. Installed ones (enable / disable via `enabledPlugins`), folders in `CLAUDE_CODE_PLUGIN_DIRS` and `mods/` (load / stop loading by editing that env var in `settings.json`), and drafts Claude wrote in `dev-mods/<session>/<name>` (Keep moves one to `mods/<name>` and loads it; Trash). Shows what the hooks module draws, hooks and calls (read from its source, never run), its `$.store` data in `plugins/store` (Clear sends it to the Trash) and its README.
 - **MCP servers**: user-scope servers from the global state file; add / edit / remove (see safety rule 5).
 - **Projects**: one row per project folder; the real path comes from the `cwd` in its transcripts, not the folder name. Detail: sessions (title = first user prompt, date, size, message count), transcript viewer, Move to Trash per session or for sessions older than N days.
 - **Memory**: `projects/*/memory/*.md` grouped by project; view / edit / Trash; `MEMORY.md` index shown first.

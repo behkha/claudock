@@ -60,7 +60,7 @@ w(
     effortLevel: 'high',
     theme: 'auto',
     statusLine: { type: 'command', command: 'bash "$HOME/.claude/statusline.sh"' },
-    env: { CLAUDE_CODE_ENABLE_TELEMETRY: '0', DISABLE_AUTOUPDATER: '1', BASH_DEFAULT_TIMEOUT_MS: '120000' },
+    env: { CLAUDE_CODE_ENABLE_TELEMETRY: '0', DISABLE_AUTOUPDATER: '1', BASH_DEFAULT_TIMEOUT_MS: '120000', CLAUDE_CODE_PLUGIN_DIRS: path.join(dir, 'mods', 'tally') },
     permissions: {
       allow: ['Bash(npm run test:*)', 'Bash(npm run lint)', 'Bash(git status)', 'Bash(git diff:*)', 'Read(~/Programming/**)', 'WebFetch(domain:docs.anthropic.com)'],
       ask: ['Bash(git push:*)', 'Bash(npm publish)'],
@@ -79,7 +79,7 @@ w(
       Notification: [{ hooks: [{ type: 'command', command: '~/.claude/hooks/notify.sh' }] }]
     },
     skillOverrides: { 'big-assets': 'off', 'legacy-deploy': 'off', 'release-notes': 'on' },
-    enabledPlugins: { [`demo-tools@${marketplace}`]: true, [`unused-helper@${marketplace}`]: false },
+    enabledPlugins: { [`demo-tools@${marketplace}`]: true, [`unused-helper@${marketplace}`]: false, [`context-gauge@${marketplace}`]: true, [`shell-guard@${marketplace}`]: false },
     extraKnownMarketplaces: { [marketplace]: { source: { source: 'directory', path: path.join(dir, 'plugins', 'marketplaces', marketplace) } } },
     // a key Claudock does not know about: must survive every edit
     futureExperimentalSetting: { nested: [1, 2, 3], flag: true }
@@ -222,9 +222,15 @@ function transcript(project, index, total, bigOne) {
   lines.push(JSON.stringify({ type: 'last-prompt', leafUuid: parent, sessionId }))
   const rel = `projects/${project.folder}/${sessionId}.jsonl`
   w(rel, lines.join('\n') + '\n', t)
+  return sessionId
 }
+// the session that drafted the fixture's dev mod (see "mods" below)
+let draftSession = ''
 for (const p of projects) {
-  for (let i = 0; i < p.sessions; i++) transcript(p, i, p.sessions, p.folder === '-Users-me-code-app' && i === 1)
+  for (let i = 0; i < p.sessions; i++) {
+    const sid = transcript(p, i, p.sessions, p.folder === '-Users-me-code-app' && i === 1)
+    if (p.folder === '-Users-me-code-app' && i === 0) draftSession = sid
+  }
   if (p.memory) {
     w(
       `projects/${p.folder}/memory/MEMORY.md`,
@@ -256,7 +262,9 @@ for (const p of projects) {
     version: 2,
     plugins: {
       [`demo-tools@${marketplace}`]: [{ scope: 'user', installPath: cacheDir, version: '1.2.0', installedAt: iso(now - 60 * DAY), lastUpdated: iso(now - 9 * DAY), gitCommitSha: sha('demo-tools').slice(0, 40) }],
-      [`unused-helper@${marketplace}`]: [{ scope: 'user', installPath: unusedDir, version: '0.3.1', installedAt: iso(now - 100 * DAY), lastUpdated: iso(now - 100 * DAY), gitCommitSha: sha('unused').slice(0, 40) }]
+      [`unused-helper@${marketplace}`]: [{ scope: 'user', installPath: unusedDir, version: '0.3.1', installedAt: iso(now - 100 * DAY), lastUpdated: iso(now - 100 * DAY), gitCommitSha: sha('unused').slice(0, 40) }],
+      [`context-gauge@${marketplace}`]: [{ scope: 'user', installPath: path.join(dir, 'plugins', 'cache', marketplace, 'context-gauge', '0.4.0'), version: '0.4.0', installedAt: iso(now - 20 * DAY), lastUpdated: iso(now - 6 * DAY), gitCommitSha: sha('context-gauge').slice(0, 40) }],
+      [`shell-guard@${marketplace}`]: [{ scope: 'user', installPath: path.join(dir, 'plugins', 'cache', marketplace, 'shell-guard', '1.1.0'), version: '1.1.0', installedAt: iso(now - 15 * DAY), lastUpdated: iso(now - 15 * DAY), gitCommitSha: sha('shell-guard').slice(0, 40) }]
     }
   }))
   w('plugins/known_marketplaces.json', json({
@@ -271,12 +279,147 @@ for (const p of projects) {
     owner: { name: 'Fixture Author' },
     plugins: [
       { name: 'demo-tools', source: './demo-tools', description: 'Small helper skills used by the fixture.' },
-      { name: 'unused-helper', source: './unused-helper', description: 'Installed but disabled.' }
+      { name: 'unused-helper', source: './unused-helper', description: 'Installed but disabled.' },
+      { name: 'context-gauge', source: './context-gauge', description: 'A mod that shows how full the context window is, above the prompt.' },
+      { name: 'shell-guard', source: './shell-guard', description: 'A mod that holds risky shell commands until you approve them.' }
     ]
   }))
   w('plugins/cache/' + marketplace + '/demo-tools/1.2.0/.claude-plugin/plugin.json', json({ name: 'demo-tools', version: '1.2.0', description: 'Small helper skills used by the fixture.', author: { name: 'Fixture Author' } }))
   w('plugins/cache/' + marketplace + '/demo-tools/1.2.0/skills/changelog-writer/SKILL.md', `---\nname: changelog-writer\ndescription: Turn merged PR titles into a changelog section.\n---\n\n# Changelog writer\n\nCollect merged PR titles since the last tag and group them.\n`)
   w('plugins/cache/' + marketplace + '/unused-helper/0.3.1/.claude-plugin/plugin.json', json({ name: 'unused-helper', version: '0.3.1', description: 'Installed but disabled.' }))
+}
+
+/* ------------------------------------------------------------------ mods (plugins whose hooks/hooks.json has `modules`) */
+{
+  // installed from the marketplace (context-gauge on, shell-guard off), a kept mod loaded through CLAUDE_CODE_PLUGIN_DIRS
+  // (tally), a kept mod that is not loaded (focus-timer) and a draft Claude wrote in a session (git-branch)
+  const mod = (root, m) => {
+    w(`${root}/.claude-plugin/plugin.json`, json({ name: m.name, version: m.version, description: m.description, author: { name: 'Fixture Author' } }), m.mtime)
+    w(`${root}/hooks/hooks.json`, json({ modules: ['./register.js'] }), m.mtime)
+    w(`${root}/hooks/register.js`, m.code, m.mtime)
+    if (m.readme) w(`${root}/README.md`, m.readme, m.mtime)
+  }
+  mod(`plugins/cache/${marketplace}/context-gauge/0.4.0`, {
+    name: 'context-gauge',
+    version: '0.4.0',
+    description: 'Shows how full the context window is, above the prompt, with a bar for each of the last turns.',
+    code: `let readings = []
+
+export function register(on) {
+  on('session.start', async ($, e, next) => {
+    readings = (await $.store.get('readings')) ?? []
+    return next(e)
+  })
+  on('turn.complete', async ($, e, next) => {
+    const result = await next(e)
+    const { context } = await $.session.usage()
+    readings = [...readings, context.percent].slice(-12)
+    await $.store.set('readings', readings)
+    $.ui.invalidate('ui.render')
+    return result
+  })
+  on('ui.render', { component: 'AbovePrompt' }, ($, e, next) => {
+    const { Text } = $.ui.resolve(e)
+    return Text({ children: 'context ' + (readings.at(-1) ?? 0) + '%' })
+  })
+}
+`,
+    readme: `# Context gauge
+
+Shows how full the context window is in the band above the prompt.
+
+\`\`\`text
+context 42%  ▁▂▃▅▆
+\`\`\`
+
+| Hook | What it does |
+|------|--------------|
+| \`turn.complete\` | Reads \`$.session.usage()\` after each turn |
+| \`ui.render\` (AbovePrompt) | Draws the gauge |
+
+## Install
+
+\`\`\`bash
+claude plugin install context-gauge@${marketplace}
+\`\`\`
+`
+  })
+  mod(`plugins/cache/${marketplace}/shell-guard/1.1.0`, {
+    name: 'shell-guard',
+    version: '1.1.0',
+    description: 'Holds rm -rf, force pushes and other risky shell commands, and shows what they would change before they run.',
+    code: `export function register(on) {
+  on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
+    if (!/rm -rf|push --force/.test(e.input.command)) return next(e)
+    const preview = await $.process.run('git', ['status', '--short'])
+    const ok = await $.ui.ask({ title: 'Run this command?', body: preview.stdout })
+    return ok ? next(e) : { refuse: 'Cancelled in shell-guard' }
+  })
+  on('ui.render', { component: 'Pane' }, ($, e, next) => next(e))
+}
+`
+  })
+  w(`plugins/store/context-gauge_${marketplace}-3f9a1c2b7d10.json`, json({ readings: Array.from({ length: 12 }, (_, i) => 18 + i * 5), history: Array.from({ length: 80 }, (_, i) => ({ turn: i, percent: (i * 7) % 100 })) }), now - DAY)
+
+  mod('mods/tally', {
+    name: 'tally',
+    version: '0.2.0',
+    description: 'Counts the tool calls Claude makes and shows the count beside the spinner. /tally prints it.',
+    mtime: now - 12 * DAY,
+    code: `let calls = 0
+
+export function register(on) {
+  on('session.start', ($, e, next) => {
+    $.command.register({ name: 'tally', description: 'Show the tool call count', run: () => 'tool calls: ' + calls })
+    return next(e)
+  })
+  on('tool.call', async ($, e, next) => {
+    calls += 1
+    $.ui.invalidate('ui.render')
+    return next(e)
+  })
+  on('ui.render', { component: 'Spinner' }, ($, e, next) => next({ ...e, props: { ...e.props, suffix: ' · tool calls: ' + calls } }))
+}
+`
+  })
+  w('plugins/store/tally_inline-9b2e4d1a0c55.json', json({ total: 1284 }), now - 2 * DAY)
+  mod('mods/focus-timer', {
+    name: 'focus-timer',
+    version: '0.1.0',
+    description: 'A 25-minute focus timer above the prompt that plays a sound when time is up. /focus starts it.',
+    mtime: now - 40 * DAY,
+    code: `export function register(on) {
+  on('session.start', ($, e, next) => {
+    $.command.register({ name: 'focus', description: 'Start a 25 minute timer', run: () => $.clock.after(25 * 60_000, () => $.audio.play('done')) })
+    return next(e)
+  })
+  on('ui.render', { component: 'AbovePrompt' }, ($, e, next) => next(e))
+}
+`
+  })
+  const draft = `dev-mods/${draftSession}/git-branch`
+  mod(draft, {
+    name: 'git-branch',
+    version: '0.1.0',
+    description: 'Shows the current git branch above the prompt.',
+    mtime: now - 3 * DAY,
+    code: `let branch = ''
+
+export function register(on) {
+  on('turn.complete', async ($, e, next) => {
+    const r = await $.process.run('git', ['branch', '--show-current'], { cwd: $.session.cwd() })
+    branch = r.stdout.trim()
+    return next(e)
+  })
+  on('ui.render', { component: 'AbovePrompt' }, ($, e, next) => {
+    const { Text } = $.ui.resolve(e)
+    return branch ? Text({ children: '⎇ ' + branch }) : next(e)
+  })
+}
+`
+  })
+  // written by Claude Code for the editor, not part of the mod (Keep leaves it out)
+  w(`${draft}/.claude-plugin/types/claude-code.d.ts`, 'export {}\n', now - 3 * DAY)
 }
 
 /* ------------------------------------------------------------------ junk / big stuff for the cleanup lists */

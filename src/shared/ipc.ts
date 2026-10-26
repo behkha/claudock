@@ -15,6 +15,7 @@ import type { SkillsApi, SkillsEvents } from './api/skills'
 import type { AgentsApi, AgentsEvents } from './api/agents'
 import type { CommandsApi, CommandsEvents } from './api/commands'
 import type { PluginsApi, PluginsEvents } from './api/plugins'
+import type { ModsApi, ModsEvents } from './api/mods'
 import type { McpApi, McpEvents } from './api/mcp'
 import type { ProjectsApi, ProjectsEvents } from './api/projects'
 import type { MemoryApi, MemoryEvents } from './api/memory'
@@ -35,6 +36,7 @@ export const DOMAINS = [
   'agents',
   'commands',
   'plugins',
+  'mods',
   'mcp',
   'projects',
   'memory',
@@ -58,6 +60,7 @@ export interface ClaudockApi {
   agents: AgentsApi
   commands: CommandsApi
   plugins: PluginsApi
+  mods: ModsApi
   mcp: McpApi
   projects: ProjectsApi
   memory: MemoryApi
@@ -79,6 +82,7 @@ export type ClaudockEvents = SystemEvents &
   AgentsEvents &
   CommandsEvents &
   PluginsEvents &
+  ModsEvents &
   McpEvents &
   ProjectsEvents &
   MemoryEvents &

@@ -13,6 +13,7 @@ export type ScreenId =
   | 'agents'
   | 'commands'
   | 'plugins'
+  | 'mods'
   | 'mcp'
   | 'projects'
   | 'memory'
@@ -43,6 +44,7 @@ export const SCREENS: ScreenDef[] = [
   { id: 'agents', label: 'Agents', group: 'Extend', folder: 'Agents' },
   { id: 'commands', label: 'Commands', group: 'Extend', folder: 'Commands' },
   { id: 'plugins', label: 'Plugins', group: 'Extend', folder: 'Plugins' },
+  { id: 'mods', label: 'Mods', group: 'Extend', folder: 'Mods' },
   { id: 'mcp', label: 'MCP servers', group: 'Extend', folder: 'Mcp' },
   { id: 'projects', label: 'Projects', group: 'Your data', folder: 'Projects' },
   { id: 'memory', label: 'Memory', group: 'Your data', folder: 'Memory' },

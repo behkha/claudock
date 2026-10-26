@@ -62,7 +62,8 @@ async function contentsOf(dir: string): Promise<PluginContents> {
     commands: commandFiles.map((f) => f.name.replace(/\//g, ':')),
     hooks: hooks.n,
     hookEvents: hooks.events,
-    mcpServers
+    mcpServers,
+    mod: isObj(hooksJson) && Array.isArray(hooksJson.modules)
   }
 }
 

@@ -10,6 +10,7 @@ import SkillsScreen from './Skills'
 import AgentsScreen from './Agents'
 import CommandsScreen from './Commands'
 import PluginsScreen from './Plugins'
+import ModsScreen from './Mods'
 import McpScreen from './Mcp'
 import ProjectsScreen from './Projects'
 import MemoryScreen from './Memory'
@@ -29,6 +30,7 @@ export const SCREEN_COMPONENTS: Record<ScreenId, ComponentType<ScreenProps>> = {
   agents: AgentsScreen,
   commands: CommandsScreen,
   plugins: PluginsScreen,
+  mods: ModsScreen,
   mcp: McpScreen,
   projects: ProjectsScreen,
   memory: MemoryScreen,
