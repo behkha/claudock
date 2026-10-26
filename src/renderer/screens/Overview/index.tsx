@@ -1,5 +1,5 @@
-import { useMemo } from 'react'
-import { Settings as SettingsIcon } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Settings as SettingsIcon, Share2 } from 'lucide-react'
 import type { ScreenId } from '@shared/nav'
 import { formatBytes, formatCount, tildify } from '@shared/format'
 import { Button, Card, Spinner, SizeBar, type SizeSegment } from '@/components'
@@ -8,6 +8,7 @@ import { cx } from '@/lib/cx'
 import { useNav, type ScreenProps } from '@/lib/nav'
 import { useFolder } from '../Storage/useFolder'
 import { FindingsList } from './Findings'
+import { ShareDialog } from './ShareDialog'
 import { useFindings } from './useFindings'
 
 /** "~/.claude" for the usual folder; a shortened form for long custom paths. */
@@ -31,6 +32,8 @@ export default function OverviewScreen(_props: ScreenProps): JSX.Element {
   const summary = useApi(() => api.overview.summary(), [])
   const folder = useFolder('')
   const found = useFindings()
+  const wrapped = useApi(() => api.overview.wrapped(), [])
+  const [sharing, setSharing] = useState(false)
 
   const known = useMemo(() => folder.entries.filter((e) => e.bytes !== null && !e.locked), [folder.entries])
   const total = known.reduce((n, e) => n + (e.bytes ?? 0), 0)
@@ -71,10 +74,15 @@ export default function OverviewScreen(_props: ScreenProps): JSX.Element {
     <div className="page">
       <div className="page__inner ov">
         <header className="ov__head">
-          <h1 className="ov__headline">
-            <span className="ov__total">{folder.loading ? '…' : formatBytes(total)}</span> in <span className="ov__dir">{label}</span>
-            {folder.scanning ? <Spinner size={16} label="Measuring" className="ov__spin" /> : null}
-          </h1>
+          <div className="ov__headrow">
+            <h1 className="ov__headline">
+              <span className="ov__total">{folder.loading ? '…' : formatBytes(total)}</span> in <span className="ov__dir">{label}</span>
+              {folder.scanning ? <Spinner size={16} label="Measuring" className="ov__spin" /> : null}
+            </h1>
+            <Button icon={<Share2 size={16} strokeWidth={1.8} />} onClick={() => setSharing(true)} disabled={wrapped.loading && !wrapped.data}>
+              Share stats
+            </Button>
+          </div>
           <p className="ov__sub" aria-live="polite">
             {found.scanning && found.findings.length === 0
               ? 'Checking for things worth a look…'
@@ -141,6 +149,7 @@ export default function OverviewScreen(_props: ScreenProps): JSX.Element {
           </div>
         </div>
       </div>
+      <ShareDialog open={sharing} stats={wrapped.data} onClose={() => setSharing(false)} />
     </div>
   )
 }

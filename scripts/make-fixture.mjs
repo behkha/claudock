@@ -298,7 +298,59 @@ w('settings.json.bak-20260412-0930', json({ model: 'opus', effortLevel: 'medium'
 w('statusline.sh', '#!/bin/bash\necho "fixture status"\n')
 w('hooks/guard-bash.sh', '#!/bin/bash\nexit 0\n')
 w('hooks/add-date.sh', '#!/bin/bash\ndate\n')
-w('stats-cache.json', json({ version: 1, lastComputedDate: iso(now).slice(0, 10), dailyActivity: [] }))
+{
+  // Claude Code's stats cache (version 5 shape): ~5 months of daily activity, quieter weekends, a few days off, bursts
+  const today = new Date(now)
+  const localDay = (back) => {
+    const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - back)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
+  const MODELS = ['claude-opus-5', 'claude-sonnet-5-5', 'claude-haiku-5']
+  const dailyActivity = []
+  const dailyModelTokens = []
+  const usage = Object.fromEntries(MODELS.map((m) => [m, { inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0, webSearchRequests: 0, costUSD: 0 }]))
+  let totalSessions = 0
+  let totalMessages = 0
+  for (let back = 150; back >= 0; back--) {
+    const date = localDay(back)
+    const dow = new Date(date + 'T12:00:00').getDay()
+    const weekend = dow === 0 || dow === 6
+    if (rnd() < (weekend ? 0.45 : 0.1)) continue
+    const burst = rnd() < 0.08 ? 3 : 1
+    const ramp = 0.6 + (1 - back / 150) * 0.8
+    const messageCount = Math.round((weekend ? int(15, 160) : int(90, 620)) * burst * ramp)
+    const sessionCount = Math.max(1, Math.round(messageCount / int(30, 70)))
+    const toolCallCount = Math.round(messageCount * (0.35 + rnd() * 0.2))
+    dailyActivity.push({ date, messageCount, sessionCount, toolCallCount })
+    totalSessions += sessionCount
+    totalMessages += messageCount
+    const tokensByModel = {}
+    for (const m of MODELS) {
+      const share = m === 'claude-opus-5' ? 0.62 : m === 'claude-sonnet-5-5' ? 0.3 : 0.08
+      const tokens = Math.round(messageCount * int(9000, 16000) * share * (0.7 + rnd() * 0.6))
+      tokensByModel[m] = tokens
+      usage[m].inputTokens += Math.round(tokens * 0.04)
+      usage[m].outputTokens += Math.round(tokens * 0.06)
+      usage[m].cacheReadInputTokens += Math.round(tokens * 0.8)
+      usage[m].cacheCreationInputTokens += Math.round(tokens * 0.1)
+      usage[m].costUSD += tokens * 0.000004
+    }
+    dailyModelTokens.push({ date, tokensByModel })
+  }
+  const hourWeights = [2, 1, 1, 0, 0, 1, 3, 8, 18, 30, 38, 40, 34, 36, 44, 46, 40, 30, 22, 18, 20, 16, 10, 5]
+  w('stats-cache.json', json({
+    version: 5,
+    lastComputedDate: localDay(0),
+    dailyActivity,
+    dailyModelTokens,
+    modelUsage: usage,
+    totalSessions,
+    totalMessages,
+    longestSession: { sessionId: uuid(), timestamp: iso(now - 40 * DAY), duration: 104_823_000, messageCount: 1432 },
+    firstSessionDate: new Date(dailyActivity[0].date + 'T13:26:11').toISOString(),
+    hourCounts: Object.fromEntries(hourWeights.map((n, h) => [String(h), n * int(80, 120)]))
+  }))
+}
 w('backups/settings.json.2025-12-01', json({ model: 'sonnet' }), now - 300 * DAY)
 w('shell-snapshots/snapshot-zsh-1700000000-abc123.sh', '# shell snapshot\nexport FIXTURE=1\n', now - 20 * DAY)
 w('telemetry/events-1.json', json([{ e: 'start' }]), now - 10 * DAY)

@@ -11,7 +11,7 @@ const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms
 /**
  * Screenshot mode (CLAUDOCK_SHOT=1, driven by scripts/shot.mjs): visits every screen in light then dark through the
  * normal `system:navigate` / `system:theme` events, waits until each is loaded and painted in that theme, saves
- * `<dir>/<theme>-<screen>.png`, prints renderer console errors as `CONSOLE_ERROR ...` and failed shots as
+ * `<dir>/<theme>-<screen>.png` (plus `palette`, `settings-json` and `share`, the Overview share dialog, and `card.png`, the card itself), prints renderer console errors as `CONSOLE_ERROR ...` and failed shots as
  * `SHOT_FAILED ...`, and exits 0 (clean) or 1 (errors).
  */
 export async function runShots(win: BrowserWindow, opts: { dir: string; only: string[] }): Promise<void> {
@@ -65,10 +65,11 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
   /**
    * Capture and save `<theme>-<what>.png`. A pixel near the bottom-right corner must match the background the DOM has
    * there, so a stale frame from before the theme switch is retried instead of saved. Skipped under a translucent
-   * overlay (the palette scrim), where the DOM colour is not what gets painted.
+   * overlay (the palette scrim or a modal dialog's backdrop), where the DOM colour is not what gets painted.
    */
   async function capture(theme: 'light' | 'dark', what: string): Promise<void> {
     const want = await js<number[]>(`(() => {
+      if (document.querySelector('dialog[open]')) return [] // a modal's backdrop dims the page: the DOM colour is not what is painted
       for (let el = document.elementFromPoint(innerWidth - 4, innerHeight - 4); el; el = el.parentElement) {
         const [r, g, b, a = 1] = (getComputedStyle(el).backgroundColor.match(/[\\d.]+/g) ?? []).map(Number)
         if (a === 1) return [r, g, b]
@@ -124,6 +125,27 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
   const restoreSettingsJson = (): Promise<void> =>
     js(`(() => { const s = window.__shotJson; if (s) s.view.dispatch({ changes: { from: 0, to: s.view.state.doc.length, insert: s.text } }); window.__shotJson = undefined })()`)
 
+  /** Overview -> "Share stats" -> the dialog with the card drawn (the canvas says so with data-ready). */
+  const openShare = (): Promise<void> =>
+    js(`(async () => {
+      const wait = async (f, ms = 15000) => {
+        const t = Date.now()
+        while (Date.now() - t < ms) { const v = f(); if (v) return v; await new Promise((r) => setTimeout(r, 100)) }
+        throw new Error('share: timed out waiting for ' + f)
+      }
+      const button = await wait(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Share stats' && !b.disabled))
+      button.click()
+      await wait(() => document.querySelector('.share__canvas[data-ready="true"]'))
+    })()`)
+  const closeShare = (): Promise<unknown> => js(`document.querySelector('.share [aria-label="Close"]')?.click()`)
+  /** The card as the dialog sends it (the same canvas), for review. It does not depend on the app theme. */
+  async function saveCard(): Promise<void> {
+    const url = await js<string>(`document.querySelector('.share__canvas').toDataURL('image/png')`)
+    const file = path.join(opts.dir, 'card.png')
+    await fsp.writeFile(file, Buffer.from(url.replace(/^data:image\/png;base64,/, ''), 'base64'))
+    console.log(`SHOT ${file} 2400x1350`)
+  }
+
   const fail = (e: unknown): void => {
     errors.push(`SHOT_FAILED ${(e as Error).message}`)
     console.log(`SHOT_FAILED ${(e as Error).message}`)
@@ -165,6 +187,14 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
         await sleep(150)
         await shoot(theme, 'palette')
         await js(`document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}))`)
+        await sleep(200)
+      }
+      if (opts.only.length === 0 || opts.only.includes('share')) {
+        emit('system:navigate', { screen: 'overview' })
+        await sleep(150)
+        await openShare().then(() => shoot(theme, 'share'), fail)
+        if (theme === 'light') await saveCard().catch(fail)
+        await closeShare()
         await sleep(200)
       }
     }

@@ -1,15 +1,17 @@
-import type { IpcMain } from 'electron'
+import { BrowserWindow, ClipboardItem, app, clipboard, dialog, nativeImage, shell, type IpcMain } from 'electron'
 import fsp from 'node:fs/promises'
 import fs from 'node:fs'
 import path from 'node:path'
 import type { Finding, OverviewApi, OverviewSummary } from '@shared/api/overview'
 import { formatBytes, formatCount } from '@shared/format'
+import { shareText } from '@shared/wrapped'
 import { exists, readJson, stat } from '../fsx'
 import { defineDomain, emit } from '../ipcx'
-import { assertWritable, configDir, globalStateFile, isSecret, resolveInside } from '../paths'
+import { assertWritable, configDir, globalStateFile, isInside, isSecret, resolveInside, samePath } from '../paths'
 import { safeWriteText, trash } from '../safeWrite'
 import { scanLoose } from './backups'
 import { scanUser } from './skills'
+import { computeWrapped } from './overviewWrapped'
 import { sizeOf } from './storage'
 
 const MB = 1024 * 1024
@@ -363,6 +365,35 @@ async function summary(): Promise<OverviewSummary> {
   }
 }
 
+/* ------------------------------------------------------------------ share card */
+
+const PNG_MAGIC = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
+const MAX_PNG = 20 * MB
+const X_INTENT = 'https://x.com/intent/post'
+
+/** The renderer's bytes, checked: a real PNG, not empty, at most 20 MB. */
+function pngBuffer(v: unknown): Buffer {
+  if (!ArrayBuffer.isView(v)) throw new Error('No image')
+  const buf = Buffer.from(v.buffer, v.byteOffset, v.byteLength)
+  if (buf.length === 0 || buf.length > MAX_PNG) throw new Error('The image is empty or larger than 20 MB')
+  if (!PNG_MAGIC.every((b, i) => buf[i] === b)) throw new Error('The image is not a PNG')
+  return buf
+}
+
+/** Electron 45 has no sync `writeImage`: the clipboard takes ClipboardItems. The decode check keeps a broken PNG off it. */
+async function copyPng(buf: Buffer): Promise<void> {
+  if (nativeImage.createFromBuffer(buf).isEmpty()) throw new Error('The image could not be read')
+  await clipboard.write([new ClipboardItem({ 'image/png': new Blob([new Uint8Array(buf)], { type: 'image/png' }) })])
+}
+
+/** The only external page the app opens on its own: the X compose page, with the text in the query. */
+async function openXCompose(text: string): Promise<void> {
+  const url = `${X_INTENT}?text=${encodeURIComponent(text)}`
+  const u = new URL(url)
+  if (u.protocol !== 'https:' || u.origin !== 'https://x.com' || u.pathname !== '/intent/post') throw new Error('Refusing to open this address')
+  await shell.openExternal(url)
+}
+
 /* ------------------------------------------------------------------ api */
 
 const impl: OverviewApi = {
@@ -396,6 +427,37 @@ const impl: OverviewApi = {
     if (path.dirname(target) !== configDir() || !/\.log$/i.test(target) || isSecret(target)) throw new Error('Only .log files in the config folder can be cleared')
     const r = await safeWriteText(relPath, '', `Clear log ${path.basename(target)}`)
     return { snapshotId: r.snapshotId }
+  },
+
+  // The share card only reads stats and writes to the clipboard or to a path the user picks, so none of it asks
+  // assertWritable(): CLAUDOCK_READONLY and the dev write guard protect the config folder, which this never touches.
+  wrapped: computeWrapped,
+
+  async copyImage(png) {
+    await copyPng(pngBuffer(png))
+  },
+
+  async saveImage(png) {
+    const buf = pngBuffer(png)
+    const win = BrowserWindow.getFocusedWindow()
+    const options = {
+      defaultPath: path.join(app.getPath('downloads'), 'claude-code-wrapped.png'),
+      filters: [{ name: 'PNG image', extensions: ['png'] }]
+    }
+    const { canceled, filePath } = win ? await dialog.showSaveDialog(win, options) : await dialog.showSaveDialog(options)
+    if (canceled || !filePath) return { saved: false }
+    // Config files are written through safeWrite only; a picture never goes into that folder or over the global state file.
+    if (isInside(configDir(), path.resolve(filePath)) || samePath(filePath, globalStateFile())) throw new Error('Choose a folder outside the Claude config folder')
+    await fsp.writeFile(filePath, buf)
+    return { saved: true }
+  },
+
+  async postOnX(png) {
+    const buf = pngBuffer(png)
+    const stats = await computeWrapped()
+    if (!stats) throw new Error('There are no stats to share yet')
+    await copyPng(buf)
+    await openXCompose(shareText(stats))
   }
 }
 
