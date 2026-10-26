@@ -22,12 +22,13 @@
   var FILES = [
     ['settings.json', 'Settings', 0.2049], ['CLAUDE.md', 'CLAUDE.md & rules', 0.2449], ['hooks/', 'Hooks', 0.2849],
     ['skills/', 'Skills', 0.4107], ['agents/', 'Agents', 0.4507], ['commands/', 'Commands', 0.4907],
-    ['plugins/', 'Plugins', 0.5317], ['projects/', 'Projects', 0.6566], ['plans/', 'Plans', 0.7376], ['history.jsonl', 'History', 0.7776]
+    ['plugins/', 'Plugins', 0.5317], ['dev-mods/', 'Mods', 0.5717], ['projects/', 'Projects', 0.6976], ['plans/', 'Plans', 0.7776],
+    ['history.jsonl', 'History', 0.8176]
   ]
   var LABEL_X = 58 / 1600 // labels' left edge
   var LABEL_FS = 18 / 1600 // labels' font size
-  var ZOOM = 1.5 // the camera starts at 1.5x on the sidebar, showing y 0.12 to 0.79 of the screenshot
-  var ZOOM_Y = 0.12
+  var ZOOM = 1.4 // the camera starts at 1.4x on the sidebar, showing y 0.15 to 0.86 of the screenshot
+  var ZOOM_Y = 0.15
 
   // Safe by design: camera (snapshot), document (atomic write), trash, lock, all in a 100x100 box
   var ICONS = [
@@ -82,7 +83,7 @@
     var screens = $$('.screen')
     var caps = $$('.cap')
     var fs = Math.max(9, W * LABEL_FS * ZOOM)
-    var start = function (i) { return { x: W * 0.06, y: H * (0.22 + i * 0.062) } }
+    var start = function (i) { return { x: W * 0.06, y: H * (0.22 + i * 0.058) } }
     var end = function (i) { return { x: W * LABEL_X * ZOOM, y: (FILES[i][2] - ZOOM_Y) * ZOOM * H } }
 
     $('#prompt').style.fontSize = fs + 'px'
@@ -108,7 +109,7 @@
     // on scroll: files fly onto the sidebar, the terminal gives way to the app, the camera pulls back, the screens change
     var short = innerWidth < 700
     var tl = gsap.timeline({
-      scrollTrigger: { trigger: '#hero', start: short ? 'top 64px' : 'top top', end: function () { return '+=' + innerHeight * (short ? 3.2 : 4.2) }, pin: true, scrub: 0.8 }
+      scrollTrigger: { trigger: '#hero', start: short ? 'top 64px' : 'top top', end: function () { return '+=' + innerHeight * (short ? 3.8 : 5) }, pin: true, scrub: 0.8 }
     })
     tl.to('.hero-intro', { autoAlpha: 0, y: -40, duration: 0.5 }, 0)
       .to('#prompt', { autoAlpha: 0, duration: 0.3 }, 0.1)
