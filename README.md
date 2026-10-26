@@ -2,9 +2,11 @@
 
 Manage your Claude Code setup (settings, hooks, skills, MCP servers, memory and more) in one window, without hand-editing the JSON and Markdown in `~/.claude`.
 
-**Beta, actively maintained** · macOS, Windows, Linux · [Source-available license](#license): free for personal use and inside your company, no redistribution · Unofficial, not affiliated with Anthropic
+**Beta, actively maintained** · macOS, Windows, Linux · [MIT license](LICENSE.md) · Unofficial, not affiliated with Anthropic
 
-![Claudock's Overview screen, on the bundled test config: disk use per folder, one-click cleanup suggestions, and counts of skills, hooks, plugins and rules](docs/screenshot.png)
+**[Download](https://github.com/behkha/claudock/releases/latest)** · [Website](https://behkha.github.io/claudock/)
+
+![Claudock walking through Overview, Skills, Settings and Storage on the bundled test config](docs/demo.gif)
 
 ## What it does
 
@@ -14,6 +16,7 @@ Claudock is a desktop app for the Claude Code config folder (`~/.claude`, or whe
 - **Extend:** skills (turn on or off, edit, duplicate), agents, commands, plugins, MCP servers
 - **Your data:** projects and their session transcripts, memory, plans, prompt history
 - **Maintain:** disk use per folder with cleanup suggestions, plus snapshots and `.bak` files you can diff and restore
+- **Share stats:** a card of your Claude Code numbers (messages, sessions, longest session, peak hour, top model, activity) from Claude Code's own `stats-cache.json`, to copy, save or post on X. It never shows project names or prompts.
 
 ⌘K (Ctrl+K on Windows and Linux) searches skills, agents, rules, hooks, sessions, memory and settings keys.
 
@@ -52,7 +55,7 @@ Download the installer for your computer from the [latest release](https://githu
 | macOS, Apple silicon | `Claudock-<version>-arm64.dmg` |
 | macOS, Intel | `Claudock-<version>-x64.dmg` |
 | Windows | `Claudock-Setup-<version>.exe` |
-| Linux | `.AppImage` or `.deb`, for x64 and arm64 |
+| Linux | `.AppImage` (`x86_64`, `arm64`) or `.deb` (`amd64`, `arm64`) |
 
 The builds are not notarized or code-signed yet, so the first launch needs one extra step:
 
@@ -69,7 +72,7 @@ Beta (v0.1.0), actively maintained. Bug reports are welcome in [Issues](https://
 
 ## License
 
-Claudock is source-available, not open source. You may use it under your choice of the [PolyForm Strict License 1.0.0](https://polyformproject.org/licenses/strict/1.0.0) (personal and noncommercial use) or the [PolyForm Internal Use License 1.0.0](https://polyformproject.org/licenses/internal-use/1.0.0) (use inside your company). Neither allows distributing, reselling or rebranding it. See [LICENSE.md](LICENSE.md).
+Claudock is open source under the [MIT License](LICENSE.md).
 
 Claudock is unofficial and is not affiliated with or endorsed by Anthropic. It uses Anthropic's palette and type styles but not the Claude or Anthropic logos.
 
