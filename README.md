@@ -4,7 +4,7 @@ See inside your `~/.claude`. Claudock is a free desktop app that lists every ski
 
 **Beta, actively maintained** · macOS, Windows, Linux · [MIT license](LICENSE.md) · Unofficial, not affiliated with Anthropic
 
-**[Download](https://github.com/behkha/claudock/releases/latest)** · [Website](https://behkha.github.io/claudock/)
+`npx claudock` · [Download](https://github.com/behkha/claudock/releases/latest) · [Website](https://behkha.github.io/claudock/)
 
 ![Claudock walking through Overview, Mods, Skills, Settings, Hooks, Storage and Backups on the bundled test config](docs/demo.gif)
 
@@ -33,7 +33,7 @@ Claude Code keeps its config in dozens of JSON, JSONL and Markdown files, and re
 
 What it doesn't do: it doesn't run, update or sign in to Claude Code, and it doesn't sync settings between machines. It only works on the config folder and `~/.claude.json`, not on the `.claude/` folders inside your repositories. If you only change a setting now and then, Claude Code's own `/config` and `/permissions` commands are enough.
 
-At launch Claudock downloads Anthropic's public settings docs (code.claude.com) and the Claude Code JSON schema to power the JSON editor's suggestions. It asks json.schemastore.org and the schema's GitHub mirror (raw.githubusercontent.com) at the same time and uses whichever answers first. It sends nothing about your config.
+At launch Claudock downloads Anthropic's public settings docs (code.claude.com) and the Claude Code JSON schema to power the JSON editor's suggestions. It asks json.schemastore.org and the schema's GitHub mirror (raw.githubusercontent.com) at the same time and uses whichever answers first. It also asks api.github.com for the latest Claudock release, to tell you when there's a newer one. It sends nothing about your config. `CLAUDOCK_OFFLINE=1` turns both off.
 
 ## Try it without touching your config
 
@@ -50,7 +50,15 @@ npm run dev
 
 ## Install
 
-Download the installer for your computer from the [latest release](https://github.com/behkha/claudock/releases/latest):
+With Node.js 22.12 or later (you likely have it for Claude Code):
+
+```sh
+npx claudock
+```
+
+npm downloads Claudock and Electron the first time, then opens the app. Nothing is code-signed, but files npm downloads aren't flagged by macOS Gatekeeper or Windows SmartScreen, so there's no warning to click through. To update, run `npx claudock@latest`; the app tells you in the sidebar when a newer release is out.
+
+Or download an installer from the [latest release](https://github.com/behkha/claudock/releases/latest):
 
 | Platform | File |
 |---|---|
@@ -59,14 +67,14 @@ Download the installer for your computer from the [latest release](https://githu
 | Windows | `Claudock-Setup-<version>.exe` |
 | Linux | `.AppImage` (`x86_64`, `arm64`) or `.deb` (`amd64`, `arm64`) |
 
-The builds are not notarized or code-signed yet, so the first launch needs one extra step:
+The installers are not notarized or code-signed, so the first launch needs one extra step:
 
 - **macOS:** open the app once, click Done when macOS says it can't verify it, then click **Open Anyway** in System Settings › Privacy & Security. If macOS says the app is damaged, run `xattr -dr com.apple.quarantine /Applications/Claudock.app`.
 - **Windows:** if SmartScreen shows "Windows protected your PC", click **More info**, then **Run anyway**.
 
-To build an installer yourself from the clone above, run `npm run dist:mac` (or `dist:win`, `dist:linux`). The output goes to `./dist`. Pushing a `v*` tag that matches `package.json`'s version builds all three platforms in GitHub Actions and attaches them to a draft release (`.github/workflows/release.yml`).
+To build an installer yourself from the clone above, run `npm run dist:mac` (or `dist:win`, `dist:linux`). The output goes to `./dist`. Pushing a `v*` tag that matches `package.json`'s version builds all three platforms in GitHub Actions, attaches them to a draft release and publishes the npm package (`.github/workflows/release.yml`).
 
-The installed app reads and writes `~/.claude`, or the folder in `CLAUDE_CONFIG_DIR` if you set it.
+Either way the app reads and writes `~/.claude`, or the folder in `CLAUDE_CONFIG_DIR` if you set it.
 
 ## Status
 

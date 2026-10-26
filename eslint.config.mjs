@@ -39,6 +39,12 @@ export default tseslint.config(
     languageOptions: { globals: globals.node }
   },
   {
+    // `npx claudock`: plain CommonJS, so it runs on any Node without a build
+    files: ['bin/**/*.js'],
+    languageOptions: { sourceType: 'commonjs', globals: globals.node },
+    rules: { '@typescript-eslint/no-require-imports': 'off' }
+  },
+  {
     rules: {
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }]
     }

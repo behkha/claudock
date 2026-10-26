@@ -31,7 +31,7 @@ export interface ConfigInfo {
   platform: Platform
   /** True when CLAUDE_CONFIG_DIR is set (dev / fixture / multi-account). */
   customDir: boolean
-  /** True when writes are allowed (always true when packaged). Dev builds block writes to the real ~/.claude. */
+  /** True when writes are allowed (always true for an installer or npm copy). Dev builds block writes to the real ~/.claude. */
   writable: boolean
   userData: string
 }
@@ -43,6 +43,19 @@ export interface AppInfo {
   platform: Platform
   arch: string
   packaged: boolean
+  install: InstallKind
+}
+
+/** How the running copy was installed: an electron-builder installer, `npx claudock`, or a git clone. */
+export type InstallKind = 'installer' | 'npm' | 'dev'
+
+/** A GitHub release newer than the running version. */
+export interface UpdateInfo {
+  version: string
+  /** The release page on GitHub. */
+  url: string
+  /** What updates this copy: the npm command, or null when the installer has to be downloaded from `url`. */
+  command: string | null
 }
 
 export interface DirSize {

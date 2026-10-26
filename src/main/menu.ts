@@ -1,5 +1,6 @@
-import { Menu, app, type MenuItemConstructorOptions } from 'electron'
+import { Menu, type MenuItemConstructorOptions } from 'electron'
 import { THEME_PREFS, type ThemePref } from '@shared/types'
+import { installKind } from './paths'
 import { currentTheme, setTheme } from './theme'
 
 const LABEL: Record<ThemePref, string> = { system: 'System', light: 'Light', dark: 'Dark' }
@@ -27,7 +28,7 @@ export function buildMenu(): void {
         { type: 'separator' },
         { role: 'reload' },
         { role: 'forceReload' },
-        ...(app.isPackaged ? [] : [{ role: 'toggleDevTools' as const }]),
+        ...(installKind() === 'dev' ? [{ role: 'toggleDevTools' as const }] : []),
         { type: 'separator' },
         { role: 'resetZoom' },
         { role: 'zoomIn' },
