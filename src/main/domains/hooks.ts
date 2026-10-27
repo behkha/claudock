@@ -11,8 +11,10 @@ import {
   updateSettingsObject,
   type JsonObject
 } from './settings'
+import { ourHookCommands } from './sessions'
 
 const STALE = 'This hook changed on disk since the list was loaded. Reload and try again.'
+const OURS = "This is one of Claudock's own hooks. Disconnect on the Overview card removes them."
 
 function commandOf(h: JsonObject): { text: string; key: 'command' | 'prompt' } {
   if (typeof h.command === 'string') return { text: h.command, key: 'command' }
@@ -35,6 +37,7 @@ async function list(fileIn: SettingsFileName): Promise<HooksData> {
   if (hooks === undefined) return base
   if (!isPlainObject(hooks)) return { ...base, problem: 'The hooks key in this file is not an object, so Claudock will not change it. Fix it in Settings > JSON.' }
 
+  const ours = ourHookCommands()
   const problems: string[] = []
   for (const [event, groups] of Object.entries(hooks)) {
     if (!(KNOWN_HOOK_EVENTS as readonly string[]).includes(event)) base.events.push(event)
@@ -63,7 +66,8 @@ async function list(fileIn: SettingsFileName): Promise<HooksData> {
           command: c.text,
           commandKey: c.key,
           timeout: typeof hook.timeout === 'number' ? hook.timeout : null,
-          scripts: await configScripts(c.text)
+          scripts: await configScripts(c.text),
+          claudock: c.key === 'command' && ours.has(c.text)
         }
         base.entries.push(entry)
       }
@@ -111,6 +115,7 @@ function locate(hooks: JsonObject | null, ref: HookRef): { groups: unknown[]; gr
   if (!isPlainObject(group) || !Array.isArray(group.hooks)) throw new Error(STALE)
   const hook = group.hooks[ref.hookIndex]
   if (!isPlainObject(hook) || commandOf(hook).text !== ref.command) throw new Error(STALE)
+  if (ourHookCommands().has(ref.command)) throw new Error(OURS)
   return { groups, group, hook }
 }
 
@@ -217,7 +222,7 @@ export function register(ipcMain: IpcMain): void {
   defineDomain(ipcMain, 'hooks', impl)
 }
 
-/** Sidebar badge: hook commands across settings.json and settings.local.json. */
+/** Sidebar badge: hook commands across settings.json and settings.local.json, without Claudock's own. */
 export async function count(): Promise<number> {
   return hookCommandCount()
 }

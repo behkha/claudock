@@ -16,9 +16,10 @@ const time = (ms: number): string => new Date(ms).toLocaleTimeString(undefined, 
  * Claude Code right now: sessions waiting for you, working or done (from the session hooks), the 5-hour and weekly
  * limits as Claude Code reported them (from the status line step), and today's tokens from the transcripts.
  * "Connect to Claude Code" adds both parts in one write; Disconnect removes both. Re-reads when either part reports
- * and once a minute, so "as of", resets and waiting times stay true.
+ * and once a minute, so "as of", resets and waiting times stay true. `disconnect` (the navigation's seq) opens the
+ * Disconnect dialog, for the Hooks screen's Claudock row.
  */
-export function ClaudeCodeCard(): JSX.Element {
+export function ClaudeCodeCard({ disconnect }: { disconnect?: number }): JSX.Element {
   const limits = useApi(() => api.limits.get(), [])
   const live = useApi(() => api.sessions.get(), [])
   const [limitsState, setLimits] = useState<LimitsState | undefined>()
@@ -67,6 +68,11 @@ export function ClaudeCodeCard(): JSX.Element {
   const askDisconnect = (): void => {
     void api.connect.previewDisconnect().then(setLeaving, (e: Error) => toast(e.message, { kind: 'error' }))
   }
+  useEffect(() => {
+    if (disconnect !== undefined) askDisconnect()
+    // once per navigation; askDisconnect is recreated every render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [disconnect])
   const run = async (fn: () => Promise<unknown>, done: string, close: () => void): Promise<void> => {
     setBusy(true)
     try {

@@ -27,8 +27,8 @@ interface Tile {
   sub: string
 }
 
-export default function OverviewScreen(_props: ScreenProps): JSX.Element {
-  const { navigate } = useNav()
+export default function OverviewScreen({ selectId }: ScreenProps): JSX.Element {
+  const { navigate, seq } = useNav()
   const info = useApi(() => api.system.configInfo(), [])
   const summary = useApi(() => api.overview.summary(), [])
   const folder = useFolder('')
@@ -74,7 +74,7 @@ export default function OverviewScreen(_props: ScreenProps): JSX.Element {
   return (
     <div className="page">
       <div className="page__inner ov">
-        <ClaudeCodeCard />
+        <ClaudeCodeCard disconnect={selectId === 'disconnect' ? seq : undefined} />
 
         <header className="ov__head">
           <div className="ov__headrow">

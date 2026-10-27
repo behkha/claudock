@@ -35,6 +35,8 @@ export interface HookEntry {
   timeout: number | null
   /** Config-dir-relative scripts the command mentions. */
   scripts: string[]
+  /** One of Claudock's own hooks (Connect to Claude Code): listed together and never edited here. */
+  claudock: boolean
 }
 
 export interface HooksData {

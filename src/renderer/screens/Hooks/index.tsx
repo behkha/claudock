@@ -6,10 +6,13 @@ import { Badge, ConfirmDialog, EmptyState, IconButton, ListDetailLayout, ListGro
 import { api, useApi } from '@/lib/api'
 import { useSelectId } from '@/lib/hooks'
 import { useNav, type ScreenProps } from '@/lib/nav'
+import { ClaudockHooks, ClaudockMark } from './ClaudockHooks'
 import { HookForm } from './HookForm'
 import './hooks.css'
 
 const NEW = '__new__'
+/** Selection id of the one row that stands for Claudock's own hooks. */
+const CLAUDOCK = '__claudock__'
 const FILE_LABEL: Record<SettingsFileName, string> = { 'settings.json': 'User', 'settings.local.json': 'Local' }
 
 /**
@@ -28,7 +31,7 @@ function parseTarget(selectId: string | undefined): { file?: SettingsFileName; i
 
 export default function HooksScreen({ selectId }: ScreenProps): JSX.Element {
   const toast = useToast()
-  const { seq } = useNav()
+  const { seq, navigate } = useNav()
   const target = useMemo(() => parseTarget(selectId), [selectId])
   const [file, setFile] = useState<SettingsFileName>(target.file ?? 'settings.json')
   const [sel, setSel] = useSelectId(target.id)
@@ -46,7 +49,9 @@ export default function HooksScreen({ selectId }: ScreenProps): JSX.Element {
     return () => window.removeEventListener('focus', reload)
   }, [reload])
 
-  const entries = useMemo(() => (data && data.file === file ? data.entries : []), [data, file])
+  const all = useMemo(() => (data && data.file === file ? data.entries : []), [data, file])
+  const entries = useMemo(() => all.filter((e) => !e.claudock), [all])
+  const ours = useMemo(() => all.filter((e) => e.claudock), [all])
   const groups = useMemo(() => {
     const by = new Map<string, HookEntry[]>()
     for (const e of entries) by.set(e.event, [...(by.get(e.event) ?? []), e])
@@ -54,9 +59,11 @@ export default function HooksScreen({ selectId }: ScreenProps): JSX.Element {
   }, [entries, data])
 
   const creating = sel === NEW
-  const selected = creating
-    ? null
-    : ((sel ? (entries.find((e) => e.id === sel) ?? entries.find((e) => e.id.startsWith(`${sel}:`))) : undefined) ?? entries[0] ?? null)
+  const found = !creating && sel ? (entries.find((e) => e.id === sel) ?? entries.find((e) => e.id.startsWith(`${sel}:`))) : undefined
+  // the Claudock row is the first row, so it is also what shows when nothing else is selected
+  const pointsAtOurs = sel === CLAUDOCK || (!!sel && ours.some((e) => e.id === sel || e.id.startsWith(`${sel}:`)))
+  const showOurs = !creating && !found && ours.length > 0 && (pointsAtOurs || !sel || entries.length === 0)
+  const selected = creating || showOurs ? null : (found ?? entries[0] ?? null)
 
   /** Run `action`, asking first when the form has unsaved edits. */
   const guard = useCallback((action: () => void) => {
@@ -95,7 +102,7 @@ export default function HooksScreen({ selectId }: ScreenProps): JSX.Element {
 
   const known = data?.events ?? []
   const problem = data?.problem ?? null
-  const empty = !!data && entries.length === 0 && !creating
+  const empty = !!data && all.length === 0 && !creating
 
   return (
     <>
@@ -151,6 +158,18 @@ export default function HooksScreen({ selectId }: ScreenProps): JSX.Element {
             isEmpty={empty}
             empty={<EmptyState icon={<Webhook />} title="No hooks in this file" description="Hooks run a command when something happens, such as before a tool runs or when Claude stops." />}
           >
+            {ours.length > 0 ? (
+              <>
+                <ListGroup>Claudock</ListGroup>
+                <ListRow
+                  selected={showOurs}
+                  leading={<ClaudockMark />}
+                  title="Connect to Claude Code"
+                  meta={String(ours.length)}
+                  onSelect={() => guard(() => setSel(CLAUDOCK))}
+                />
+              </>
+            ) : null}
             {groups.map((g) => (
               <ListGroupBlock key={g.event} event={g.event} count={g.items.length}>
                 {g.items.map((e) => (
@@ -169,7 +188,14 @@ export default function HooksScreen({ selectId }: ScreenProps): JSX.Element {
           </ListPane>
         }
         detail={
-          creating || selected ? (
+          showOurs ? (
+            <ClaudockHooks
+              entries={ours}
+              filePath={info.data ? `${info.data.configDir}${info.data.sep}${file}` : file}
+              fileName={file}
+              onDisconnect={() => navigate('overview', 'disconnect')}
+            />
+          ) : creating || selected ? (
             <HookForm
               key={creating ? `new:${newEvent}` : `${file}:${selected?.id}`}
               entry={selected}
