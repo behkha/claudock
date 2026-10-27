@@ -10,6 +10,7 @@ import { defineDomain, emit } from '../ipcx'
 import { assertWritable, configDir, globalStateFile, isInside, isSecret, resolveInside, samePath } from '../paths'
 import { safeWriteText, trash } from '../safeWrite'
 import { scanLoose } from './backups'
+import { countHooks } from './settings'
 import { scanUser } from './skills'
 import { displayedStatusLine } from './limits'
 import { computeWrapped } from './overviewWrapped'
@@ -317,21 +318,7 @@ async function summary(): Promise<OverviewSummary> {
   const pluginKeys = installedPlugins && typeof installedPlugins === 'object' ? Object.keys(installedPlugins) : []
   const enabled = (settings.enabledPlugins ?? {}) as Record<string, unknown>
 
-  let hooks = 0
-  let hookEvents = 0
-  const hookMap = settings.hooks
-  if (hookMap && typeof hookMap === 'object') {
-    for (const groups of Object.values(hookMap as Record<string, unknown>)) {
-      if (!Array.isArray(groups)) continue
-      let inEvent = 0
-      for (const g of groups) {
-        const list = (g as { hooks?: unknown } | null)?.hooks
-        inEvent += Array.isArray(list) ? list.length : 0
-      }
-      if (inEvent > 0) hookEvents++
-      hooks += inEvent
-    }
-  }
+  const { commands: hooks, events: hookEvents } = countHooks(settings.hooks)
 
   const [skills, pluginSkills, rules, projects, prompts, global] = await Promise.all([
     countSkillsIn(abs('skills')),

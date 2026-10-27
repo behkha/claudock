@@ -7,6 +7,7 @@ import { spawn } from 'node:child_process'
 import { connectDir } from './connect/folder'
 import { GROUP_MS } from './connect/sessionModel'
 import { postedAlerts } from './domains/sessions'
+import { countHooks } from './domains/settings'
 import { emit } from './ipcx'
 import { configDir } from './paths'
 import { setTheme } from './theme'
@@ -16,7 +17,7 @@ const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms
 /**
  * Screenshot mode (CLAUDOCK_SHOT=1, driven by scripts/shot.mjs): visits every screen in light then dark through the
  * normal `system:navigate` / `system:theme` events, waits until each is loaded and painted in that theme, saves
- * `<dir>/<theme>-<screen>.png` (plus `connect`, the Connect sheet, `connected`, the Overview card after connecting with one played status line run and three sessions played through the real hooks, which must post exactly one alert, and `disconnect`, its confirm dialog, which must leave settings.json byte for byte as it was, `palette`, `settings-json`, `mods-draft`, the Mods screen with the fixture's draft selected, and `share`, the Overview share dialog, and `card.png`, the card itself), prints renderer console errors as `CONSOLE_ERROR ...` and failed shots as
+ * `<dir>/<theme>-<screen>.png` (plus `connect`, the Connect sheet, `connected`, the Overview card after connecting with one played status line run and three sessions played through the real hooks, which must post exactly one alert, `connected-hooks`, the Hooks screen then, where Claudock's hooks are one row and out of the counts, and `disconnect`, the confirm dialog that row's Disconnect… opens, which must leave settings.json byte for byte as it was, `palette`, `settings-json`, `mods-draft`, the Mods screen with the fixture's draft selected, and `share`, the Overview share dialog, and `card.png`, the card itself), prints renderer console errors as `CONSOLE_ERROR ...` and failed shots as
  * `SHOT_FAILED ...`, and exits 0 (clean) or 1 (errors).
  */
 export async function runShots(win: BrowserWindow, opts: { dir: string; only: string[] }): Promise<void> {
@@ -245,7 +246,9 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
   /**
    * Overview -> Connect to Claude Code -> the sheet (shot) -> Connect -> one status line run and three sessions through
    * the real hooks (one ends up waiting on a permission prompt, one working, one done) -> exactly one alert -> the card
-   * (shot) -> Disconnect -> settings.json byte for byte as before, and the connect folder empty of scripts.
+   * (shot) -> Hooks: one Claudock row, the list and sidebar counts as before (shot) -> its Disconnect… -> the card's
+   * dialog, with the Overview tile as before (shot) -> settings.json byte for byte as before, and the connect folder
+   * empty of scripts.
    */
   async function connectFlow(theme: 'light' | 'dark'): Promise<void> {
     const file = path.join(configDir(), 'settings.json')
@@ -288,8 +291,18 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
     const want = `${path.basename(a.cwd)} is waiting for you`
     if (posted.length !== 1 || posted[0] !== want) throw new Error(`connect: expected one alert "${want}", got ${JSON.stringify(posted)}`)
     await shoot(theme, 'connected')
-    await click('Disconnect')
-    await waitFor(`document.querySelector('dialog[open] .diff')`, 'the Disconnect dialog')
+    const own = String(countHooks((JSON.parse(before.toString('utf8')) as { hooks?: unknown }).hooks).commands)
+    emit('system:navigate', { screen: 'hooks' })
+    await waitFor(
+      `document.querySelector('.list-row--selected')?.textContent.includes('Connect to Claude Code') && document.querySelector('.list-pane__count')?.textContent === ${JSON.stringify(own)} && [...document.querySelectorAll('.nav-item')].find((b) => b.textContent.includes('Hooks'))?.querySelector('.nav-item__count')?.textContent === ${JSON.stringify(own)}`,
+      'the Claudock row on Hooks, with the counts as before connecting'
+    )
+    await shoot(theme, 'connected-hooks')
+    await click('Disconnect…')
+    await waitFor(
+      `document.querySelector('dialog[open] .diff') && document.querySelector('.ov__tile[aria-label^="Hooks: ${own}."]')`,
+      'the Disconnect dialog, with the Overview tile as before connecting'
+    )
     await shoot(theme, 'disconnect')
     await click('Disconnect', `document.querySelector('dialog[open]')`)
     await waitFor(`!document.querySelector('dialog[open]') && [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Connect to Claude Code')`, 'the disconnect')

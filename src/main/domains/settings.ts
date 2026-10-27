@@ -6,6 +6,7 @@ import { listDir, readText, stat } from '../fsx'
 import { defineDomain } from '../ipcx'
 import { assertWritable, configDir, resolveInside } from '../paths'
 import { getSettingsDocs } from '../settingsDocs'
+import { ourHookCommands } from './sessions'
 import { listSnapshots, readSnapshotText, restoreSnapshot, safeWriteJson, safeWriteText, withFileLock as sharedFileLock } from '../safeWrite'
 
 /* ------------------------------------------------------------------ shared helpers (also used by hooks + permissions) */
@@ -151,15 +152,17 @@ export async function configScripts(command: string): Promise<string[]> {
 
 /* ------------------------------------------------------------------ summary */
 
-function countHooks(hooks: unknown): { commands: number; events: number } {
+/** Hook commands, and events with at least one, leaving out Claudock's own (Connect to Claude Code adds them). */
+export function countHooks(hooks: unknown): { commands: number; events: number } {
   if (!isPlainObject(hooks)) return { commands: 0, events: 0 }
+  const ours = ourHookCommands()
   let commands = 0
   let events = 0
   for (const groups of Object.values(hooks)) {
     if (!Array.isArray(groups)) continue
     let inEvent = 0
     for (const g of groups) {
-      if (isPlainObject(g) && Array.isArray(g.hooks)) inEvent += g.hooks.filter(isPlainObject).length
+      if (isPlainObject(g) && Array.isArray(g.hooks)) inEvent += g.hooks.filter((h) => isPlainObject(h) && !(typeof h.command === 'string' && ours.has(h.command))).length
     }
     if (inEvent > 0) events++
     commands += inEvent
