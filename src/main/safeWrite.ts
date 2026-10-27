@@ -193,12 +193,12 @@ export async function readSnapshotText(id: string, rel: string): Promise<string>
 }
 
 /** Restore `rel` from snapshot `id`. The current file is snapshotted first (via safeWrite). The global state file cannot be restored wholesale (Claude Code writes it constantly): use `readSnapshotText` + `writeGlobalStateKey`. */
-export async function restoreSnapshot(id: string, rel: string): Promise<void> {
+export async function restoreSnapshot(id: string, rel: string, reason = `Restore of ${rel} from snapshot ${id}`): Promise<WriteResult> {
   if (rel === GLOBAL_STATE_REL) throw new Error('Restore single keys of .claude.json instead of the whole file')
   const abs = await snapshotFilePath(id, rel)
   await assertNotSecretReal(abs)
   const data = await fsp.readFile(abs)
-  await atomicWriteWithSnapshot(rel, data, `Restore of ${rel} from snapshot ${id}`)
+  return atomicWriteWithSnapshot(rel, data, reason)
 }
 
 /** Move a snapshot folder to the OS Trash (never fs.rm). */

@@ -10,6 +10,8 @@ export interface ConfirmDialogProps {
   /** danger = destructive confirm (Move to Trash). Focus starts on Cancel. */
   tone?: 'default' | 'danger'
   busy?: boolean
+  /** The confirm button is disabled (nothing chosen yet). */
+  confirmDisabled?: boolean
   onConfirm: () => void
   onCancel: () => void
 }
@@ -23,6 +25,7 @@ export function ConfirmDialog({
   cancelLabel = 'Cancel',
   tone = 'default',
   busy,
+  confirmDisabled,
   onConfirm,
   onCancel
 }: ConfirmDialogProps): JSX.Element {
@@ -58,7 +61,7 @@ export function ConfirmDialog({
             <Button variant="secondary" autoFocus={tone === 'danger'} onClick={onCancel} disabled={busy}>
               {cancelLabel}
             </Button>
-            <Button variant={tone === 'danger' ? 'danger' : 'primary'} autoFocus={tone !== 'danger'} onClick={onConfirm} loading={busy}>
+            <Button variant={tone === 'danger' ? 'danger' : 'primary'} autoFocus={tone !== 'danger'} onClick={onConfirm} loading={busy} disabled={confirmDisabled}>
               {confirmLabel}
             </Button>
           </div>

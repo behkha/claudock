@@ -4,6 +4,9 @@ import path from 'node:path'
 import { SCREENS, type ScreenId } from '@shared/nav'
 import { app } from 'electron'
 import { spawn } from 'node:child_process'
+import { connectDir } from './connect/folder'
+import { GROUP_MS } from './connect/sessionModel'
+import { postedAlerts } from './domains/sessions'
 import { emit } from './ipcx'
 import { configDir } from './paths'
 import { setTheme } from './theme'
@@ -13,7 +16,7 @@ const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms
 /**
  * Screenshot mode (CLAUDOCK_SHOT=1, driven by scripts/shot.mjs): visits every screen in light then dark through the
  * normal `system:navigate` / `system:theme` events, waits until each is loaded and painted in that theme, saves
- * `<dir>/<theme>-<screen>.png` (plus `limits-confirm` and `limits`, live limits turned on through the Overview card with one played status line run and turned off again, which must leave settings.json byte for byte as it was, `palette`, `settings-json`, `mods-draft`, the Mods screen with the fixture's draft selected, and `share`, the Overview share dialog, and `card.png`, the card itself), prints renderer console errors as `CONSOLE_ERROR ...` and failed shots as
+ * `<dir>/<theme>-<screen>.png` (plus `connect`, the Connect sheet, `connected`, the Overview card after connecting with one played status line run and three sessions played through the real hooks, which must post exactly one alert, and `disconnect`, its confirm dialog, which must leave settings.json byte for byte as it was, `palette`, `settings-json`, `mods-draft`, the Mods screen with the fixture's draft selected, and `share`, the Overview share dialog, and `card.png`, the card itself), prints renderer console errors as `CONSOLE_ERROR ...` and failed shots as
  * `SHOT_FAILED ...`, and exits 0 (clean) or 1 (errors).
  */
 export async function runShots(win: BrowserWindow, opts: { dir: string; only: string[] }): Promise<void> {
@@ -207,24 +210,95 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
     if (out.trim() !== 'fixture status') throw new Error(`limits: status line printed ${JSON.stringify(out)}, not the fixture's own line`)
   }
 
-  /** Overview -> Show live limits -> confirm (shot) -> on -> one status line run (shot) -> Turn off -> settings.json as before. */
-  async function limitsFlow(theme: 'light' | 'dark'): Promise<void> {
+  /** Play Claude Code firing the session hooks: run `command` once with `input` on stdin, from this process (alive, so the session stays). */
+  function playHook(command: string, input: object): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const child = spawn('/bin/sh', ['-c', command], { stdio: ['pipe', 'pipe', 'pipe'] })
+      let out = ''
+      child.stdout.on('data', (b: Buffer) => (out += b.toString()))
+      child.on('error', reject)
+      child.on('close', (code) => (code === 0 && out === '' ? resolve() : reject(new Error(`connect: hook exited ${code} with output ${JSON.stringify(out)}`))))
+      child.stdin.end(JSON.stringify(input))
+    })
+  }
+
+  /** The three newest fixture sessions, one per project folder, standing in for running ones. */
+  async function fixtureSessions(): Promise<{ id: string; cwd: string }[]> {
+    const root = path.join(configDir(), 'projects')
+    const found: { id: string; cwd: string; mtime: number }[] = []
+    for (const folder of await fsp.readdir(root)) {
+      const dir = path.join(root, folder)
+      for (const f of await fsp.readdir(dir).catch(() => [] as string[])) {
+        if (!f.endsWith('.jsonl')) continue
+        const text = await fsp.readFile(path.join(dir, f), 'utf8')
+        const cwd = (JSON.parse(text.split('\n')[0]) as { cwd?: string }).cwd
+        if (cwd) found.push({ id: f.slice(0, -6), cwd, mtime: (await fsp.stat(path.join(dir, f))).mtimeMs })
+      }
+    }
+    const seen = new Set<string>()
+    return found
+      .sort((a, b) => b.mtime - a.mtime)
+      .filter((x) => !seen.has(x.cwd) && seen.add(x.cwd))
+      .slice(0, 3)
+  }
+
+  /**
+   * Overview -> Connect to Claude Code -> the sheet (shot) -> Connect -> one status line run and three sessions through
+   * the real hooks (one ends up waiting on a permission prompt, one working, one done) -> exactly one alert -> the card
+   * (shot) -> Disconnect -> settings.json byte for byte as before, and the connect folder empty of scripts.
+   */
+  async function connectFlow(theme: 'light' | 'dark'): Promise<void> {
     const file = path.join(configDir(), 'settings.json')
     const before = await fsp.readFile(file)
-    await click('Show live limits')
-    await waitFor(`document.querySelector('dialog[open] .diff')`, 'the confirm dialog')
-    await shoot(theme, 'limits-confirm')
-    await click('Turn on', `document.querySelector('dialog[open]')`)
-    await waitFor(`!document.querySelector('dialog[open]') && [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Turn off')`, 'the step to turn on')
+    await click('Connect to Claude Code')
+    await waitFor(`document.querySelector('dialog[open] .diff') && document.querySelectorAll('dialog[open] input[type=checkbox]:checked').length === 2`, 'the Connect sheet')
+    await shoot(theme, 'connect')
+    await click('Connect', `document.querySelector('dialog[open]')`)
+    await waitFor(`!document.querySelector('dialog[open]') && [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Disconnect')`, 'the connection')
     await js(`document.querySelectorAll('.toast__close').forEach((b) => b.click())`)
     await playStatusLine()
-    await waitFor(`[...document.querySelectorAll('.lim__top b')].map((b) => b.textContent).join(' ') === '42% 61%'`, 'the limits to show')
-    await shoot(theme, 'limits')
-    await click('Turn off')
-    await click('Turn off', `document.querySelector('dialog[open]')`)
-    await waitFor(`!document.querySelector('dialog[open]') && [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Show live limits')`, 'the step to turn off')
+    const settings = JSON.parse(await fsp.readFile(file, 'utf8')) as { hooks?: Record<string, { hooks?: { command?: string }[] }[]> }
+    const steps = new Map<string, string>()
+    for (const groups of Object.values(settings.hooks ?? {})) {
+      for (const g of groups) for (const h of g.hooks ?? []) {
+        const m = /hook\.sh' (\w+)$/.exec(h.command ?? '')
+        if (m) steps.set(m[1], h.command as string)
+      }
+    }
+    for (const step of ['prompt', 'ask', 'notify', 'stop', 'question', 'tool', 'end']) if (!steps.has(step)) throw new Error(`connect: no ${step} hook in settings.json`)
+    const [a, b, c] = await fixtureSessions()
+    const alerts = postedAlerts().length
+    const input = (x: { id: string; cwd: string }, extra: object): object => ({ session_id: x.id, cwd: x.cwd, transcript_path: '', permission_mode: 'default', ...extra })
+    for (const x of [a, b, c]) await playHook(steps.get('prompt') as string, input(x, { hook_event_name: 'UserPromptSubmit', prompt: 'Fix the flaky checkout test' }))
+    await waitFor(`document.querySelectorAll('.cc__row--working').length === 3`, 'three working sessions')
+    await playHook(steps.get('stop') as string, input(c, { hook_event_name: 'Stop', stop_hook_active: false }))
+    await playHook(steps.get('ask') as string, input(a, { hook_event_name: 'PermissionRequest', tool_name: 'Bash', tool_input: { command: 'npm test' } }))
+    // a tool from another agent finishing leaves the wait alone
+    await playHook(steps.get('tool') as string, input(a, { hook_event_name: 'PostToolUse', tool_name: 'Read', agent_id: 'sub-1', tool_response: {} }))
+    await playHook(steps.get('notify') as string, input(a, { hook_event_name: 'Notification', notification_type: 'permission_prompt', message: 'Claude needs your permission to use Bash' }))
+    // idle_prompt arrives a minute after a finished turn: it must not count as waiting
+    await playHook(steps.get('notify') as string, input(c, { hook_event_name: 'Notification', notification_type: 'idle_prompt', message: 'Claude is waiting for your input' }))
+    await waitFor(
+      `document.querySelectorAll('.cc__row--waiting').length === 1 && document.querySelectorAll('.cc__row--done').length === 1 && [...document.querySelectorAll('.lim__top b')].map((b) => b.textContent).join(' ') === '42% 61%'`,
+      'one waiting, one working, one done session and the limits'
+    )
+    // the alert goes out once the grouping window closes
+    await sleep(GROUP_MS + 1000)
+    const posted = postedAlerts().slice(alerts)
+    const want = `${path.basename(a.cwd)} is waiting for you`
+    if (posted.length !== 1 || posted[0] !== want) throw new Error(`connect: expected one alert "${want}", got ${JSON.stringify(posted)}`)
+    await shoot(theme, 'connected')
+    await click('Disconnect')
+    await waitFor(`document.querySelector('dialog[open] .diff')`, 'the Disconnect dialog')
+    await shoot(theme, 'disconnect')
+    await click('Disconnect', `document.querySelector('dialog[open]')`)
+    await waitFor(`!document.querySelector('dialog[open]') && [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Connect to Claude Code')`, 'the disconnect')
     await js(`document.querySelectorAll('.toast__close').forEach((b) => b.click())`)
-    if (!before.equals(await fsp.readFile(file))) throw new Error('limits: settings.json is not byte for byte what it was before turning live limits on')
+    if (!before.equals(await fsp.readFile(file))) throw new Error('connect: settings.json is not byte for byte what it was before connecting')
+    // left behind on purpose: hook.sh as a no-op and statusline.sh, for sessions that still run them until Claude Code reloads
+    const left = (await fsp.readdir(connectDir()).catch(() => [] as string[])).filter((n) => n !== 'hook.sh' && n !== 'statusline.sh')
+    if (left.length) throw new Error(`connect: the connect folder still holds ${left.join(', ')}`)
+    if (!(await fsp.readFile(path.join(connectDir(), 'hook.sh'), 'utf8')).includes('exit 0\n')) throw new Error('connect: hook.sh was not made a no-op')
   }
 
   const fail = (e: unknown): void => {
@@ -263,10 +337,10 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
         emit('system:navigate', { screen: (screens[screens.length - 1]?.id ?? 'overview') as ScreenId })
         await sleep(150)
       }
-      if (process.platform !== 'win32' && (opts.only.length === 0 || opts.only.includes('limits'))) {
+      if (process.platform !== 'win32' && (opts.only.length === 0 || opts.only.includes('connect'))) {
         emit('system:navigate', { screen: 'overview' })
         await sleep(150)
-        await limitsFlow(theme).catch(fail)
+        await connectFlow(theme).catch(fail)
       }
       if (opts.only.length === 0 || opts.only.includes('mods') || opts.only.includes('mods-draft')) {
         emit('system:navigate', { screen: 'mods' })
