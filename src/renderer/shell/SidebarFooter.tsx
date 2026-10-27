@@ -3,7 +3,7 @@ import { Button } from '@/components'
 import { api, useApi } from '@/lib/api'
 
 /**
- * "Unofficial · v0.1.0", or, when GitHub has a newer release, "v0.2.0 available" opening a popover with the update:
+ * "Unofficial · v0.1.0", or, when a newer release is out, "v0.2.0 available" opening a popover with the update:
  * the npm command to copy, or the release page for installer builds (an ad-hoc signed app can't update itself).
  */
 export function SidebarFooter(): JSX.Element {
@@ -14,7 +14,7 @@ export function SidebarFooter(): JSX.Element {
   const root = useRef<HTMLElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
 
-  // main answers from a cache and asks GitHub again at most every six hours, so asking on every focus is cheap
+  // main answers from a cache and asks again at most every six hours, so asking on every focus is cheap
   const recheck = update.reload // stable across renders
   useEffect(() => {
     window.addEventListener('focus', recheck)

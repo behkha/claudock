@@ -40,6 +40,7 @@ jobs:
           [ "v$version" = "$GITHUB_REF_NAME" ] || { echo "Tag $GITHUB_REF_NAME does not match package.json version $version"; exit 1; }
       - run: npm ci
       - run: npm run typecheck
+      - run: npm test
       - run: npm run build
       # --publish never: the release job uploads, so three builders never race to create the release.
       - run: npx electron-builder ${{ matrix.target }} --publish never

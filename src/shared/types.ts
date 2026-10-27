@@ -49,7 +49,7 @@ export interface AppInfo {
 /** How the running copy was installed: an electron-builder installer, `npx claudock`, or a git clone. */
 export type InstallKind = 'installer' | 'npm' | 'dev'
 
-/** A GitHub release newer than the running version. */
+/** A release newer than the running version. */
 export interface UpdateInfo {
   version: string
   /** The release page on GitHub. */

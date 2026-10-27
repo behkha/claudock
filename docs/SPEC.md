@@ -131,6 +131,6 @@ Rules: Clay is the only accent and is used for indicators (toggle on, active dot
 
 ## Definition of done
 
-- `npm run typecheck`, `npm run lint` and `npm run build` pass.
+- `npm run typecheck`, `npm run lint`, `npm test` and `npm run build` pass.
 - `npm run shot` produces a screenshot of every screen in light and dark, on the fixture, with no console errors.
 - `npm run dist:mac` produces a working `.dmg`. Windows and Linux targets are configured in electron-builder.

@@ -13,6 +13,6 @@ Every write to the user's config goes through `src/main/safeWrite.ts`. Never rea
 ## Pull requests
 
 - One change per pull request, with a sentence on why.
-- Run `npm run typecheck` and `npm run lint` before you push.
+- Run `npm run typecheck`, `npm run lint` and `npm test` before you push.
 - For a change to a screen, add a before and after screenshot (`npm run shot -- --only <screen>`).
 - By opening a pull request you agree that your change is released under the [MIT License](LICENSE.md).
