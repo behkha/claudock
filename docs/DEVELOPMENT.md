@@ -18,7 +18,7 @@ npm run dev       # runs the app on the fixture
 
 All writes to the user's config go through `src/main/safeWrite.ts` (snapshot to `<userData>/snapshots`, temp file + atomic rename, JSON validated, deletes to the OS Trash). Claudock's own data is written directly (temp file + rename) and never snapshotted: `<userData>/prefs.json`, the cache of the settings docs, `<userData>/settings-docs.json`, and the live limits step, `<userData>/live-limits/<config dir hash>/` (`statusline.sh`, which Claude Code runs as the status line once the step is on, `state.json` with the previous `statusLine` value, and `limits.json` with the last `rate_limits` Claude Code sent; `src/main/domains/limits.ts`). Turning the step on or off changes only `statusLine` in settings.json, through `updateSettings`. `.credentials.json` and `sessions/*.key` are never read.
 
-At launch the main process downloads Anthropic's settings docs for the Settings JSON editor (`src/main/settingsDocs.ts`). `CLAUDOCK_OFFLINE=1` skips that fetch, so the editor uses the cache or the copy bundled with the app (screenshots skip it too). Installed copies also ask GitHub for the latest release to show a new-version notice (`src/main/update.ts`); `CLAUDOCK_OFFLINE=1` skips that too. `CLAUDOCK_LATEST_VERSION=9.9.9 npm run dev` shows the notice without asking GitHub.
+At launch the main process downloads Anthropic's settings docs for the Settings JSON editor (`src/main/settingsDocs.ts`). `CLAUDOCK_OFFLINE=1` skips that fetch, so the editor uses the cache or the copy bundled with the app (screenshots skip it too). Installed copies also check for a newer release to show a new-version notice (`src/main/update.ts`): a stable build asks GitHub for the latest release, a beta build (a version with `-`) asks npm for the `latest` and `beta` dist-tags. `CLAUDOCK_OFFLINE=1` skips that too. `CLAUDOCK_LATEST_VERSION=9.9.9 npm run dev` shows the notice without a request (a pre-release value counts as the newest beta, so a stable build ignores it).
 
 ## Scripts
 
@@ -28,6 +28,7 @@ At launch the main process downloads Anthropic's settings docs for the Settings 
 | `npm run dev:real` | Same on your real folder, writes disabled |
 | `npm run build` | Production build into `./out` |
 | `npm run typecheck` / `npm run lint` | tsc (main + renderer) / ESLint |
+| `npm test` | Unit tests (`src/**/*.test.ts`) with Node's test runner |
 | `npm run fixture` | Rebuild `./.fixture/claude` |
 | `npm run fixture:status` | Plays Claude Code calling the fixture's status line once with sample `rate_limits` (`-- --five 80`, `--week`, `--no-limits`, `--expired`) |
 | `npm run shot` | Headless screenshots of every screen, light and dark, into `./.shots`. `-- --only skills,palette`, `-- --out <dir>` |
