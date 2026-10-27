@@ -14,6 +14,7 @@ Claudock works on the Claude Code config folder (`~/.claude`, or the folder in `
 - For `~/.claude.json` it re-reads the file right before writing and changes only the key you edited.
 - Deletes go to the OS Trash.
 - It doesn't run, update or sign in to Claude Code, and it doesn't touch the `.claude/` folders inside your repositories.
+- "Connect to Claude Code" is the one change that makes Claude Code run something of Claudock's. You see the exact settings.json change first. It adds a status line step and nine hooks, small `sh` scripts in Claudock's own app data folder. The status line step saves the 5-hour and weekly limits Claude Code sends, then runs your own status line unchanged. The hooks save each running session's state (working, waiting for you or done), its folder, and Claude Code's short notification text. They never save prompts or tool output, print nothing, and use no network. Claudock shows a system notification when a session starts waiting. Clicking it brings that session's terminal app forward (`open -b` on macOS). Disconnect removes both parts and puts settings.json back exactly as it was, or removes only Claudock's keys if something else changed the file in between.
 
 ## What it never reads
 

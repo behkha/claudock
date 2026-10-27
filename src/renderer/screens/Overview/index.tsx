@@ -8,7 +8,7 @@ import { cx } from '@/lib/cx'
 import { useNav, type ScreenProps } from '@/lib/nav'
 import { useFolder } from '../Storage/useFolder'
 import { FindingsList } from './Findings'
-import { LimitsCard } from './LimitsCard'
+import { ClaudeCodeCard } from './ClaudeCodeCard'
 import { ShareDialog } from './ShareDialog'
 import { useFindings } from './useFindings'
 
@@ -74,7 +74,7 @@ export default function OverviewScreen(_props: ScreenProps): JSX.Element {
   return (
     <div className="page">
       <div className="page__inner ov">
-        <LimitsCard />
+        <ClaudeCodeCard />
 
         <header className="ov__head">
           <div className="ov__headrow">

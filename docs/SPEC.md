@@ -44,6 +44,8 @@ src/
       overview.ts storage.ts backups.ts settings.ts rules.ts hooks.ts
       permissions.ts skills.ts agents.ts commands.ts plugins.ts mods.ts mcp.ts
       projects.ts memory.ts plans.ts history.ts search.ts system.ts
+      limits.ts sessions.ts connect.ts   (live limits, "needs me" sessions, Connect to Claude Code)
+    connect/         pure parts of Connect (hook script, settings merge, session model, alert rule), unit-tested
     domains/index.ts registers all of them (already lists every domain)
   preload/index.ts   exposes `window.claudock` built from the domain list
   renderer/

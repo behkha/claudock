@@ -23,6 +23,8 @@ import * as plans from './plans'
 import * as history from './history'
 import * as search from './search'
 import * as limits from './limits'
+import * as sessions from './sessions'
+import * as connect from './connect'
 
 /** Every domain. Do not edit when adding methods: just implement them in `domains/<name>.ts`. */
 export const domainModules: Record<DomainName, DomainModule> = {
@@ -45,7 +47,9 @@ export const domainModules: Record<DomainName, DomainModule> = {
   plans,
   history,
   search,
-  limits
+  limits,
+  sessions,
+  connect
 }
 
 export function registerAll(ipcMain: IpcMain): void {

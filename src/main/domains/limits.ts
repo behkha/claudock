@@ -1,72 +1,35 @@
 import type { IpcMain } from 'electron'
-import crypto from 'node:crypto'
 import fs from 'node:fs'
 import fsp from 'node:fs/promises'
 import path from 'node:path'
-import type { LimitWindow, LimitsApi, LimitsPreview, LimitsState, LiveLimits, TokenWindow, TokenWindows } from '@shared/api/limits'
+import type { LimitWindow, LimitsApi, LimitsState, LiveLimits, TokenWindow, TokenWindows } from '@shared/api/limits'
+import { connectDir, readConnectState, writeOwn, type ConnectState } from '../connect/folder'
+import { shQuote } from '../connect/hookScript'
 import { defineDomain, emit } from '../ipcx'
-import { assertWritable, configDir, userDataDir } from '../paths'
-import { isObj, readSettings, updateSettings } from './extendShared'
+import { configDir } from '../paths'
+import { isObj, readSettings } from './extendShared'
 
 /**
  * Limits: token counts from the transcripts under projects/, and the 5-hour / weekly percentages Claude Code hands to
- * the status line. The status line step is a small sh script in Claudock's own data folder
- * (`<userData>/live-limits/<config dir hash>/`, never the config folder): it saves `rate_limits` to limits.json there,
- * then runs the statusLine command the user had before, with the same input. settings.json is only changed through
- * updateSettings (snapshot, atomic write), and turning the step off puts the previous statusLine value back exactly.
+ * the status line. The status line step is a small sh script in Claudock's connect folder
+ * (`<userData>/connect/<config dir hash>/`, never the config folder): it saves `rate_limits` to limits.json there,
+ * then runs the statusLine command the user had before, with the same input. "Connect to Claude Code"
+ * (src/main/domains/connect.ts) installs and removes it; this file owns the script and reads what it saves.
  */
 
 const DAY = 86_400_000
 const HOUR = 3_600_000
 const WIN = process.platform === 'win32'
 const SCRIPT = 'statusline.sh'
-const STATE = 'state.json'
 const LIVE = 'limits.json'
-
-/* ------------------------------------------------------------------ own data folder */
-
-/** One folder per config dir, so the fixture and the real folder (and several accounts) never share limits. */
-function dataDir(): string {
-  const key = WIN || process.platform === 'darwin' ? configDir().toLowerCase() : configDir()
-  return path.join(userDataDir(), 'live-limits', crypto.createHash('sha256').update(key).digest('hex').slice(0, 12))
-}
-
-/** POSIX single quoting: safe for any string, including quotes and `$`. */
-const shQuote = (s: string): string => `'${s.replace(/'/g, `'\\''`)}'`
 
 /** The statusLine.command while the step is on. */
 export function stepCommand(): string {
-  return `sh ${shQuote(path.join(dataDir(), SCRIPT))}`
+  return `sh ${shQuote(path.join(connectDir(), SCRIPT))}`
 }
 
-const isOurs = (statusLine: unknown): boolean => isObj(statusLine) && statusLine.command === stepCommand()
-
-interface StepState {
-  v: 1
-  /** statusLine exactly as it was before the step was turned on; `present: false` when there was none. */
-  original: { present: true; value: unknown } | { present: false }
-  at: string
-}
-
-async function readState(): Promise<StepState | null> {
-  try {
-    const s = JSON.parse(await fsp.readFile(path.join(dataDir(), STATE), 'utf8')) as StepState
-    return s?.v === 1 && isObj(s.original) && typeof s.original.present === 'boolean' ? s : null
-  } catch {
-    return null
-  }
-}
-
-/** App data, not config: written directly (temp file + rename), like prefs.json. */
-async function writeOwn(name: string, text: string, mode = 0o644): Promise<void> {
-  const dir = dataDir()
-  await fsp.mkdir(dir, { recursive: true })
-  const tmp = path.join(dir, `.${name}.${crypto.randomBytes(4).toString('hex')}.tmp`)
-  await fsp.writeFile(tmp, text, { mode })
-  await fsp.rename(tmp, path.join(dir, name))
-}
-
-const removeOwn = (name: string): Promise<void> => fsp.rm(path.join(dataDir(), name), { force: true })
+/** settings.json's statusLine runs the step. */
+export const isStepOn = (statusLine: unknown): boolean => isObj(statusLine) && statusLine.command === stepCommand()
 
 /* ------------------------------------------------------------------ the status line step */
 
@@ -124,12 +87,12 @@ END {
 }`
 
 /** The step's script. `original` is the previous statusLine.command, run with the same stdin, cwd and env. */
-function stepScript(original: string | null): string {
+export function stepScript(original: string | null): string {
   return [
     '#!/bin/sh',
     '# Claudock live limits. Claude Code runs this as your status line: it saves the rate_limits it receives into',
-    '# this folder, then runs the status line you had before. Turn live limits off in Claudock to put that back.',
-    `dir=${shQuote(dataDir())}`,
+    '# this folder, then runs the status line you had before. Disconnect in Claudock to put that back.',
+    `dir=${shQuote(connectDir())}`,
     `cmd=${shQuote(original ?? '')}`,
     'in="$dir/.in.$$"',
     `trap 'rm -f "$in" "$dir/.limits.$$"; exit 143' HUP INT TERM`,
@@ -160,15 +123,37 @@ function stepScript(original: string | null): string {
   ].join('\n')
 }
 
-const commandOf = (state: StepState | null): string | null =>
-  state?.original.present && isObj(state.original.value) && typeof state.original.value.command === 'string' ? state.original.value.command : null
+/** The statusLine.command the step wraps (the one the user had before), or null. */
+export const commandOf = (state: ConnectState | null): string | null => {
+  const o = state?.statusLine?.original
+  return o?.present && isObj(o.value) && typeof o.value.command === 'string' ? o.value.command : null
+}
+
+/** Write the step's script for the statusLine it wraps. Must exist before settings.json points at it. */
+export async function writeStepScript(original: string | null): Promise<void> {
+  await fsp.rm(path.join(connectDir(), LIVE), { force: true })
+  await writeOwn(SCRIPT, stepScript(original), 0o755)
+}
+
+/** The step's files, when settings.json never pointed at them (a Connect that failed). */
+export async function removeStepFiles(): Promise<void> {
+  await Promise.all([SCRIPT, LIVE].map((n) => fsp.rm(path.join(connectDir(), n), { force: true })))
+}
+
+/**
+ * After Disconnect: the saved limits go; the script stays (it runs the user's own status line), so a session that
+ * still runs it until Claude Code reloads settings.json keeps its status line. The next Connect rewrites it.
+ */
+export async function retireStepFiles(): Promise<void> {
+  await fsp.rm(path.join(connectDir(), LIVE), { force: true })
+}
 
 /** The script is regenerated from state.json if it went missing while settings.json still points at it. */
 async function ensureScript(): Promise<void> {
   if (WIN) return
-  const st = await readState()
-  if (!st || fs.existsSync(path.join(dataDir(), SCRIPT))) return
-  if (!isOurs((await readSettings()).data.statusLine)) return
+  const st = await readConnectState()
+  if (!st?.statusLine || fs.existsSync(path.join(connectDir(), SCRIPT))) return
+  if (!isStepOn((await readSettings()).data.statusLine)) return
   await writeOwn(SCRIPT, stepScript(commandOf(st)), 0o755)
 }
 
@@ -184,7 +169,7 @@ function windowOf(v: unknown): LimitWindow | null {
 
 async function readLive(): Promise<LiveLimits | null> {
   try {
-    const o = JSON.parse(await fsp.readFile(path.join(dataDir(), LIVE), 'utf8')) as unknown
+    const o = JSON.parse(await fsp.readFile(path.join(connectDir(), LIVE), 'utf8')) as unknown
     if (!isObj(o) || o.v !== 1 || typeof o.at !== 'number' || !isObj(o.rate_limits)) return null
     const fiveHour = windowOf(o.rate_limits.five_hour)
     const sevenDay = windowOf(o.rate_limits.seven_day)
@@ -377,15 +362,15 @@ async function currentTokens(): Promise<TokenWindows> {
 export async function currentLimits(): Promise<LimitsState> {
   const tokens = await currentTokens()
   if (WIN) return { step: 'unsupported', live: null, tokens }
-  const on = isOurs((await readSettings()).data.statusLine)
+  const on = isStepOn((await readSettings()).data.statusLine)
   return { step: on ? 'on' : 'off', live: on ? await readLive() : null, tokens }
 }
 
 /** The statusLine command to show people: their own one while the step wraps it, else what settings.json says. */
 export async function displayedStatusLine(statusLine: unknown): Promise<string | null> {
   if (!isObj(statusLine) || typeof statusLine.command !== 'string') return null
-  if (!isOurs(statusLine)) return statusLine.command
-  return commandOf(await readState())
+  if (!isStepOn(statusLine)) return statusLine.command
+  return commandOf(await readConnectState())
 }
 
 type Listener = (s: LimitsState) => void
@@ -415,7 +400,7 @@ function watch(on: boolean): void {
   watcher = null
   if (!on) return
   try {
-    watcher = fs.watch(dataDir(), (_ev, name) => {
+    watcher = fs.watch(connectDir(), (_ev, name) => {
       if (name === null || name === LIVE) notifySoon()
     })
     watcher.on('error', () => watch(false))
@@ -424,77 +409,26 @@ function watch(on: boolean): void {
   }
 }
 
-/* ------------------------------------------------------------------ turning the step on and off */
-
-function assertSupported(): void {
-  if (WIN) throw new Error('Live limits are not available on Windows yet')
-}
+/* ------------------------------------------------------------------ after Connect or Disconnect */
 
 /** statusLine must be missing or a command Claude Code runs; anything else is left alone. */
-function wrappable(statusLine: unknown): statusLine is undefined | { command: string } {
+export function wrappable(statusLine: unknown): statusLine is undefined | { command: string } {
   if (statusLine === undefined) return true
   return isObj(statusLine) && (statusLine.type === undefined || statusLine.type === 'command') && typeof statusLine.command === 'string'
 }
 
-const sameJson = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b)
-
-async function preview(): Promise<LimitsPreview> {
-  assertSupported()
-  const { data, error } = await readSettings()
-  if (error) throw new Error(error)
-  const sl = data.statusLine
-  if (isOurs(sl)) return { before: stepCommand(), after: commandOf(await readState()) }
-  return { before: isObj(sl) && typeof sl.command === 'string' ? sl.command : null, after: stepCommand() }
-}
-
-async function enable(): Promise<{ snapshotId: string | null }> {
-  assertSupported()
-  assertWritable()
-  const { data, error } = await readSettings()
-  if (error) throw new Error(`${error}. Nothing was written.`)
-  const before = data.statusLine
-  if (isOurs(before)) return { snapshotId: null }
-  if (!wrappable(before)) throw new Error("statusLine in settings.json isn't a command, so live limits can't run alongside it. Nothing was written.")
-  const state: StepState = {
-    v: 1,
-    original: before === undefined ? { present: false } : { present: true, value: JSON.parse(JSON.stringify(before)) as unknown },
-    at: new Date().toISOString()
-  }
-  // the script must exist before settings.json points at it: Claude Code runs a changed command at once
-  await removeOwn(LIVE)
-  await writeOwn(STATE, JSON.stringify(state, null, 2) + '\n')
-  await writeOwn(SCRIPT, stepScript(before?.command ?? null), 0o755)
-  const r = await updateSettings((s) => {
-    if (!sameJson(s.statusLine, before)) throw new Error('settings.json changed while turning on live limits. Nothing was written; try again.')
-    s.statusLine = before === undefined ? { type: 'command', command: stepCommand() } : { ...before, command: stepCommand() }
-  }, 'Turn on live limits')
-  watch(true)
+/** Watch for new limits while the step is on, and tell every surface the step changed. */
+export function stepChanged(on: boolean): void {
+  watch(on)
   notifySoon()
-  return { snapshotId: r.snapshotId }
-}
-
-async function disable(): Promise<{ snapshotId: string | null }> {
-  assertSupported()
-  assertWritable()
-  const state = await readState()
-  const r = await updateSettings((s) => {
-    if (!isOurs(s.statusLine)) return false
-    if (state?.original.present) s.statusLine = state.original.value
-    // no record of what was there (Claudock's data folder was cleared): remove the step rather than leave it broken
-    else delete s.statusLine
-  }, 'Turn off live limits')
-  watch(false)
-  await Promise.all([removeOwn(SCRIPT), removeOwn(STATE), removeOwn(LIVE)])
-  notifySoon()
-  return { snapshotId: r.snapshotId }
 }
 
 export function register(ipcMain: IpcMain): void {
-  const impl: LimitsApi = { get: currentLimits, preview, enable, disable }
+  const impl: LimitsApi = { get: currentLimits }
   defineDomain(ipcMain, 'limits', impl)
   if (WIN) return
   void readSettings().then(async ({ data }) => {
-    const on = isOurs(data.statusLine)
+    const on = isStepOn(data.statusLine)
     if (on) await ensureScript()
     watch(on)
   }, () => undefined)
