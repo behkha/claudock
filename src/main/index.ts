@@ -9,11 +9,13 @@ import { startSettingsDocsFetch } from './settingsDocs'
 import { menuBarShown, onMenuBarChanged, openedAtLogin, startMenuBar } from './menubar'
 import { installKind } from './paths'
 import { createMainWindow, mainWindow, showMainWindow } from './windows'
+import { DEMO_APP_DATA_NAME, demoMode, startDemo } from './demo'
 import icon from '../../resources/icon.png?asset'
 
 // Keep app data separate from the Electron default and from other apps. CLAUDOCK_USER_DATA lets tests/screenshots isolate it.
+// `--demo` gets a folder of its own (src/main/demo/index.ts).
 app.setName('Claudock')
-app.setPath('userData', process.env.CLAUDOCK_USER_DATA || path.join(app.getPath('appData'), 'Claudock'))
+app.setPath('userData', process.env.CLAUDOCK_USER_DATA || path.join(app.getPath('appData'), demoMode ? DEMO_APP_DATA_NAME : 'Claudock'))
 // Windows names alerts after the Start menu shortcut with this id (electron-builder's appId); without it they say
 // "electron.app.Claudock"
 if (process.platform === 'win32' && installKind() === 'installer') app.setAppUserModelId('app.claudock')
@@ -38,6 +40,8 @@ const mac = process.platform === 'darwin'
 const single = !shotMode && installKind() !== 'dev'
 const primary = !single || app.requestSingleInstanceLock()
 if (!primary) app.quit()
+// rebuilt only by the copy that runs, so a second `--demo` launch doesn't wipe the folder the first one shows
+else if (demoMode) startDemo(app.getPath('userData'))
 app.on('second-instance', () => void app.whenReady().then(showMainWindow))
 
 void app.whenReady().then(async () => {

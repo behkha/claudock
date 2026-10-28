@@ -42,7 +42,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "lint": "eslint .",
     "test": "node --test --experimental-strip-types --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON \"src/**/*.test.ts\"",
-    "fixture": "node scripts/make-fixture.mjs",
+    "fixture": "node --experimental-strip-types --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/make-fixture.mjs",
     "fixture:hooks": "node scripts/fixture-hooks.mjs",
     "fixture:status": "node scripts/fixture-status.mjs",
     "shot": "node scripts/shot.mjs",

@@ -4,6 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { LAUNCH_AGENT_LABEL, LOGIN_ARG, autostartEntry, launchAgent, unstablePath } from './menubar/loginFiles'
 import { configDir, installKind, isCustomConfigDir, isInside } from './paths'
+import { demoMode } from './demo'
 
 /**
  * Open at login, for the menu bar. macOS: a LaunchAgent in ~/Library/LaunchAgents; Linux: an autostart entry in
@@ -17,7 +18,8 @@ const WIN = process.platform === 'win32'
 
 /** The command that starts this copy, or null when a login item for it would break. */
 function command(): string[] | null {
-  if (installKind() === 'dev') return null
+  // the demo would start at login on a made-up config, from a login item the real copy shares
+  if (installKind() === 'dev' || demoMode) return null
   // an AppImage runs from a temporary mount; APPIMAGE is the file itself
   const exe = process.env.APPIMAGE || process.execPath
   const appPath = app.getAppPath()

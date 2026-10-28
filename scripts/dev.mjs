@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const fixture = path.join(root, '.fixture', 'claude')
 if (!process.env.CLAUDE_CONFIG_DIR) {
-  if (!fs.existsSync(fixture)) spawnSync(process.execPath, [path.join(root, 'scripts', 'make-fixture.mjs')], { stdio: 'inherit' })
+  if (!fs.existsSync(fixture)) spawnSync(process.execPath, ['--experimental-strip-types', '--disable-warning=ExperimentalWarning', '--disable-warning=MODULE_TYPELESS_PACKAGE_JSON', path.join(root, 'scripts', 'make-fixture.mjs')], { stdio: 'inherit' })
   process.env.CLAUDE_CONFIG_DIR = fixture
 }
 console.log(`config dir: ${process.env.CLAUDE_CONFIG_DIR}`)

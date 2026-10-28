@@ -51,6 +51,7 @@ src/
       limits.ts sessions.ts connect.ts   (live limits, "needs me" sessions, Connect to Claude Code)
       menubar.ts       (what the popover asks of the menu bar)
     connect/         pure parts of Connect (hook script, settings merge, session model, alert rule), unit-tested
+    demo/            `--demo`: the synthetic config (fixture.ts, also `npm run fixture`) built in its own data folder
     domains/index.ts registers all of them (already lists every domain)
   preload/index.ts   exposes `window.claudock` built from the domain list
   renderer/
@@ -61,7 +62,7 @@ src/
     popover/         the menu bar popover (popover.html, a second page)
     lib/api.ts       typed `window.claudock` accessor + `useQuery`-style hook
 scripts/
-  make-fixture.mjs   builds ./.fixture/claude
+  make-fixture.mjs   builds ./.fixture/claude from src/main/demo/fixture.ts
   shot.mjs           launches the app on the fixture and saves a PNG per screen to ./.shots
 ```
 
