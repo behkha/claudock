@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ccusage with a GUI: desktop options for Claude Code</title>
+<meta name="description" content="ccusage is a CLI. If you want Claude Code token, cost and limit numbers in a window or menu bar, these are the apps that show them, and what each lacks.">
+<link rel="canonical" href="https://behkha.github.io/claudock/alternatives/ccusage-gui/">
+<meta name="theme-color" content="#faf9f5" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#262624" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../../apple-touch-icon.png">
+
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Claudock">
+<meta property="og:title" content="ccusage with a GUI: desktop options for Claude Code">
+<meta property="og:description" content="ccusage is a CLI. If you want Claude Code token, cost and limit numbers in a window or menu bar, these are the apps that show them, and what each lacks.">
+<meta property="og:url" content="https://behkha.github.io/claudock/alternatives/ccusage-gui/">
+<meta property="og:image" content="https://behkha.github.io/claudock/og.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="stylesheet" href="../../style.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Does ccusage have a GUI?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Not from the project. It's a CLI with a status line mode. Its docs list menu bar apps and dashboards made by other people."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Which GUI shows my Claude Code 5-hour limit?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "CC Switch shows subscription quota with a reset countdown in its tray. Claudock shows the 5-hour and weekly percentages Claude Code reports, in the menu bar. Claude Code Usage Monitor shows them in the terminal."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Are these numbers exact?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Cost is estimated from local logs in every tool here. Limit percentages are exact only when they come from Claude Code itself, through its status line."
+      }
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": "Claudock",
+      "item": "https://behkha.github.io/claudock/"
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "name": "Compare",
+      "item": "https://behkha.github.io/claudock/alternatives/claude-code-gui/"
+    },
+    {
+      "@type": "ListItem",
+      "position": 3,
+      "name": "ccusage with a GUI",
+      "item": "https://behkha.github.io/claudock/alternatives/ccusage-gui/"
+    }
+  ]
+}
+</script>
+<script src="../../app.js" defer></script>
+</head>
+<body>
+
+<header class="bar">
+  <a class="brand" href="../../" aria-label="Claudock home">
+    <svg class="mark" viewBox="0 0 1024 1024" width="28" height="28" aria-hidden="true">
+      <rect x="32" y="32" width="960" height="960" rx="216" fill="#141413"/>
+      <g transform="translate(512 512) scale(1.165) translate(-512 -512)">
+        <path d="M 236 552 C 282 458, 372 452, 442 512 C 512 572, 602 568, 650 474" fill="none" stroke="#FAF9F5" stroke-width="80" stroke-linecap="round"/>
+        <rect x="716" y="372" width="100" height="284" rx="16" fill="#D97757"/>
+      </g>
+    </svg>
+    <span>Claudock</span>
+  </a>
+  <a class="bar-link" href="https://github.com/behkha/claudock">GitHub</a>
+</header>
+
+<main class="doc">
+<h1>ccusage with a GUI</h1>
+<p>ccusage is the standard way to see what Claude Code costs. It reads your local session logs and prints daily, monthly, session and 5-hour reports in the terminal. It's free, fast, updated almost daily, and reads the logs of 17 other agent CLIs too.</p>
+<p>It's a CLI by design. Its live dashboard was removed in v18, and it has no app of its own; its docs list menu bar apps and dashboards made by other people. If you want the same numbers in a window, here's what exists.</p>
+
+<h2>The short answer</h2>
+<div class="tbl stack">
+  <table>
+    <thead><tr><th scope="col">You want</th><th scope="col">Use</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">Tokens, cost and quota in a desktop app and tray</th><td data-col="Use"><span>CC Switch</span></td></tr>
+      <tr><th scope="row">Your 5-hour and weekly limits as Claude Code reports them, in the menu bar</th><td data-col="Use"><span>Claudock</span></td></tr>
+      <tr><th scope="row">The same official limits, live, in a terminal</th><td data-col="Use"><span>Claude Code Usage Monitor</span></td></tr>
+      <tr><th scope="row">A cost dashboard inside a session GUI</th><td data-col="Use"><span>opcode, though its last release was August 2025</span></td></tr>
+      <tr><th scope="row">Exact cost reports and scripting</th><td data-col="Use"><span>Keep ccusage</span></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="tbl stack wide">
+  <table>
+    <caption>As of 28 October 2026</caption>
+    <thead><tr><th scope="col"><span class="visually-hidden">Topic</span></th><th scope="col">ccusage</th><th scope="col">CC Switch</th><th scope="col">Claudock</th><th scope="col">Usage Monitor</th><th scope="col">opcode</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">Interface</th><td data-col="ccusage"><span>CLI, status line</span></td><td data-col="CC Switch"><span>Desktop app, tray</span></td><td data-col="Claudock"><span>Desktop app, menu bar</span></td><td data-col="Usage Monitor"><span>Terminal UI, status line</span></td><td data-col="opcode"><span>Desktop app</span></td></tr>
+      <tr><th scope="row">Tokens</th><td data-col="ccusage"><span>By day, month, session, 5-hour block</span></td><td data-col="CC Switch"><span>Yes, with cache hit rate</span></td><td data-col="Claudock"><span>Per 5-hour and weekly window</span></td><td data-col="Usage Monitor"><span>Yes</span></td><td data-col="opcode"><span>By model, project, date</span></td></tr>
+      <tr><th scope="row">Cost</th><td data-col="ccusage"><span>Yes, per model</span></td><td data-col="CC Switch"><span>Yes</span></td><td data-col="Claudock"><span>No</span></td><td data-col="Usage Monitor"><span>Yes</span></td><td data-col="opcode"><span>Yes</span></td></tr>
+      <tr><th scope="row">Official 5-hour %</th><td data-col="ccusage"><span><span class="ns">Not in their docs</span></span></td><td data-col="CC Switch"><span>Yes, with reset countdown</span></td><td data-col="Claudock"><span>Yes, with reset time</span></td><td data-col="Usage Monitor"><span>Yes, via its status line step</span></td><td data-col="opcode"><span><span class="ns">Not in their README</span></span></td></tr>
+      <tr><th scope="row">Official weekly %</th><td data-col="ccusage"><span><span class="ns">Not in their docs</span></span></td><td data-col="CC Switch"><span><span class="ns">Not in their README</span></span></td><td data-col="Claudock"><span>Yes, with reset time</span></td><td data-col="Usage Monitor"><span>Yes, via its status line step</span></td><td data-col="opcode"><span><span class="ns">Not in their README</span></span></td></tr>
+      <tr><th scope="row">Activity heat map</th><td data-col="ccusage"><span><span class="ns">Not in their docs</span></span></td><td data-col="CC Switch"><span>Yes</span></td><td data-col="Claudock"><span>Yes, 26 weeks</span></td><td data-col="Usage Monitor"><span><span class="ns">Not in their README</span></span></td><td data-col="opcode"><span><span class="ns">Not in their README</span></span></td></tr>
+      <tr><th scope="row">Export</th><td data-col="ccusage"><span>JSON</span></td><td data-col="CC Switch"><span><span class="ns">Not in their README</span></span></td><td data-col="Claudock"><span>Stats as an image</span></td><td data-col="Usage Monitor"><span>JSON, CSV</span></td><td data-col="opcode"><span>Yes</span></td></tr>
+      <tr><th scope="row">Other CLIs</th><td data-col="ccusage"><span>17 more</span></td><td data-col="CC Switch"><span>11 more</span></td><td data-col="Claudock"><span>No</span></td><td data-col="Usage Monitor"><span>No</span></td><td data-col="opcode"><span>No</span></td></tr>
+      <tr><th scope="row">Also edits Claude Code config</th><td data-col="ccusage"><span>No</span></td><td data-col="CC Switch"><span>Providers, MCP, skills, prompts</span></td><td data-col="Claudock"><span>All of <code>~/.claude</code></span></td><td data-col="Usage Monitor"><span>No</span></td><td data-col="opcode"><span>MCP, CLAUDE.md</span></td></tr>
+      <tr><th scope="row">Latest release</th><td data-col="ccusage"><span>26 Oct 2026</span></td><td data-col="CC Switch"><span>26 Oct 2026</span></td><td data-col="Claudock"><span>3 Dec 2026</span></td><td data-col="Usage Monitor"><span>27 Jun 2026</span></td><td data-col="opcode"><span>31 Aug 2025</span></td></tr>
+      <tr><th scope="row">License</th><td data-col="ccusage"><span>MIT</span></td><td data-col="CC Switch"><span>MIT</span></td><td data-col="Claudock"><span>MIT</span></td><td data-col="Usage Monitor"><span>MIT</span></td><td data-col="opcode"><span>AGPL-3.0</span></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<h2>CC Switch</h2>
+<p>The fullest GUI for ccusage's kind of numbers. It reads your session logs for tokens, cache hit rate and spend, draws a heat map and keeps per-request logs. It shows how much subscription quota is left, with a reset countdown, on its cards and in the tray. Usage is one part of a bigger app that switches API providers and manages MCP servers, skills and prompts across twelve CLIs. Signed builds, auto-update.</p>
+<p><strong>Good fit if</strong> you want ccusage's numbers plus your quota in the tray, and don't mind a larger app. <a href="../../compare/cc-switch/">Claudock vs CC Switch</a></p>
+
+<h2>Claudock</h2>
+<p>A desktop app for Claude Code's <code>~/.claude</code> folder, with your limits in the menu bar. After one Connect step, it shows the 5-hour and weekly percentages exactly as Claude Code reports them, with their reset times, and never estimates one. Until a terminal session reports them, or on Windows, it shows the tokens used in each window, counted from your transcripts. It doesn't show cost.</p>
+<p>It also shows which sessions are running or waiting for you, alerts you when one starts waiting, and has a screen for every part of your setup: settings, hooks, permissions, skills, agents, commands, plugins and MCP servers.</p>
+<p><strong>Good fit if</strong> you want your real limits at a glance and your setup in one window. Keep ccusage alongside it for cost.</p>
+
+<h2>Claude Code Usage Monitor</h2>
+<p>Not a GUI, but the closest thing to ccusage's old live dashboard. It's a Python terminal app with progress bars for the 5-hour window, burn rate, reset countdown and forecasts. With its status line step added, it shows the official 5-hour and 7-day percentages and labels every number by where it came from. Its README points to separate menu bar companions.</p>
+<p><strong>Good fit if</strong> you live in the terminal and want official limits with forecasts.</p>
+
+<h2>opcode</h2>
+<p>A desktop app for running Claude Code sessions and agents, with a usage dashboard: cost and tokens by model, project and date, charts and export. Its README lists usage alerts as "coming soon". Its latest release is v0.2.0 from 31 August 2025, with no Windows installer.</p>
+<p><strong>Good fit if</strong> you also want to run sessions from a window. <a href="../../compare/opcode/">Claudock vs opcode</a></p>
+
+<h2>Keep ccusage</h2>
+<p>For exact numbers, ccusage is still the reference: per-model cost with cache tokens, offline pricing, filters, JSON output and a status line. Every app above shows estimates from the same local logs. ccusage's own docs say costs may not match actual billing, and the same goes for the apps above.</p>
+
+<h2>Coming to Claudock</h2>
+<p>Planned, not shipped, and not part of the comparison above.</p>
+<ul>
+  <li>An archive that keeps sessions before Claude Code's cleanup deletes them</li>
+  <li>What each MCP server and skill costs in context</li>
+</ul>
+
+<h2>FAQ</h2>
+<h3>Does ccusage have a GUI?</h3>
+<p>Not from the project. It's a CLI with a status line mode. Its docs list menu bar apps and dashboards made by other people.</p>
+<h3>Which GUI shows my Claude Code 5-hour limit?</h3>
+<p>CC Switch shows subscription quota with a reset countdown in its tray. Claudock shows the 5-hour and weekly percentages Claude Code reports, in the menu bar. Claude Code Usage Monitor shows them in the terminal.</p>
+<h3>Are these numbers exact?</h3>
+<p>Cost is estimated from local logs in every tool here. Limit percentages are exact only when they come from Claude Code itself, through its status line.</p>
+
+<p>See also <a href="../../alternatives/claude-code-gui/">Claude Code GUIs in 2026</a>.</p>
+
+
+<div class="get">
+  <div class="npx">
+    <code id="npx-cmd"><b aria-hidden="true">$ </b>npx claudock</code>
+    <button class="npx-copy" id="npx-copy" type="button" hidden>Copy</button>
+  </div>
+  <p class="inst">
+    <a href="https://github.com/behkha/claudock/releases/latest">Download an installer</a>
+    <a class="note" href="https://github.com/behkha/claudock#install">Not signed yet: first-launch steps</a>
+  </p>
+</div>
+
+
+<p class="fine">Facts come from each project's GitHub repo and docs, checked 28 October 2026. Claudock is one of the tools compared here; the others are described as their own READMEs and docs describe them. If something here is wrong or out of date, <a href="https://github.com/behkha/claudock/issues">open an issue</a> and it will be fixed.</p>
+</main>
+
+<footer class="foot">
+  <nav aria-label="Project">
+    <a href="https://github.com/behkha/claudock">GitHub</a>
+    <a href="../../alternatives/claude-code-gui/">Compare</a>
+    <a href="../../privacy/">Privacy</a>
+    <a href="../../terms/">Terms</a>
+    <a href="https://github.com/behkha/claudock/blob/main/LICENSE.md">Free and open source (MIT)</a>
+  </nav>
+  <p>Unofficial, not affiliated with Anthropic</p>
+</footer>
+
+</body>
+</html>

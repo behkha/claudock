@@ -106,11 +106,11 @@
 
 <div class="tbl stack wide">
   <table>
-    <caption>As of 27 October 2026</caption>
+    <caption>As of 28 October 2026</caption>
     <thead><tr><th scope="col"><span class="visually-hidden">Tool</span></th><th scope="col">Main job</th><th scope="col">Runs sessions</th><th scope="col">Edits <code>~/.claude</code></th><th scope="col">Usage numbers</th><th scope="col">OS</th><th scope="col">Latest release</th><th scope="col">License</th></tr></thead>
     <tbody>
       <tr><th scope="row">Claude Code's own apps</th><td data-col="Main job"><span>Run Claude Code</span></td><td data-col="Runs sessions"><span>Yes</span></td><td data-col="Edits ~/.claude"><span>Through Claude Code</span></td><td data-col="Usage numbers"><span><code>/usage</code></span></td><td data-col="OS"><span>macOS, Windows, web, IDEs</span></td><td data-col="Latest release"><span>Ships with Claude Code</span></td><td data-col="License"><span>Anthropic's terms</span></td></tr>
-      <tr><th scope="row">Claudock</th><td data-col="Main job"><span>Manage <code>~/.claude</code></span></td><td data-col="Runs sessions"><span>No</span></td><td data-col="Edits ~/.claude"><span>Every part of it</span></td><td data-col="Usage numbers"><span>Activity stats, share card</span></td><td data-col="OS"><span>macOS, Windows, Linux</span></td><td data-col="Latest release"><span>26 Oct 2026</span></td><td data-col="License"><span>MIT</span></td></tr>
+      <tr><th scope="row">Claudock</th><td data-col="Main job"><span>Manage <code>~/.claude</code></span></td><td data-col="Runs sessions"><span>No</span></td><td data-col="Edits ~/.claude"><span>Every part of it</span></td><td data-col="Usage numbers"><span>Limits as Claude Code reports them, tokens, activity</span></td><td data-col="OS"><span>macOS, Windows, Linux</span></td><td data-col="Latest release"><span>3 Dec 2026</span></td><td data-col="License"><span>MIT</span></td></tr>
       <tr><th scope="row">CC Switch</th><td data-col="Main job"><span>Providers and config across 12 CLIs</span></td><td data-col="Runs sessions"><span>No</span></td><td data-col="Edits ~/.claude"><span>Providers, MCP, skills, prompts</span></td><td data-col="Usage numbers"><span>Tokens, cost, quota</span></td><td data-col="OS"><span>macOS, Windows, Linux</span></td><td data-col="Latest release"><span>26 Oct 2026</span></td><td data-col="License"><span>MIT</span></td></tr>
       <tr><th scope="row">opcode</th><td data-col="Main job"><span>Run sessions and agents</span></td><td data-col="Runs sessions"><span>Yes</span></td><td data-col="Edits ~/.claude"><span>MCP, CLAUDE.md</span></td><td data-col="Usage numbers"><span>Tokens, cost</span></td><td data-col="OS"><span>macOS, Linux (Windows from source)</span></td><td data-col="Latest release"><span>31 Aug 2025</span></td><td data-col="License"><span>AGPL-3.0</span></td></tr>
       <tr><th scope="row">ccusage</th><td data-col="Main job"><span>Usage reports (CLI)</span></td><td data-col="Runs sessions"><span>No</span></td><td data-col="Edits ~/.claude"><span>No</span></td><td data-col="Usage numbers"><span>Tokens, cost</span></td><td data-col="OS"><span>Any with Node, Bun or Nix</span></td><td data-col="Latest release"><span>26 Oct 2026</span></td><td data-col="License"><span>MIT</span></td></tr>
@@ -128,8 +128,8 @@
       <tr><th scope="row">See and change everything in <code>~/.claude</code></th><td data-col="Use"><span>Claudock</span></td></tr>
       <tr><th scope="row">Switch API providers, or manage several CLIs</th><td data-col="Use"><span>CC Switch</span></td></tr>
       <tr><th scope="row">Exact cost reports</th><td data-col="Use"><span>ccusage</span></td></tr>
-      <tr><th scope="row">Your 5-hour limit, live</th><td data-col="Use"><span>Claude Code Usage Monitor (terminal) or CC Switch (tray)</span></td></tr>
-      <tr><th scope="row">Post your Claude Code stats</th><td data-col="Use"><span>Claudock</span></td></tr>
+      <tr><th scope="row">Your 5-hour limit, live</th><td data-col="Use"><span>Claudock (menu bar), CC Switch (tray) or Claude Code Usage Monitor (terminal)</span></td></tr>
+      <tr><th scope="row">Know when a session is waiting for you</th><td data-col="Use"><span>Claudock</span></td></tr>
     </tbody>
   </table>
 </div>
@@ -149,14 +149,16 @@
 <p><strong>Best for</strong> running Claude Code in a window, from the people who make it. <strong>Not built for</strong> an overview of everything in <code>~/.claude</code>, bulk changes, or cleanup.</p>
 
 <h2>Claudock</h2>
-<p>A desktop app for the <code>~/.claude</code> folder, with one screen for each part: settings (as a form or raw JSON), CLAUDE.md and rules, hooks, permissions, skills, agents, commands, plugins, mods, MCP servers, projects and transcripts, memory, plans, history, storage and backups. ⌘K searches across all of them.</p>
+<p>A desktop app for the <code>~/.claude</code> folder, with one screen for each part: Today, settings (as a form or raw JSON), CLAUDE.md and rules, hooks, permissions, skills, agents, commands, plugins, mods, MCP servers, projects and transcripts, memory, plans, history, storage and backups. ⌘K searches across all of them.</p>
 <p>Before every write, it saves a snapshot of the file outside <code>~/.claude</code>, then writes atomically. For <code>~/.claude.json</code> it changes only the key you edited. Deletes go to the OS Trash. It never reads credentials. A Share stats card turns Claude Code's own numbers into an image you can post.</p>
-<p>It's a v0.1 beta. It runs with <code>npx claudock</code>, with no installer and no security warning; the installers aren't signed. There's no auto-update, and it doesn't run sessions, switch providers, or track cost.</p>
+<p>Its home screen and menu bar show your 5-hour and weekly limits exactly as Claude Code reports them (token counts otherwise), which sessions are running, and which are waiting for you. One alert tells you when a session starts waiting.</p>
+<p>It's a young beta. It runs with <code>npx claudock</code>, with no installer and no security warning; the installers aren't signed. There's no auto-update, and it doesn't run sessions, switch providers, or track cost.</p>
 <p><strong>Best for</strong> people who've customised Claude Code and want to see and change all of it safely. <strong>Not built for</strong> running sessions, other CLIs, or cost tracking.</p>
 
 <h2>CC Switch</h2>
 <p>The most used tool here, with about 149K stars. It switches API providers for twelve coding CLIs in one click, from the app or the tray. It also manages MCP servers, skills (with a store) and prompt files across them, browses and exports sessions, and shows usage, cost and subscription quota. Signed builds, auto-update, and a release every day or two.</p>
 <p><strong>Best for</strong> people who switch providers or use Codex, Gemini CLI and others alongside Claude Code. <strong>Not built for</strong> Claude Code's hooks, permission rules, agents, commands or plugins. Its README says it leaves them alone when switching, and doesn't describe editing them.</p>
+<p><a href="../../compare/cc-switch/">Claudock vs CC Switch</a></p>
 
 <h2>opcode</h2>
 <p>Formerly Claudia. A desktop app that runs Claude Code for you. You start and resume sessions, run custom agents in the background with their own permissions, and rewind or fork sessions with checkpoints. It has a cost and token dashboard, an MCP manager and a CLAUDE.md editor.</p>
@@ -167,6 +169,7 @@
 <h2>ccusage</h2>
 <p>Not a GUI, but most people asking about Claude Code usage end up here. A fast CLI that reads your local logs and prints daily, weekly, monthly, session and 5-hour reports with cost per model. It also has a status line mode, JSON output and offline pricing, and covers 17 other agent CLIs. Released almost daily.</p>
 <p><strong>Best for</strong> exact token and cost reports, and scripting. <strong>Not built for</strong> a window or a menu bar (its docs list third-party ones), or changing config.</p>
+<p><a href="../../alternatives/ccusage-gui/">ccusage with a GUI</a></p>
 
 <h2>Claude Code Usage Monitor</h2>
 <p>A Python terminal app with live progress bars for the 5-hour window, burn rate, reset countdown and forecasts. With its status line step added, it shows the official 5-hour and 7-day percentages from Claude Code itself, and it labels each number by source.</p>
@@ -175,9 +178,9 @@
 <h2>Coming to Claudock</h2>
 <p>Planned, not shipped, and not part of the comparison above.</p>
 <ul>
-  <li>Live 5-hour and weekly limits, and a menu bar glance</li>
-  <li>A Today screen and a first-launch numbers screen</li>
-  <li>Full-text session search, and a skills and MCP store</li>
+  <li>Profiles: separate Claude Code setups you switch between</li>
+  <li>An archive that keeps sessions before Claude Code's cleanup deletes them</li>
+  <li>What each MCP server and skill costs in context</li>
 </ul>
 
 <h2>FAQ</h2>
@@ -203,7 +206,7 @@
 </div>
 
 
-<p class="fine">Facts come from each project's GitHub repo and docs, checked 27 October 2026. Claudock is one of the tools compared here; the others are described as their own READMEs describe them. If something is wrong or out of date, <a href="https://github.com/behkha/claudock/issues">open an issue</a>.</p>
+<p class="fine">Facts come from each project's GitHub repo and docs, checked 28 October 2026. Claudock is one of the tools compared here; the others are described as their own READMEs describe them. If something is wrong or out of date, <a href="https://github.com/behkha/claudock/issues">open an issue</a>.</p>
 </main>
 
 <footer class="foot">

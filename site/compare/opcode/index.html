@@ -112,11 +112,11 @@
 
 <div class="tbl stack">
   <table>
-    <caption>As of 27 October 2026</caption>
+    <caption>As of 28 October 2026</caption>
     <thead><tr><th scope="col"><span class="visually-hidden">Topic</span></th><th scope="col">Claudock</th><th scope="col">opcode</th></tr></thead>
     <tbody>
       <tr><th scope="row">Built for</th><td data-col="Claudock"><span>Managing <code>~/.claude</code> and <code>~/.claude.json</code></span></td><td data-col="opcode"><span>Running Claude Code sessions and agents</span></td></tr>
-      <tr><th scope="row">Runs Claude Code sessions</th><td data-col="Claudock"><span>No</span></td><td data-col="opcode"><span>Yes, start and resume</span></td></tr>
+      <tr><th scope="row">Runs Claude Code sessions</th><td data-col="Claudock"><span>No; shows which are running or waiting for you, with an alert</span></td><td data-col="opcode"><span>Yes, start and resume</span></td></tr>
       <tr><th scope="row">Custom agents</th><td data-col="Claudock"><span>Edit the agent files in <code>~/.claude/agents</code></span></td><td data-col="opcode"><span>Its own CC Agents with per-agent file and network permissions, run in the background</span></td></tr>
       <tr><th scope="row">Session checkpoints</th><td data-col="Claudock"><span>No</span></td><td data-col="opcode"><span>Timeline, restore, fork, diff</span></td></tr>
       <tr><th scope="row">Read past transcripts</th><td data-col="Claudock"><span>Yes</span></td><td data-col="opcode"><span>Yes</span></td></tr>
@@ -127,11 +127,11 @@
       <tr><th scope="row">Slash commands, plugins</th><td data-col="Claudock"><span>Edit commands; turn plugins on or off</span></td><td data-col="opcode"><span><span class="ns">Not in their README</span></span></td></tr>
       <tr><th scope="row">CLAUDE.md</th><td data-col="Claudock"><span>Edit <code>CLAUDE.md</code> and <code>rules/</code></span></td><td data-col="opcode"><span>Editor with preview; finds CLAUDE.md files across projects</span></td></tr>
       <tr><th scope="row">MCP servers</th><td data-col="Claudock"><span>Add, edit, remove; writes only the changed key</span></td><td data-col="opcode"><span>Add, edit, test connection, import from Claude Desktop</span></td></tr>
-      <tr><th scope="row">Usage numbers</th><td data-col="Claudock"><span>Activity stats and a share card: messages, sessions, longest session, peak hour, top model</span></td><td data-col="opcode"><span>Cost and tokens by model, project and date; export</span></td></tr>
+      <tr><th scope="row">Usage numbers</th><td data-col="Claudock"><span>5-hour and weekly limits as Claude Code reports them, token counts, activity stats</span></td><td data-col="opcode"><span>Cost and tokens by model, project and date; export</span></td></tr>
       <tr><th scope="row">Disk use and cleanup</th><td data-col="Claudock"><span>Per folder, with cleanup suggestions</span></td><td data-col="opcode"><span><span class="ns">Not in their README</span></span></td></tr>
       <tr><th scope="row">Undo for config edits</th><td data-col="Claudock"><span>Snapshot before every write; diff and restore</span></td><td data-col="opcode"><span><span class="ns">Not in their README</span></span></td></tr>
       <tr><th scope="row">Windows</th><td data-col="Claudock"><span><code>npx claudock</code> or an <code>.exe</code></span></td><td data-col="opcode"><span>Build from source; no Windows file in the v0.2.0 release</span></td></tr>
-      <tr><th scope="row">Latest release</th><td data-col="Claudock"><span>v0.1.1, 26 Oct 2026</span></td><td data-col="opcode"><span>v0.2.0, 31 Aug 2025</span></td></tr>
+      <tr><th scope="row">Latest release</th><td data-col="Claudock"><span>v0.2.0, 3 Dec 2026</span></td><td data-col="opcode"><span>v0.2.0, 31 Aug 2025</span></td></tr>
       <tr><th scope="row">License</th><td data-col="Claudock"><span>MIT</span></td><td data-col="opcode"><span>AGPL-3.0</span></td></tr>
       <tr><th scope="row">Stack</th><td data-col="Claudock"><span>Electron</span></td><td data-col="opcode"><span>Tauri</span></td></tr>
       <tr><th scope="row">Price</th><td data-col="Claudock"><span>Free</span></td><td data-col="opcode"><span>Free</span></td></tr>
@@ -141,7 +141,7 @@
 
 <h2>Running Claude Code</h2>
 <p>opcode wraps the Claude Code CLI. You pick a project, start a session or resume an old one, and work in opcode's window. Its checkpoints save the state of a session as you go, so you can jump back, branch off, or diff two points. Its CC Agents feature runs a custom agent in a background process with its own file and network permissions and keeps a log of each run.</p>
-<p>Claudock does none of this. You keep running <code>claude</code> in your terminal or editor. Claudock lists past sessions per project and lets you read them, Trash one, or clear out sessions older than a number of days you pick.</p>
+<p>Claudock doesn't run sessions. You keep running <code>claude</code> in your terminal or editor, and Claudock shows which sessions are working, done, or waiting for you, with one alert when a session starts waiting. It lists past sessions per project and lets you read them, Trash one, or clear out sessions older than a number of days you pick.</p>
 
 <h2>Changing your setup</h2>
 <p>Claude Code's behaviour comes from files in <code>~/.claude</code>: <code>settings.json</code>, hooks, permission rules, skills, agents, commands, plugins, and MCP servers in <code>~/.claude.json</code>. opcode's README covers two of them, CLAUDE.md and MCP servers. It doesn't mention settings, hooks, permissions, skills, commands or plugins.</p>
@@ -153,7 +153,7 @@
 
 <h2>Usage and cost</h2>
 <p>opcode has a usage dashboard: cost and tokens by model, project and date, with charts and export. Its README lists usage alerts as "coming soon".</p>
-<p>Claudock shows activity, not cost: messages, sessions, longest session, peak hour, top model and a heat map, read from Claude Code's own <code>stats-cache.json</code>. You can post them as an image. It doesn't count tokens or dollars yet. For cost reports today, use opcode or ccusage.</p>
+<p>Claudock shows your 5-hour and weekly limits exactly as Claude Code reports them, in the app and the menu bar, and the tokens used in each window when no percentage has been reported. It also shows activity: messages, sessions, longest session, top model and a heat map you can post as an image. It doesn't show cost. For cost reports, use opcode or ccusage.</p>
 
 <h2>Install and updates</h2>
 <p>Claudock runs with <code>npx claudock</code> on macOS, Windows and Linux. npm downloads don't carry the macOS quarantine flag or the Windows Mark of the Web, so there's no security warning. There are also installers for macOS (Apple silicon and Intel), Windows and Linux. They aren't signed, so their first launch needs one extra click. There's no auto-update; the app tells you when a newer release is out.</p>
@@ -170,7 +170,7 @@
 
 <h2>Who Claudock is best for</h2>
 <ul>
-  <li>You run Claude Code in a terminal or editor and want a window for its setup.</li>
+  <li>You run Claude Code in a terminal or editor and want a window for its setup, and your limits in the menu bar.</li>
   <li>You have many skills, hooks, MCP servers or permission rules and want to see them all and turn them on or off.</li>
   <li>You've broken <code>settings.json</code> or <code>~/.claude.json</code> before and want undo.</li>
   <li>You're on Windows.</li>
@@ -184,9 +184,9 @@
 <h2>Coming to Claudock</h2>
 <p>Planned, not shipped, and not part of the comparison above.</p>
 <ul>
-  <li>Live 5-hour and weekly limits, and a menu bar glance</li>
-  <li>Full-text session search</li>
-  <li>Session replay and export</li>
+  <li>Profiles: separate Claude Code setups you switch between</li>
+  <li>An archive that keeps sessions before Claude Code's cleanup deletes them, with export</li>
+  <li>What each MCP server and skill costs in context</li>
 </ul>
 
 <h2>FAQ</h2>
@@ -214,7 +214,7 @@
 </div>
 
 
-<p class="fine">Facts about opcode come from <a href="https://github.com/winfunc/opcode">github.com/winfunc/opcode</a> (README and releases), checked 27 October 2026. If something here is wrong or out of date, <a href="https://github.com/behkha/claudock/issues">open an issue</a> and it will be fixed.</p>
+<p class="fine">Facts about opcode come from <a href="https://github.com/winfunc/opcode">github.com/winfunc/opcode</a> (README and releases), checked 28 October 2026. If something here is wrong or out of date, <a href="https://github.com/behkha/claudock/issues">open an issue</a> and it will be fixed.</p>
 </main>
 
 <footer class="foot">
