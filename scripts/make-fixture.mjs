@@ -585,7 +585,12 @@ w('settings.json.bak-20260412-0930', json({ model: 'opus', effortLevel: 'medium'
   const line = '[2026-09-01T10:00:00Z] statusline render ok cost=$0.42 ctx=63% model=opus\n'
   w('statusline.debug.log', line.repeat(Math.ceil((3 * 1024 * 1024) / line.length)), now - 2 * DAY)
 }
-w('statusline.sh', '#!/bin/bash\necho "fixture status"\n')
+// a typical status line: the model and the folder, read from the status JSON Claude Code sends on stdin
+w(
+  'statusline.sh',
+  '#!/bin/bash\ninput=$(cat)\nmodel=$(printf \'%s\' "$input" | sed -n \'s/.*"display_name":"\\([^"]*\\)".*/\\1/p\')\n' +
+    'dir=$(printf \'%s\' "$input" | sed -n \'s/.*"current_dir":"\\([^"]*\\)".*/\\1/p\')\necho "${model:-Claude} · ${dir##*/}"\n'
+)
 w('hooks/guard-bash.sh', '#!/bin/bash\nexit 0\n')
 w('hooks/add-date.sh', '#!/bin/bash\ndate\n')
 {

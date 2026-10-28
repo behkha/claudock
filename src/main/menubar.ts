@@ -255,6 +255,9 @@ export async function popoverForShots(): Promise<BrowserWindow> {
   return w
 }
 
+/** What the menu bar item shows now (its title and icon), for recording mode, where no item is added. */
+export const glanceForShots = (): Glance | null => last
+
 export { openedAtLogin }
 
 export async function startMenuBar(): Promise<void> {

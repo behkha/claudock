@@ -3,6 +3,7 @@ import path from 'node:path'
 import { registerAll } from './domains'
 import { buildMenu } from './menu'
 import { initTheme, onThemeChanged } from './theme'
+import { runRecord } from './record'
 import { runShots } from './shot'
 import { startSettingsDocsFetch } from './settingsDocs'
 import { menuBarShown, onMenuBarChanged, openedAtLogin, startMenuBar } from './menubar'
@@ -60,7 +61,7 @@ void app.whenReady().then(async () => {
   const win = openedAtLogin() && menuBarShown() ? null : createMainWindow()
   if (shotMode && win) {
     win.webContents.once('did-finish-load', () => {
-      void runShots(win, {
+      void (process.env.CLAUDOCK_RECORD === '1' ? runRecord : runShots)(win, {
         dir: process.env.CLAUDOCK_SHOT_DIR || path.join(process.cwd(), '.shots'),
         only: (process.env.CLAUDOCK_SHOT_ONLY || '').split(',').filter(Boolean)
       })

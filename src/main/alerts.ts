@@ -7,13 +7,13 @@ import { Notification } from 'electron'
  */
 
 const SHOT = process.env.CLAUDOCK_SHOT === '1'
-const shotAlerts: string[] = []
+const shotAlerts: { title: string; body: string }[] = []
 /** Notifications stay referenced until closed, or Electron may collect them before a click arrives. */
 const shown = new Set<Notification>()
 
 export function postAlert(text: { title: string; body: string }, opts: { sound: boolean; onClick: () => void }): void {
   if (SHOT) {
-    shotAlerts.push(text.title)
+    shotAlerts.push({ title: text.title, body: text.body })
     console.log(`ALERT ${text.title} | ${text.body}`)
     return
   }
@@ -26,4 +26,6 @@ export function postAlert(text: { title: string; body: string }, opts: { sound: 
 }
 
 /** Alert titles posted so far in screenshot mode. */
-export const postedAlerts = (): string[] => [...shotAlerts]
+export const postedAlerts = (): string[] => shotAlerts.map((a) => a.title)
+/** Alerts posted so far in screenshot mode, with their bodies (recording mode draws them as the banner). */
+export const postedAlertTexts = (): { title: string; body: string }[] => shotAlerts.map((a) => ({ ...a }))

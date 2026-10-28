@@ -46,6 +46,7 @@
     "fixture:hooks": "node scripts/fixture-hooks.mjs",
     "fixture:status": "node scripts/fixture-status.mjs",
     "shot": "node scripts/shot.mjs",
+    "record": "node scripts/shot.mjs --record",
     "icons": "electron scripts/make-icons.mjs",
     "settings-docs": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/make-settings-docs.mjs",
     "dist:mac": "npm run build && electron-builder --mac --arm64 --x64",
