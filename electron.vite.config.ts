@@ -34,6 +34,10 @@ export default defineConfig({
     root: resolve(__dirname, 'src/renderer'),
     resolve: { alias: { '@shared': shared, '@': resolve(__dirname, 'src/renderer') } },
     plugins: [react(), csp],
-    build: { outDir: resolve(out, 'renderer'), rollupOptions: { input: { index: resolve(__dirname, 'src/renderer/index.html') } } }
+    build: {
+      outDir: resolve(out, 'renderer'),
+      // the main window, and the menu bar popover (src/main/menubar.ts)
+      rollupOptions: { input: { index: resolve(__dirname, 'src/renderer/index.html'), popover: resolve(__dirname, 'src/renderer/popover.html') } }
+    }
   }
 })

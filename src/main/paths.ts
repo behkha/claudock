@@ -1,4 +1,5 @@
 import { app } from 'electron'
+import fs from 'node:fs'
 import fsp from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
@@ -39,11 +40,19 @@ export function snapshotsDir(): string {
   return path.join(userDataDir(), 'snapshots')
 }
 
+let kind: InstallKind | undefined
+
 /**
  * How this copy was installed. `npx claudock` runs the plain app folder with npm's Electron, so `app.isPackaged` is false
  * there too; that folder sits directly in a node_modules folder, a git clone does not.
  */
 export function installKind(): InstallKind {
+  return (kind ??= detectInstallKind())
+}
+
+function detectInstallKind(): InstallKind {
+  // the Claudock.app `npx claudock` keeps in userData on macOS (bin/macApp.js) holds a copy of the npm app folder
+  if (fs.existsSync(path.join(app.getAppPath(), 'claudock-npm-copy.json'))) return 'npm'
   if (app.isPackaged) return 'installer'
   return path.basename(path.dirname(app.getAppPath())) === 'node_modules' ? 'npm' : 'dev'
 }

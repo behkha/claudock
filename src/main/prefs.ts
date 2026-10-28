@@ -10,9 +10,12 @@ interface Prefs {
   theme: ThemePref
   /** The "needs me" alert rule (src/main/domains/sessions.ts). */
   alerts: AlertPrefs
+  /** The menu bar item (the tray icon on Windows and Linux) is shown. On by default, except on Windows, where Connect
+   *  (sessions and live limits) isn't available yet and the icon would show nothing but its tooltip. */
+  menuBar: boolean
 }
 
-const DEFAULTS: Prefs = { theme: 'system', alerts: DEFAULT_ALERT_PREFS }
+const DEFAULTS: Prefs = { theme: 'system', alerts: DEFAULT_ALERT_PREFS, menuBar: process.platform !== 'win32' }
 let cache: Prefs | null = null
 
 const file = (): string => path.join(userDataDir(), 'prefs.json')
@@ -21,7 +24,12 @@ export async function loadPrefs(): Promise<Prefs> {
   if (cache) return cache
   try {
     const raw = JSON.parse(await fsp.readFile(file(), 'utf8')) as Partial<Prefs>
-    cache = { ...DEFAULTS, ...(THEME_PREFS.includes(raw.theme as ThemePref) ? { theme: raw.theme as ThemePref } : {}), alerts: normalizeAlertPrefs(raw.alerts) }
+    cache = {
+      ...DEFAULTS,
+      ...(THEME_PREFS.includes(raw.theme as ThemePref) ? { theme: raw.theme as ThemePref } : {}),
+      alerts: normalizeAlertPrefs(raw.alerts),
+      ...(typeof raw.menuBar === 'boolean' ? { menuBar: raw.menuBar } : {})
+    }
   } catch {
     cache = { ...DEFAULTS }
   }

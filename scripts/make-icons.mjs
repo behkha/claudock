@@ -1,6 +1,8 @@
 // Renders build/icon.svg (macOS layout) and build/icon-square.svg (Windows / Linux layout) into the files
 // electron-builder and the app use: build/icon.icns, build/icon.ico, build/icon.png (1024) and resources/icon.png (512,
-// the runtime window icon). Run with `npm run icons` (it needs Electron for SVG rendering, plus macOS `iconutil` for .icns).
+// the runtime window icon), plus resources/icon.icns (the icon of the Claudock.app npx makes, bin/macApp.js) and the
+// menu bar icons in resources/: trayTemplate and trayWaiting (macOS, 18x16 pt), tray and trayDot (Windows / Linux,
+// 16 px), each with an @2x file. Run with `npm run icons` (it needs Electron for SVG rendering, plus macOS `iconutil` for .icns).
 import { BrowserWindow, app } from 'electron'
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
@@ -16,22 +18,23 @@ app.dock?.hide()
 
 let win
 
-/** Draws the SVG onto a canvas at `size` px in a hidden window and returns PNG bytes (transparent background). */
-async function render(svgFile, size) {
+/** Draws the SVG onto a canvas at `size` px (or `size` x `height`) in a hidden window and returns PNG bytes (transparent background). */
+async function render(svgFile, size, height = size) {
   if (!win) {
     win = new BrowserWindow({ show: false, webPreferences: { offscreen: true } })
     await win.loadURL('data:text/html,<html><body></body></html>')
   }
   const svg = Buffer.from(fs.readFileSync(svgFile, 'utf8')).toString('base64')
   const dataUrl = await win.webContents.executeJavaScript(`(async () => {
-    const img = new Image(${size}, ${size})
+    const img = new Image(${size}, ${height})
     img.src = 'data:image/svg+xml;base64,${svg}'
     await img.decode()
     const c = document.createElement('canvas')
-    c.width = c.height = ${size}
+    c.width = ${size}
+    c.height = ${height}
     const g = c.getContext('2d')
     g.imageSmoothingQuality = 'high'
-    g.drawImage(img, 0, 0, ${size}, ${size})
+    g.drawImage(img, 0, 0, ${size}, ${height})
     return c.toDataURL('image/png')
   })()`)
   return Buffer.from(dataUrl.split(',')[1], 'base64')
@@ -83,7 +86,20 @@ app.whenReady().then(async () => {
     fs.writeFileSync(path.join(build, 'icon.png'), await render(square, 1024))
     fs.mkdirSync(path.join(root, 'resources'), { recursive: true })
     fs.writeFileSync(path.join(root, 'resources', 'icon.png'), await render(square, 512))
-    console.log('icons: build/icon.icns, build/icon.ico, build/icon.png, resources/icon.png')
+    fs.copyFileSync(path.join(build, 'icon.icns'), path.join(root, 'resources', 'icon.icns'))
+
+    // menu bar / tray
+    const res = (name) => path.join(root, 'resources', name)
+    for (const [svg, name, w, h] of [
+      ['trayTemplate.svg', 'trayTemplate', 18, 16],
+      ['trayWaiting.svg', 'trayWaiting', 18, 16],
+      ['icon-square.svg', 'tray', 16, 16],
+      ['trayDot.svg', 'trayDot', 16, 16]
+    ]) {
+      fs.writeFileSync(res(`${name}.png`), await render(path.join(build, svg), w, h))
+      fs.writeFileSync(res(`${name}@2x.png`), await render(path.join(build, svg), w * 2, h * 2))
+    }
+    console.log('icons: build/icon.icns, build/icon.ico, build/icon.png, resources/icon.png, resources/icon.icns, resources/tray*.png')
     app.exit(0)
   } catch (e) {
     console.error(e)

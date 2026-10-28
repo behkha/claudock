@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Tray icon while a session waits, Windows / Linux: icon-square.svg with a clay dot in the corner. -->
+  <rect x="32" y="32" width="960" height="960" rx="216" fill="#141413"/>
+  <g transform="translate(512 512) scale(1.165) translate(-512 -512)">
+    <path d="M 236 552 C 282 458, 372 452, 442 512 C 512 572, 602 568, 650 474" fill="none" stroke="#FAF9F5" stroke-width="80" stroke-linecap="round"/>
+    <rect x="716" y="372" width="100" height="284" rx="16" fill="#D97757"/>
+  </g>
+  <circle cx="824" cy="200" r="200" fill="#D97757" stroke="#FAF9F5" stroke-width="48"/>
+</svg>

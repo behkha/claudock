@@ -1,0 +1,112 @@
+/* Shared live parts (components/live.tsx): session rows and limit meters. Tokens only. */
+.cc__sessions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.cc__sessions li + li {
+  border-top: 0.5px solid var(--border);
+}
+.cc__row {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 10px;
+  row-gap: 2px;
+  width: 100%;
+  padding: 8px 8px;
+  margin: 0 -8px;
+  box-sizing: content-box;
+  max-width: 100%;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.cc__row:hover {
+  background: var(--hover);
+}
+.cc__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+.cc__row--waiting .cc__dot {
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.cc__row--working .cc__dot {
+  border: 1.5px solid var(--text-2);
+}
+.cc__row--done .cc__dot {
+  background: var(--success);
+}
+.cc__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cc__when {
+  font-size: var(--fs-small);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.cc__what {
+  grid-column: 2 / 4;
+  font-size: var(--fs-small);
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+.lim__meter {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.lim__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.lim__top b {
+  font-family: var(--font-serif);
+  font-size: var(--fs-heading);
+  font-weight: 400;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.lim__none {
+  color: var(--text-3);
+}
+.lim__track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+.lim__fill {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--accent);
+}
+.lim__fill--stale {
+  background: var(--text-3);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .lim__fill {
+    transition: width 0.6s ease;
+  }
+}
+.lim__foot {
+  font-size: var(--fs-caption);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}

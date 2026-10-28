@@ -37,7 +37,11 @@ src/
     ipc.ts           channel names + the `ClaudockApi` type (one namespace per domain)
     types.ts
   main/
-    index.ts         window, menu, app lifecycle
+    index.ts         app lifecycle
+    windows.ts       the main window, page loading, the Dock icon while the menu bar is shown
+    menubar.ts       the menu bar item (tray), its popover window, the limit alerts
+    menubar/         pure parts of the menu bar (what it shows, the limit alert rule, login item files), unit-tested
+    loginItem.ts     Open at login
     paths.ts         config dir resolution + `resolveInside()` guard
     safeWrite.ts     snapshot + atomic write + JSON validation
     domains/         ONE file per domain; each exports `register(ipcMain)`
@@ -45,6 +49,7 @@ src/
       permissions.ts skills.ts agents.ts commands.ts plugins.ts mods.ts mcp.ts
       projects.ts memory.ts plans.ts history.ts search.ts system.ts
       limits.ts sessions.ts connect.ts   (live limits, "needs me" sessions, Connect to Claude Code)
+      menubar.ts       (what the popover asks of the menu bar)
     connect/         pure parts of Connect (hook script, settings merge, session model, alert rule), unit-tested
     domains/index.ts registers all of them (already lists every domain)
   preload/index.ts   exposes `window.claudock` built from the domain list
@@ -53,6 +58,7 @@ src/
     styles/tokens.css styles/base.css
     components/      shared primitives (see below)
     screens/         ONE folder per screen, same names as the sidebar
+    popover/         the menu bar popover (popover.html, a second page)
     lib/api.ts       typed `window.claudock` accessor + `useQuery`-style hook
 scripts/
   make-fixture.mjs   builds ./.fixture/claude
@@ -91,6 +97,10 @@ Layout for every list-type screen: sidebar (220–240px) · list pane (300–360
 - **History**: `history.jsonl` with search and project filter.
 - **Storage**: drill-down bars per folder with sizes, plus the cleanup actions from Overview.
 - **Backups**: Claudock snapshots (restore / diff / delete) and loose `.bak` files found in the config dir (diff against current, restore, or tidy into `backups/`).
+
+## Menu bar
+
+On by default on macOS and Linux, off on Windows until Connect works there (View › Show in Menu Bar / Show in Tray; Open at Login is there too). The item shows the Claudock mark and the higher of the 5-hour and weekly percentages, only when Claude Code reported them and the window hasn't reset; while a session waits, the mark turns clay with a dot. Clicking it opens a 320px popover: sessions (waiting first), both limits, today's tokens, "Search sessions" (opens the window with ⌘K), Pause 1 h, a gear for the settings view (reminder, done alert, limit alert %, limit reset alert, sound, Open at login, Show in menu bar, Quit) and Open Claudock. Right-click gives a native menu (Open Claudock, Pause, Quit). With the item shown, closing the window keeps Claudock running on macOS (the Dock icon goes with the window) and Windows; Linux quits as before, since many desktops show no tray and Electron can't tell.
 
 Scanning 8+ GB must not block the UI: size scans run async in the main process with a concurrency limit, stream progress, and cache results by path + mtime.
 
