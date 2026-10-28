@@ -1,7 +1,7 @@
 // Renders build/icon.svg (macOS layout) and build/icon-square.svg (Windows / Linux layout) into the files
 // electron-builder and the app use: build/icon.icns, build/icon.ico, build/icon.png (1024) and resources/icon.png (512,
 // the runtime window icon), plus resources/icon.icns (the icon of the Claudock.app npx makes, bin/macApp.js) and the
-// menu bar icons in resources/: trayTemplate and trayWaiting (macOS, 24x16 pt), tray and trayDot (Windows / Linux,
+// menu bar icons in resources/: trayTemplate and trayWaiting (macOS, 18x16 pt), tray and trayDot (Windows / Linux,
 // 16 px), each with an @2x file. Run with `npm run icons` (it needs Electron for SVG rendering, plus macOS `iconutil` for .icns).
 import { BrowserWindow, app } from 'electron'
 import { execFileSync } from 'node:child_process'
@@ -91,8 +91,8 @@ app.whenReady().then(async () => {
     // menu bar / tray
     const res = (name) => path.join(root, 'resources', name)
     for (const [svg, name, w, h] of [
-      ['trayTemplate.svg', 'trayTemplate', 24, 16],
-      ['trayWaiting.svg', 'trayWaiting', 24, 16],
+      ['trayTemplate.svg', 'trayTemplate', 18, 16],
+      ['trayWaiting.svg', 'trayWaiting', 18, 16],
       ['icon-square.svg', 'tray', 16, 16],
       ['trayDot.svg', 'trayDot', 16, 16]
     ]) {
