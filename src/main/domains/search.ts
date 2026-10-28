@@ -6,7 +6,7 @@ import type { SearchResult } from '@shared/types'
 import { parseFrontmatter } from '@shared/frontmatter'
 import { readJson } from '../fsx'
 import { defineDomain } from '../ipcx'
-import { configDir } from '../paths'
+import { configDir, onConfigDirChanged } from '../paths'
 import { listMemoryFiles } from './memory'
 import { listPlans } from './plans'
 import { listProjectSummaries, readHead, sessionTitle } from './projects'
@@ -218,6 +218,8 @@ let base: Built<Item[]> | null = null
 let baseBuilding: Promise<Built<Item[]>> | null = null
 let sessions: Built<Item[]> | null = null
 let sessionsBuilding: Promise<void> | null = null
+/** Bumped when another profile opens, so a build of the old folder that finishes late isn't kept. */
+let gen = 0
 
 async function safe(p: Promise<Item[]>): Promise<Item[]> {
   try {
@@ -228,6 +230,7 @@ async function safe(p: Promise<Item[]>): Promise<Item[]> {
 }
 
 function buildBase(): Promise<Built<Item[]>> {
+  const g = gen
   baseBuilding ??= (async () => {
     const settingsByFile = await Promise.all(
       SETTINGS_FILES.map(async (f) => {
@@ -246,8 +249,9 @@ function buildBase(): Promise<Built<Item[]>> {
       safe(planItems()),
       safe(projectItems())
     ])
-    base = { at: Date.now(), items: parts.flat() }
-    return base
+    const built = { at: Date.now(), items: parts.flat() }
+    if (g === gen) base = built
+    return built
   })().finally(() => {
     baseBuilding = null
   })
@@ -255,9 +259,10 @@ function buildBase(): Promise<Built<Item[]>> {
 }
 
 function refreshSessions(): void {
+  const g = gen
   sessionsBuilding ??= sessionItems()
     .then((items) => {
-      sessions = { at: Date.now(), items }
+      if (g === gen) sessions = { at: Date.now(), items }
     })
     .catch(() => undefined)
     .finally(() => {
@@ -303,6 +308,12 @@ function score(item: Item, tokens: string[], whole: string): number {
 }
 
 export function register(ipcMain: IpcMain): void {
+  onConfigDirChanged(() => {
+    gen++
+    base = sessions = null
+    baseBuilding = null
+    sessionsBuilding = null
+  })
   defineDomain(ipcMain, 'search', {
     async query(q: string): Promise<SearchResult[]> {
       const whole = (q ?? '').trim().toLowerCase()

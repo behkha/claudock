@@ -4,14 +4,15 @@ import fs from 'node:fs'
 import fsp from 'node:fs/promises'
 import path from 'node:path'
 import type { AlertPrefs, HooksStatus, LiveSession, SessionsApi, SessionsState } from '@shared/api/sessions'
-import { connectDir, connectSerial, removeOwn, writeOwn } from '../connect/folder'
+import { connectDir, connectDirFor, connectSerial, folderKey, removeOwn, writeOwn } from '../connect/folder'
 import { HOOKS, hookCommand, hookEntry, hookScript } from '../connect/hookScript'
-import { AlertRule, SESSION_FILE_RE, applyLines, isGone, normalizeAlertPrefs, toLiveSessions, transitions, type SessionFold } from '../connect/sessionModel'
+import { AlertRule, SESSION_FILE_RE, applyLines, isGone, normalizeAlertPrefs, sortLive, toLiveSessions, transitions, type SessionFold } from '../connect/sessionModel'
 import { hasHooks, type HookGroup } from '../connect/settingsHooks'
 import { postAlert } from '../alerts'
 import { defineDomain, emit } from '../ipcx'
 import { showMainWindow } from '../windows'
 import { loadPrefs, savePrefs } from '../prefs'
+import { configDir, onConfigDirChanged, openConfigDir, samePath } from '../paths'
 import { readSettings } from './extendShared'
 import { findTranscript, ownSessionName, sessionTitle } from './projects'
 
@@ -28,23 +29,24 @@ import { findTranscript, ownSessionName, sessionTitle } from './projects'
 const WIN = process.platform === 'win32'
 const MAC = process.platform === 'darwin'
 const TICK_MS = 30_000
+let registered = false
 
 /* ------------------------------------------------------------------ the hooks in settings.json */
 
-const sessionsDir = (): string => path.join(connectDir(), 'sessions')
+const sessionsDirOf = (conn: string): string => path.join(conn, 'sessions')
 
 /** Claudock's hook commands, exactly as they appear in settings.json. */
-export const ourHookCommands = (): Set<string> => new Set(HOOKS.map((h) => hookCommand(connectDir(), h.step)))
+export const ourHookCommands = (conn = connectDir()): Set<string> => new Set(HOOKS.map((h) => hookCommand(conn, h.step)))
 
 /** The groups Connect appends to settings.json, one per hook. */
 export const hookGroups = (): HookGroup[] => HOOKS.map((h) => ({ event: h.event, matcher: h.matcher, entry: hookEntry(connectDir(), h) }))
 
-export const hooksInstalled = (settings: Record<string, unknown>): boolean => hasHooks(settings, ourHookCommands())
+export const hooksInstalled = (settings: Record<string, unknown>, conn = connectDir()): boolean => hasHooks(settings, ourHookCommands(conn))
 
 /** The hook script and an empty sessions folder. Must exist before settings.json points at the script. */
-export async function writeHookFiles(): Promise<void> {
-  await writeOwn('hook.sh', hookScript(connectDir()), 0o755)
-  await fsp.mkdir(sessionsDir(), { recursive: true })
+export async function writeHookFiles(conn = connectDir()): Promise<void> {
+  await writeOwn('hook.sh', hookScript(conn), 0o755, conn)
+  await fsp.mkdir(sessionsDirOf(conn), { recursive: true })
 }
 
 /** The hook script and every session file, when settings.json never pointed at them (a Connect that failed). */
@@ -80,52 +82,6 @@ interface FileRead {
   rest: Buffer
   fold: SessionFold | null
 }
-const reads = new Map<string, FileRead>()
-
-/** Each session's state from its file; files of sessions that are gone are deleted (Claudock's own data). */
-async function readFolds(): Promise<SessionFold[]> {
-  const dir = sessionsDir()
-  const names = await fsp.readdir(dir).catch(() => [] as string[])
-  const now = Date.now()
-  const out: SessionFold[] = []
-  const seen = new Set<string>()
-  for (const n of names) {
-    const id = SESSION_FILE_RE.exec(n)?.[1]
-    if (!id) continue
-    const abs = path.join(dir, n)
-    const st = await fsp.lstat(abs).catch(() => null)
-    if (!st?.isFile()) continue
-    seen.add(id)
-    let r = reads.get(id)
-    // a new file under the same name (SessionEnd, then a late line) or a shorter one: read it from the start
-    if (!r || r.ino !== st.ino || st.size < r.offset) r = { ino: st.ino, offset: 0, rest: Buffer.alloc(0), fold: null }
-    if (st.size > r.offset) {
-      const chunk = await readRange(abs, r.offset, st.size).catch(() => null)
-      if (chunk) {
-        const buf = Buffer.concat([r.rest, chunk])
-        const end = buf.lastIndexOf(0x0a) + 1
-        r.fold = applyLines(r.fold, id, buf.toString('utf8', 0, end).split('\n'))
-        r.rest = Buffer.from(buf.subarray(end))
-        r.offset += chunk.length
-      }
-    }
-    reads.set(id, r)
-    if (r.fold && isGone(r.fold, now, alive)) {
-      await fsp.rm(abs, { force: true })
-      reads.delete(id)
-      continue
-    }
-    if (r.fold) out.push(r.fold)
-  }
-  for (const id of reads.keys()) if (!seen.has(id)) reads.delete(id)
-  // a hook killed by its timeout between writing its line and appending it leaves the line file behind
-  for (const n of names) {
-    if (!/^\..+\.line$/.test(n)) continue
-    const st = await fsp.lstat(path.join(dir, n)).catch(() => null)
-    if (st?.isFile() && now - st.mtimeMs > 60_000) await fsp.rm(path.join(dir, n), { force: true })
-  }
-  return out
-}
 
 async function readRange(abs: string, from: number, to: number): Promise<Buffer> {
   const fh = await fsp.open(abs, 'r')
@@ -138,99 +94,268 @@ async function readRange(abs: string, from: number, to: number): Promise<Buffer>
   }
 }
 
-let hooks: HooksStatus = WIN ? 'unsupported' : 'off'
-let sessions: LiveSession[] = []
-/** The previous list by id; null until the first read, so sessions already waiting at launch don't alert. */
-let prev: Map<string, LiveSession> | null = null
-/** Terminal app per session, for `show()`. */
-let apps = new Map<string, string | null>()
-let published = ''
+/**
+ * One profile's sessions: its settings.json says whether the hooks are in, and its connect folder holds what they wrote.
+ * Every profile is watched at once, so the menu bar and the alerts cover them all; the window shows the open one's.
+ */
+class Watch {
+  readonly dir: string
+  readonly conn: string
+  /** The profile's name, while there are several (rows and alerts say which profile). */
+  label: string | null = null
+  hooks: HooksStatus = WIN ? 'unsupported' : 'off'
+  sessions: LiveSession[] = []
+  /** The previous list by id; null until the first read, so sessions already waiting at launch don't alert. */
+  private prev: Map<string, LiveSession> | null = null
+  /** Terminal app per session, for `show()`. */
+  apps = new Map<string, string | null>()
+  private published = ''
+  private readonly reads = new Map<string, FileRead>()
+  /** First prompts by session id: they never change, so each transcript's head is read once. */
+  private readonly firstPrompts = new Map<string, string>()
+  private watcher: fs.FSWatcher | null = null
+  private watching = false
+  private soon: NodeJS.Timeout | null = null
+  private running: Promise<void> | null = null
+  private rerun = false
+  private closed = false
 
-const snapshot = (): SessionsState => ({ hooks, sessions, waiting: sessions.filter((s) => s.status === 'waiting').length })
+  constructor(dir: string) {
+    this.dir = dir
+    this.conn = connectDirFor(dir)
+  }
 
-/** Everything Today and the menu bar show. */
-export async function currentSessions(): Promise<SessionsState> {
-  await refresh()
-  return snapshot()
+  snapshot(): SessionsState {
+    return { hooks: this.hooks, sessions: this.sessions, waiting: this.sessions.filter((s) => s.status === 'waiting').length }
+  }
+
+  /** Re-read settings.json and the sessions folder. Calls made while a read runs share one more read after it. */
+  refresh(): Promise<void> {
+    if (this.running) {
+      this.rerun = true
+      return this.running
+    }
+    this.running = (async () => {
+      do {
+        this.rerun = false
+        await this.readOnce()
+      } while (this.rerun)
+    })().finally(() => {
+      this.running = null
+    })
+    return this.running
+  }
+
+  refreshSoon(): void {
+    if (this.soon) clearTimeout(this.soon)
+    this.soon = setTimeout(() => {
+      this.soon = null
+      void this.refresh().catch(() => undefined)
+    }, 150)
+  }
+
+  close(): void {
+    this.closed = true
+    if (this.soon) clearTimeout(this.soon)
+    this.watcher?.close()
+    this.watcher = null
+  }
+
+  private async readOnce(): Promise<void> {
+    if (WIN || this.closed) return
+    const settings = await readSettings(this.dir)
+    // settings.json mid-write or unreadable: keep what is known rather than drop every session (and alert again after)
+    if (settings.error) return
+    const on = hooksInstalled(settings.data, this.conn)
+    this.hooks = on ? 'on' : 'off'
+    if (on !== this.watching) await this.watch(on)
+    const folds = on ? await this.readFolds() : []
+    if (!on) this.reads.clear()
+    const next = await this.withNames(toLiveSessions(folds))
+    if (this.closed) return
+    const changes = transitions(this.prev, next)
+    this.prev = new Map(next.map((s) => [s.id, s]))
+    this.apps = new Map(folds.map((f) => [f.id, f.app]))
+    this.sessions = next
+    const label = (s: LiveSession): LiveSession => (this.label ? { ...s, profile: this.label } : s)
+    rule.update(everySession(), { waiting: changes.waiting.map(label), done: changes.done.map(label) })
+    const json = JSON.stringify(this.snapshot())
+    if (json === this.published) return
+    this.published = json
+    changed(this)
+  }
+
+  /** Each session's state from its file; files of sessions that are gone are deleted (Claudock's own data). */
+  private async readFolds(): Promise<SessionFold[]> {
+    const dir = sessionsDirOf(this.conn)
+    const names = await fsp.readdir(dir).catch(() => [] as string[])
+    const now = Date.now()
+    const out: SessionFold[] = []
+    const seen = new Set<string>()
+    for (const n of names) {
+      const id = SESSION_FILE_RE.exec(n)?.[1]
+      if (!id) continue
+      const abs = path.join(dir, n)
+      const st = await fsp.lstat(abs).catch(() => null)
+      if (!st?.isFile()) continue
+      seen.add(id)
+      let r = this.reads.get(id)
+      // a new file under the same name (SessionEnd, then a late line) or a shorter one: read it from the start
+      if (!r || r.ino !== st.ino || st.size < r.offset) r = { ino: st.ino, offset: 0, rest: Buffer.alloc(0), fold: null }
+      if (st.size > r.offset) {
+        const chunk = await readRange(abs, r.offset, st.size).catch(() => null)
+        if (chunk) {
+          const buf = Buffer.concat([r.rest, chunk])
+          const end = buf.lastIndexOf(0x0a) + 1
+          r.fold = applyLines(r.fold, id, buf.toString('utf8', 0, end).split('\n'))
+          r.rest = Buffer.from(buf.subarray(end))
+          r.offset += chunk.length
+        }
+      }
+      this.reads.set(id, r)
+      if (r.fold && isGone(r.fold, now, alive)) {
+        await fsp.rm(abs, { force: true })
+        this.reads.delete(id)
+        continue
+      }
+      if (r.fold) out.push(r.fold)
+    }
+    for (const id of this.reads.keys()) if (!seen.has(id)) this.reads.delete(id)
+    // a hook killed by its timeout between writing its line and appending it leaves the line file behind
+    for (const n of names) {
+      if (!/^\..+\.line$/.test(n)) continue
+      const st = await fsp.lstat(path.join(dir, n)).catch(() => null)
+      if (st?.isFile() && now - st.mtimeMs > 60_000) await fsp.rm(path.join(dir, n), { force: true })
+    }
+    return out
+  }
+
+  /**
+   * Each session's own name from its transcript (cached there), else its first prompt, so rows say which session, not
+   * only which folder.
+   */
+  private async withNames(list: LiveSession[]): Promise<LiveSession[]> {
+    const ids = new Set(list.map((s) => s.id))
+    for (const id of this.firstPrompts.keys()) if (!ids.has(id)) this.firstPrompts.delete(id)
+    const root = path.join(this.dir, 'projects')
+    return Promise.all(
+      list.map(async (s) => {
+        const abs = await findTranscript(s.id, s.cwd, root).catch(() => null)
+        if (!abs) return s
+        const own = await ownSessionName(abs)
+        if (own) return { ...s, title: own }
+        let first = this.firstPrompts.get(s.id)
+        if (first === undefined) {
+          first = await sessionTitle(abs)
+          if (first) this.firstPrompts.set(s.id, first)
+        }
+        return { ...s, title: first || null }
+      })
+    )
+  }
+
+  /**
+   * Watch the sessions folder while the hooks are in settings.json. Turning on also makes sure hook.sh is the current
+   * script: Claudock's folder may have been cleared, or Disconnect left its no-op and the hooks came back (a snapshot
+   * restored in Backups).
+   */
+  private async watch(on: boolean): Promise<void> {
+    this.watching = on
+    this.watcher?.close()
+    this.watcher = null
+    if (!on) return
+    // checked again under the connect lock, so a Disconnect that just ran keeps its no-op
+    await connectSerial(async () => {
+      const text = await fsp.readFile(path.join(this.conn, 'hook.sh'), 'utf8').catch(() => null)
+      if (text === hookScript(this.conn)) return
+      const { data, error } = await readSettings(this.dir)
+      if (!error && hooksInstalled(data, this.conn)) await writeHookFiles(this.conn)
+    }).catch(() => undefined)
+    if (this.closed) return
+    try {
+      fs.mkdirSync(sessionsDirOf(this.conn), { recursive: true })
+      const w = fs.watch(sessionsDirOf(this.conn), () => this.refreshSoon())
+      // the tick keeps reading if the watcher fails
+      w.on('error', () => {
+        w.close()
+        if (this.watcher === w) this.watcher = null
+      })
+      this.watcher = w
+    } catch {
+      /* folder can't be made: the tick still reads it */
+    }
+  }
 }
 
-type Listener = (s: SessionsState) => void
+/** Every watched profile by folder key. The open profile always has one. */
+const watches = new Map<string, Watch>()
+
+function watchFor(dir: string): Watch {
+  const key = folderKey(dir)
+  let w = watches.get(key)
+  if (!w) {
+    w = new Watch(dir)
+    watches.set(key, w)
+    if (registered) w.refreshSoon()
+  }
+  return w
+}
+
+const open = (): Watch => watchFor(openConfigDir())
+
+/** Every profile's sessions in one list, each naming its profile while there are several: the alert rule and the popover. */
+export function everySession(): LiveSession[] {
+  return sortLive([...watches.values()].flatMap((w) => (w.label ? w.sessions.map((s) => ({ ...s, profile: w.label as string })) : w.sessions)))
+}
+
+/**
+ * The profiles to watch, with their names (src/main/domains/profiles.ts). Names go on rows and alerts only when there are
+ * several. Folders no longer listed stop being watched, except the open one.
+ */
+export function watchFolders(list: { dir: string; name: string }[]): void {
+  const keep = new Set(list.map((p) => folderKey(p.dir)))
+  keep.add(folderKey(openConfigDir()))
+  for (const [k, w] of watches) {
+    if (keep.has(k)) continue
+    w.close()
+    watches.delete(k)
+  }
+  for (const p of list) {
+    const w = watchFor(p.dir)
+    const label = list.length > 1 ? p.name : null
+    if (w.label !== label) {
+      w.label = label
+      changed(w)
+    }
+  }
+}
+
+/** Everything Today and the menu bar show, for the open profile (the calling window's). */
+export async function currentSessions(): Promise<SessionsState> {
+  const w = watchFor(configDir())
+  await w.refresh()
+  return w.snapshot()
+}
+
+/** One profile's sessions (the menu bar reads every profile). */
+export async function sessionsIn(dir: string): Promise<SessionsState> {
+  const w = watchFor(dir)
+  await w.refresh()
+  return w.snapshot()
+}
+
+type Listener = (dir: string) => void
 const listeners = new Set<Listener>()
 
-/** For main-process surfaces (the menu bar glance). Returns the unsubscribe function. */
+/** For main-process surfaces (the menu bar glance): a profile's sessions changed. Returns the unsubscribe function. */
 export function onSessionsChanged(cb: Listener): () => void {
   listeners.add(cb)
   return () => listeners.delete(cb)
 }
 
-let running: Promise<void> | null = null
-let rerun = false
-
-/** Re-read settings.json and the sessions folder. Calls made while a read runs share one more read after it. */
-function refresh(): Promise<void> {
-  if (running) {
-    rerun = true
-    return running
-  }
-  running = (async () => {
-    do {
-      rerun = false
-      await readOnce()
-    } while (rerun)
-  })().finally(() => {
-    running = null
-  })
-  return running
-}
-
-async function readOnce(): Promise<void> {
-  if (WIN) return
-  const settings = await readSettings()
-  // settings.json mid-write or unreadable: keep what is known rather than drop every session (and alert again after)
-  if (settings.error) return
-  const on = hooksInstalled(settings.data)
-  hooks = on ? 'on' : 'off'
-  if (on !== watching) await watch(on)
-  const folds = on ? await readFolds() : []
-  if (!on) reads.clear()
-  const next = await withNames(toLiveSessions(folds))
-  const changes = transitions(prev, next)
-  prev = new Map(next.map((s) => [s.id, s]))
-  apps = new Map(folds.map((f) => [f.id, f.app]))
-  sessions = next
-  rule.update(next, changes)
-  const json = JSON.stringify(snapshot())
-  if (json === published) return
-  published = json
-  const state = snapshot()
-  emit('sessions:changed', state)
-  for (const l of listeners) l(state)
-}
-
-/** First prompts by session id: they never change, so each transcript's head is read once. */
-const firstPrompts = new Map<string, string>()
-
-/**
- * Each session's own name from its transcript (cached there), else its first prompt, so rows say which session, not
- * only which folder.
- */
-async function withNames(list: LiveSession[]): Promise<LiveSession[]> {
-  const ids = new Set(list.map((s) => s.id))
-  for (const id of firstPrompts.keys()) if (!ids.has(id)) firstPrompts.delete(id)
-  return Promise.all(
-    list.map(async (s) => {
-      const abs = await findTranscript(s.id, s.cwd).catch(() => null)
-      if (!abs) return s
-      const own = await ownSessionName(abs)
-      if (own) return { ...s, title: own }
-      let first = firstPrompts.get(s.id)
-      if (first === undefined) {
-        first = await sessionTitle(abs)
-        if (first) firstPrompts.set(s.id, first)
-      }
-      return { ...s, title: first || null }
-    })
-  )
+function changed(w: Watch): void {
+  if (samePath(w.dir, openConfigDir())) emit('sessions:changed', w.snapshot())
+  for (const l of listeners) l(w.dir)
 }
 
 /* ------------------------------------------------------------------ alerts */
@@ -251,7 +376,8 @@ const rule = new AlertRule({ now: Date.now, setTimeout: (fn, ms) => setTimeout(f
 /** Bring the session's terminal app forward (macOS, when the hook knew it), else Claudock's own window. */
 export async function show(id: string): Promise<void> {
   if (typeof id !== 'string') throw new Error('Unknown session')
-  const bundle = apps.get(id)
+  let bundle: string | null | undefined
+  for (const w of watches.values()) if (w.apps.has(id)) bundle = w.apps.get(id)
   if (!MAC || !bundle || !/^[A-Za-z0-9.-]+$/.test(bundle)) return showMainWindow()
   await new Promise<void>((resolve) => {
     execFile('/usr/bin/open', ['-b', bundle], (err) => {
@@ -261,54 +387,11 @@ export async function show(id: string): Promise<void> {
   })
 }
 
-/* ------------------------------------------------------------------ watching */
+/* ------------------------------------------------------------------ after Connect or Disconnect */
 
-let watcher: fs.FSWatcher | null = null
-let watching = false
-let soon: NodeJS.Timeout | null = null
-
-function refreshSoon(): void {
-  if (soon) clearTimeout(soon)
-  soon = setTimeout(() => {
-    soon = null
-    void refresh().catch(() => undefined)
-  }, 150)
-}
-
-/**
- * Watch the sessions folder while the hooks are in settings.json. Turning on also makes sure hook.sh is the current
- * script: Claudock's folder may have been cleared, or Disconnect left its no-op and the hooks came back (a snapshot
- * restored in Backups).
- */
-async function watch(on: boolean): Promise<void> {
-  watching = on
-  watcher?.close()
-  watcher = null
-  if (!on) return
-  // checked again under the connect lock, so a Disconnect that just ran keeps its no-op
-  await connectSerial(async () => {
-    const text = await fsp.readFile(path.join(connectDir(), 'hook.sh'), 'utf8').catch(() => null)
-    if (text === hookScript(connectDir())) return
-    const { data, error } = await readSettings()
-    if (!error && hooksInstalled(data)) await writeHookFiles()
-  }).catch(() => undefined)
-  try {
-    fs.mkdirSync(sessionsDir(), { recursive: true })
-    const w = fs.watch(sessionsDir(), () => refreshSoon())
-    // the tick keeps reading if the watcher fails
-    w.on('error', () => {
-      w.close()
-      if (watcher === w) watcher = null
-    })
-    watcher = w
-  } catch {
-    /* folder can't be made: the tick still reads it */
-  }
-}
-
-/** After Connect or Disconnect: re-read (which starts or stops watching) and tell every surface. */
+/** After Connect or Disconnect (on the open profile): re-read (which starts or stops watching) and tell every surface. */
 export function hooksChanged(): void {
-  refreshSoon()
+  watchFor(configDir()).refreshSoon()
 }
 
 /** The alert settings as last loaded or set, for the limit alert rule's tick (src/main/menubar.ts). */
@@ -332,9 +415,18 @@ export function register(ipcMain: IpcMain): void {
   const impl: SessionsApi = { get: currentSessions, show, alertPrefs, setAlertPrefs }
   defineDomain(ipcMain, 'sessions', impl)
   void ready()
+  registered = true
+  // another profile opened: the window gets its sessions (they were already being watched)
+  onConfigDirChanged(() => {
+    const w = open()
+    // a quick switch away and back: only the folder still open is sent
+    void w.refresh().then(() => samePath(w.dir, openConfigDir()) && emit('sessions:changed', w.snapshot()), () => undefined)
+  })
   if (WIN) return
-  void refresh().catch(() => undefined)
+  open().refreshSoon()
   // always, connected or not: sessions whose Claude Code process exited, the clock on "4 min", and hooks that appear
   // in settings.json some other way (a read that failed at launch, a snapshot restored in Backups)
-  setInterval(refreshSoon, TICK_MS)
+  setInterval(() => {
+    for (const w of watches.values()) w.refreshSoon()
+  }, TICK_MS)
 }

@@ -1,4 +1,4 @@
-import type { LimitHit, LimitHits, LimitWindow } from './api/limits'
+import type { LimitHit, LimitHits, LimitWindow, LimitsState } from './api/limits'
 
 /** A reading older than this shows "as of <time>". */
 export const LIMITS_STALE_MS = 15 * 60_000
@@ -69,4 +69,23 @@ export function limitShown(w: LimitWindow | null | undefined, liveAt: number | u
   const view = limitView(w, now)
   if (hit && hit.resetsAt > now && (view.percent === null || hit.at >= (liveAt ?? 0))) return { kind: 'reached', resetsAt: hit.resetsAt }
   return view.percent === null ? { kind: 'tokens' } : { kind: 'percent', view }
+}
+
+/**
+ * One profile's limits in a list of profiles (the title bar's profile menu, the popover's other profiles), from what
+ * Claude Code recorded: "42%" / "5-hour 42% · Weekly 61%" (`long`), "Limit reached", else today's tokens.
+ */
+export function limitsLine(l: LimitsState, now: number, long: boolean): string {
+  const live = l.step === 'on' ? l.live : null
+  const five = limitShown(live?.fiveHour, live?.at, l.hits.fiveHour, now)
+  const week = limitShown(live?.sevenDay, live?.at, l.hits.sevenDay, now)
+  if (five.kind === 'reached' || week.kind === 'reached') return 'Limit reached'
+  const pct = (s: LimitShown): number | null => (s.kind === 'percent' ? s.view.percent : null)
+  const [a, b] = [pct(five), pct(week)]
+  if (a !== null || b !== null) {
+    if (!long) return `${Math.max(a ?? 0, b ?? 0)}%`
+    return [a !== null ? `5-hour ${a}%` : null, b !== null ? `Weekly ${b}%` : null].filter(Boolean).join(' · ')
+  }
+  const t = formatTokens(l.tokens.today.tokens)
+  return long ? `${t} tokens today` : t
 }

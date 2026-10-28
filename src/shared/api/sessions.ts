@@ -1,8 +1,8 @@
 /**
  * Sessions domain contract: which running Claude Code sessions are working, waiting for you or done. The data comes
  * from the session hooks "Connect to Claude Code" adds (see src/shared/api/connect.ts); without them the list is empty.
- * Read by Today and the menu bar: main can call `currentSessions()` and `onSessionsChanged()`
- * in src/main/domains/sessions.ts directly.
+ * `get()` is the open profile's, for Today; the menu bar reads every profile's through `sessionsIn()` and
+ * `everySession()` in src/main/domains/sessions.ts (put together by `currentGlance()` in profiles.ts).
  */
 
 export type SessionStatus = 'working' | 'waiting' | 'done'
@@ -30,6 +30,8 @@ export interface LiveSession {
   message: string | null
   /** While working: the last tool it finished (subagents' included) and when, so the row moves as Claude works. */
   activity: { tool: string; at: number } | null
+  /** The profile's name, in lists that hold several profiles' sessions (the menu bar popover). */
+  profile?: string
 }
 
 /**

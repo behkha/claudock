@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { ChevronLeft, Settings } from 'lucide-react'
-import type { LimitsState } from '@shared/api/limits'
 import type { MenubarState } from '@shared/api/menubar'
-import type { AlertPrefs, SessionsState } from '@shared/api/sessions'
+import type { Glance } from '@shared/api/profiles'
+import type { AlertPrefs } from '@shared/api/sessions'
 import { formatCount } from '@shared/format'
-import { LIMITS_STALE_MS, formatTokens } from '@shared/limits'
+import { LIMITS_STALE_MS, formatTokens, limitsLine } from '@shared/limits'
 import { Button } from '@/components/Button'
 import { IconButton } from '@/components/IconButton'
 import { Kbd } from '@/components/Kbd'
@@ -16,7 +16,9 @@ import { useThemeSync } from '@/lib/theme'
 
 /**
  * The menu bar popover (src/main/menubar.ts opens it): what needs you first, then both limits, today's tokens, search,
- * and the alert settings behind the gear. Opening it again always starts on the first view with fresh data.
+ * and the alert settings behind the gear. Opening it again always starts on the first view with fresh data. With
+ * several profiles (item 42, decision 2 A) the sessions are every profile's, each naming its profile, the meters are
+ * the profile open in the window, and each other profile is one line that opens it there.
  */
 
 const TICK_MS = 30_000
@@ -29,8 +31,7 @@ const time = (ms: number): string => new Date(ms).toLocaleTimeString(undefined, 
 export function Popover(): JSX.Element {
   useThemeSync()
   const [view, setView] = useState<'main' | 'settings'>('main')
-  const [limits, setLimits] = useState<LimitsState>()
-  const [sessions, setSessions] = useState<SessionsState>()
+  const [glance, setGlance] = useState<Glance>()
   const [prefs, setPrefs] = useState<AlertPrefs>()
   const [bar, setBar] = useState<MenubarState>()
   const [now, setNow] = useState(Date.now())
@@ -40,8 +41,7 @@ export function Popover(): JSX.Element {
   const load = useCallback(() => {
     setNow(Date.now())
     const fail = (e: Error): void => toast(e.message, { kind: 'error' })
-    void api.limits.get().then(setLimits, fail)
-    void api.sessions.get().then(setSessions, fail)
+    void api.profiles.glance().then(setGlance, fail)
     void api.sessions.alertPrefs().then(setPrefs, fail)
     void api.menubar.get().then(setBar, fail)
   }, [toast])
@@ -52,13 +52,9 @@ export function Popover(): JSX.Element {
     return () => clearInterval(t)
   }, [])
   // a new reading moves "just now" and the waiting times along with it
-  useEvent('limits:changed', (v) => {
+  useEvent('profiles:glance', (v) => {
     setNow(Date.now())
-    setLimits(v)
-  })
-  useEvent('sessions:changed', (v) => {
-    setNow(Date.now())
-    setSessions(v)
+    setGlance(v)
   })
   useEvent('menubar:changed', setBar)
   useEvent('menubar:opened', () => {
@@ -100,34 +96,35 @@ export function Popover(): JSX.Element {
   return (
     <div className="pop" ref={root}>
       {view === 'main' ? (
-        <Main limits={limits} sessions={sessions} prefs={prefs} now={now} onPause={change} onSettings={() => setView('settings')} />
+        <Main glance={glance} prefs={prefs} now={now} onPause={change} onSettings={() => setView('settings')} />
       ) : (
-        <SettingsView limits={limits} sessions={sessions} prefs={prefs} bar={bar} onChange={change} onBar={changeBar} onBack={() => setView('main')} />
+        <SettingsView glance={glance} prefs={prefs} bar={bar} onChange={change} onBar={changeBar} onBack={() => setView('main')} />
       )}
     </div>
   )
 }
 
 function Main({
-  limits,
-  sessions,
+  glance,
   prefs,
   now,
   onPause,
   onSettings
 }: {
-  limits: LimitsState | undefined
-  sessions: SessionsState | undefined
+  glance: Glance | undefined
   prefs: AlertPrefs | undefined
   now: number
   onPause: (patch: Partial<AlertPrefs>) => void
   onSettings: () => void
 }): JSX.Element {
+  const open = glance?.profiles.find((p) => p.open)
+  const others = glance?.profiles.filter((p) => !p.open) ?? []
+  const limits = open?.limits
   const limitsOn = limits?.step === 'on'
-  const hooksOn = sessions?.hooks === 'on'
-  const known = limits !== undefined && sessions !== undefined
-  const canConnect = known && limits.step !== 'unsupported' && !limitsOn && !hooksOn
-  const list = hooksOn ? sessions.sessions : []
+  const hooksOn = open?.hooks === 'on'
+  const known = open !== undefined
+  const canConnect = known && limits?.step !== 'unsupported' && !limitsOn && !hooksOn
+  const list = glance?.sessions ?? []
   const today = limits?.tokens.today
   const stale = limitsOn && limits.live ? now - limits.live.at > LIMITS_STALE_MS : false
   const paused = prefs?.pausedUntil != null && prefs.pausedUntil > now
@@ -146,14 +143,30 @@ function Main({
           ))}
         </ul>
       ) : null}
+      {limitsOn && others.length ? <div className="pop__label">{open?.name}</div> : null}
       {limitsOn ? (
         <div className="pop__meters">
           <LimitMeter label="5-hour" w={limits.live?.fiveHour} at={limits.live?.at} stale={stale} hit={limits.hits.fiveHour} tokens={limits.tokens.fiveHour.tokens} span="last 5 hours" now={now} />
           <LimitMeter label="Weekly" w={limits.live?.sevenDay} at={limits.live?.at} stale={stale} hit={limits.hits.sevenDay} tokens={limits.tokens.sevenDay.tokens} span="last 7 days" now={now} />
         </div>
       ) : null}
+      {others.length ? (
+        <ul className="pop__others" aria-label="Other profiles">
+          {others.map((p) => (
+            <li key={p.id}>
+              <button type="button" className="pop__other" onClick={() => void api.profiles.openInWindow(p.id)}>
+                <span className="pop__other-name">
+                  {p.waiting > 0 ? <span className="pop__other-dot" role="img" aria-label={`${p.waiting} waiting`} /> : null}
+                  {p.name}
+                </span>
+                <span className="pop__mono">{limitsLine(p.limits, now, true)}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       <div className="pop__today">
-        <span>Today</span>
+        <span>{others.length && open ? `${open.name} today` : 'Today'}</span>
         <span className="pop__mono">
           {today ? `${formatTokens(today.tokens)} tokens · ${formatCount(today.sessions)} ${today.sessions === 1 ? 'session' : 'sessions'}` : '…'}
         </span>
@@ -182,16 +195,14 @@ function Main({
 }
 
 function SettingsView({
-  limits,
-  sessions,
+  glance,
   prefs,
   bar,
   onChange,
   onBar,
   onBack
 }: {
-  limits: LimitsState | undefined
-  sessions: SessionsState | undefined
+  glance: Glance | undefined
   prefs: AlertPrefs | undefined
   bar: MenubarState | undefined
   onChange: (patch: Partial<AlertPrefs>) => void
@@ -200,8 +211,9 @@ function SettingsView({
 }): JSX.Element {
   const back = useRef<HTMLButtonElement>(null)
   useEffect(() => back.current?.focus(), [])
-  const sessionAlerts = sessions?.hooks !== 'unsupported'
-  const limitAlerts = limits?.step !== 'unsupported'
+  const open = glance?.profiles.find((p) => p.open)
+  const sessionAlerts = open?.hooks !== 'unsupported'
+  const limitAlerts = open?.limits.step !== 'unsupported'
   return (
     <div className="pop__view">
       <div className="pop__head">

@@ -13,13 +13,19 @@ import type { Baseline } from './baseline'
 
 const WIN = process.platform === 'win32'
 
-export function connectDir(): string {
-  const key = WIN || process.platform === 'darwin' ? configDir().toLowerCase() : configDir()
-  return path.join(userDataDir(), 'connect', crypto.createHash('sha256').update(key).digest('hex').slice(0, 12))
+/** A config folder's key: its connect folder's name, and its profile id (src/main/domains/profiles.ts). */
+export function folderKey(configFolder: string): string {
+  const key = WIN || process.platform === 'darwin' ? configFolder.toLowerCase() : configFolder
+  return crypto.createHash('sha256').update(key).digest('hex').slice(0, 12)
 }
 
-export async function writeOwn(name: string, text: string, mode = 0o644): Promise<void> {
-  const dir = connectDir()
+/** The connect folder of any config folder; every profile has its own. */
+export const connectDirFor = (configFolder: string): string => path.join(userDataDir(), 'connect', folderKey(configFolder))
+
+/** The connect folder of the profile open in the window. */
+export const connectDir = (): string => connectDirFor(configDir())
+
+export async function writeOwn(name: string, text: string, mode = 0o644, dir = connectDir()): Promise<void> {
   await fsp.mkdir(dir, { recursive: true })
   const tmp = path.join(dir, `.${name}.${crypto.randomBytes(4).toString('hex')}.tmp`)
   await fsp.writeFile(tmp, text, { mode })
@@ -45,9 +51,9 @@ export interface ConnectState {
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 
-export async function readConnectState(): Promise<ConnectState | null> {
+export async function readConnectState(dir = connectDir()): Promise<ConnectState | null> {
   try {
-    const s = JSON.parse(await fsp.readFile(path.join(connectDir(), 'state.json'), 'utf8')) as ConnectState
+    const s = JSON.parse(await fsp.readFile(path.join(dir, 'state.json'), 'utf8')) as ConnectState
     if (s?.v !== 2) return null
     if (s.statusLine !== null && !(isObj(s.statusLine) && isObj(s.statusLine.original) && typeof s.statusLine.original.present === 'boolean')) return null
     if (s.hooks !== null && !(isObj(s.hooks) && typeof s.hooks.hooksKey === 'boolean' && Array.isArray(s.hooks.events))) return null

@@ -3,7 +3,7 @@ import fsp from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { LAUNCH_AGENT_LABEL, LOGIN_ARG, autostartEntry, launchAgent, unstablePath } from './menubar/loginFiles'
-import { configDir, installKind, isCustomConfigDir, isInside } from './paths'
+import { installKind, isInside, launchEnv } from './paths'
 import { demoMode } from './demo'
 
 /**
@@ -33,7 +33,8 @@ function command(): string[] | null {
   return [exe, ...(noSandbox ? ['--no-sandbox'] : []), ...(loadsItself ? [] : [appPath]), LOGIN_ARG]
 }
 
-const env = (): Record<string, string> => (isCustomConfigDir() ? { CLAUDE_CONFIG_DIR: configDir() } : {})
+// the folder it was started on, not the profile open now: at login it reopens the last profile by itself
+const env = launchEnv
 
 function file(): string {
   if (MAC) return path.join(os.homedir(), 'Library', 'LaunchAgents', `${LAUNCH_AGENT_LABEL}.plist`)

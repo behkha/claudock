@@ -1,11 +1,10 @@
 import { BrowserWindow, Menu, Tray, app, nativeImage, nativeTheme, screen, type NativeImage } from 'electron'
-import type { LimitsState } from '@shared/api/limits'
 import type { MenubarState } from '@shared/api/menubar'
-import type { SessionsState } from '@shared/api/sessions'
+import type { Glance as Profiles } from '@shared/api/profiles'
 import { isPaused } from './connect/sessionModel'
 import { postAlert } from './alerts'
-import { currentLimits, onLimitsChanged } from './domains/limits'
-import { alertPrefs, currentAlertPrefs, currentSessions, onSessionsChanged, setAlertPrefs } from './domains/sessions'
+import { currentGlance, onGlanceChanged } from './domains/profiles'
+import { alertPrefs, currentAlertPrefs, setAlertPrefs } from './domains/sessions'
 import { emit } from './ipcx'
 import { isOpenAtLogin, loginItemAvailable, openedAtLogin, setOpenAtLogin } from './loginItem'
 import { glance, type Glance } from './menubar/glance'
@@ -45,10 +44,11 @@ let tray: Tray | null = null
 let pop: BrowserWindow | null = null
 let hiddenAt = 0
 let contentHeight = 360
-let limits: LimitsState | undefined
-let sessions: SessionsState | undefined
+/** Every profile's limits and sessions (src/main/domains/profiles.ts). */
+let profiles: Profiles | undefined
 let last: Glance | null = null
-const rule = new LimitAlertRule()
+/** One limit alert rule per profile: each account has its own windows. */
+const rules = new Map<string, LimitAlertRule>()
 
 const noop = (): void => undefined
 
@@ -67,7 +67,10 @@ function image(kind: Glance['icon']): NativeImage {
 }
 
 function render(force = false): void {
-  const g = glance(limits, sessions, Date.now())
+  const open = profiles?.profiles.find((p) => p.open)
+  const anyHooks = profiles?.profiles.some((p) => p.hooks === 'on') ?? false
+  const sessions = profiles ? { hooks: anyHooks ? ('on' as const) : ('off' as const), sessions: profiles.sessions, waiting: profiles.waiting } : undefined
+  const g = glance(open?.limits, sessions, Date.now(), profiles?.profiles ?? [])
   const prev = last
   last = g
   if (tray) {
@@ -189,9 +192,19 @@ function toggle(): void {
 /* ------------------------------------------------------------------ limit alerts */
 
 function checkLimits(): void {
+  if (!profiles) return
   const prefs = currentAlertPrefs()
-  const live = limits?.step === 'on' ? limits.live : null
-  for (const a of rule.update(live, prefs, Date.now())) postAlert(a, { sound: prefs.sound, onClick: () => showMainWindow() })
+  const several = profiles.profiles.length > 1
+  for (const id of rules.keys()) if (!profiles.profiles.some((p) => p.id === id)) rules.delete(id)
+  for (const p of profiles.profiles) {
+    let rule = rules.get(p.id)
+    if (!rule) rules.set(p.id, (rule = new LimitAlertRule()))
+    const live = p.limits.step === 'on' ? p.limits.live : null
+    for (const a of rule.update(live, prefs, Date.now())) {
+      // with several profiles the alert says whose limit it is: "Work: 5-hour limit at 80%"
+      postAlert(several ? { ...a, title: `${p.name}: ${a.title}` } : a, { sound: prefs.sound, onClick: () => showMainWindow() })
+    }
+  }
 }
 
 /* ------------------------------------------------------------------ state */
@@ -264,24 +277,13 @@ export async function startMenuBar(): Promise<void> {
   shown = (await loadPrefs()).menuBar
   // the limit rule reads the alert settings on every tick
   await alertPrefs()
-  onSessionsChanged((s) => {
-    sessions = s
-    render()
-  })
-  onLimitsChanged((l) => {
-    limits = l
+  const update = (g: Profiles): void => {
+    profiles = g
     render()
     checkLimits()
-  })
-  void currentSessions().then((s) => {
-    sessions = s
-    render()
-  }, noop)
-  void currentLimits().then((l) => {
-    limits = l
-    render()
-    checkLimits()
-  }, noop)
+  }
+  onGlanceChanged(update)
+  void currentGlance().then(update, noop)
   setInterval(() => {
     render()
     checkLimits()

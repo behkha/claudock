@@ -15,15 +15,16 @@ Design source of truth: the "Claudock design options" canvas, Option A (three-pa
 
 ## Folder resolution (main process)
 
-- Config dir: `process.env.CLAUDE_CONFIG_DIR` if set, else `path.join(os.homedir(), '.claude')`. This is the same rule Claude Code uses, so it works on all three OSes.
-- Global state file: `$CLAUDE_CONFIG_DIR/.claude.json` when the env var is set, else `~/.claude.json`.
+- Launch folder: `process.env.CLAUDE_CONFIG_DIR` if set, else `path.join(os.homedir(), '.claude')`. This is the same rule Claude Code uses, so it works on all three OSes.
+- Config dir: the folder of the profile open in the window (see Profiles), which is the launch folder until another profile is opened. Every domain reads it through `configDir()`.
+- Global state file: `.claude.json` inside the config dir, except for `~/.claude` started without the env var, which uses `~/.claude.json` (as Claude Code does).
 - Always use `path.join` / `path.sep`. Never hard-code `/`.
 
 ## Safety rules (non-negotiable)
 
 1. **Never read, display, copy or back up `.credentials.json`** or any `*.key` file under `sessions/`. Show them only as a locked row ("Credentials — hidden").
 2. **Every write goes through `safeWrite()`** in the main process: snapshot the current file into the snapshot store, write to a temp file in the same folder, then `rename` over the target (atomic). JSON files are validated before writing and keep 2-space indentation and a trailing newline.
-3. **Snapshot store**: `<app userData>/snapshots/<ISO timestamp>/<path relative to config dir>`, plus a `manifest.json` per snapshot (`{ at, reason, files: [rel paths] }`). Snapshots never go into `~/.claude` itself.
+3. **Snapshot store**: `<app userData>/snapshots/<ISO timestamp>/<path relative to config dir>`, plus a `manifest.json` per snapshot (`{ at, reason, files: [rel paths], dir }`, `dir` being the config folder it was taken in). Backups lists only the open profile's snapshots (those without `dir`, from before profiles, belong to the launch folder Claudock had when profiles first loaded), and a restore never crosses profiles. Snapshots never go into `~/.claude` itself.
 4. **Deletes go to the OS Trash** via `shell.trashItem`, never `fs.rm`.
 5. **`.claude.json` is written by Claude Code constantly.** Re-read it immediately before writing, change only the key being edited (e.g. `mcpServers`), and write atomically.
 6. **The renderer has no Node access.** `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`. On Linux systems that block Chromium's OS sandbox for unpackaged apps (Ubuntu 24.04), `npx claudock` and the AppImage start with `--no-sandbox`, like electron-builder's AppImage launcher; the `.deb` keeps it. Every file path coming from the renderer is resolved and checked to be inside the config dir (or the global state file) before use.
@@ -48,8 +49,10 @@ src/
       today.ts overview.ts storage.ts backups.ts settings.ts rules.ts hooks.ts
       permissions.ts skills.ts agents.ts commands.ts plugins.ts mods.ts mcp.ts
       projects.ts memory.ts plans.ts history.ts search.ts system.ts
-      limits.ts sessions.ts connect.ts   (live limits, "needs me" sessions, Connect to Claude Code)
+      limits.ts sessions.ts connect.ts   (live limits, "needs me" sessions, Connect to Claude Code; per profile folder)
       menubar.ts       (what the popover asks of the menu bar)
+      profiles.ts      (profiles: which folder the window shows, every profile's glance for the menu bar)
+    profiles/        pure parts of profiles (names, the start command), unit-tested
     connect/         pure parts of Connect (hook script, settings merge, session model, alert rule), unit-tested
     demo/            `--demo`: the synthetic config (fixture.ts, also `npm run fixture`) built in its own data folder
     domains/index.ts registers all of them (already lists every domain)
@@ -62,7 +65,7 @@ src/
     popover/         the menu bar popover (popover.html, a second page)
     lib/api.ts       typed `window.claudock` accessor + `useQuery`-style hook
 scripts/
-  make-fixture.mjs   builds ./.fixture/claude from src/main/demo/fixture.ts
+  make-fixture.mjs   builds ./.fixture/claude and ./.fixture/claude-work from src/main/demo/fixture.ts and workFixture.ts
   shot.mjs           launches the app on the fixture and saves a PNG per screen to ./.shots
 ```
 
@@ -103,9 +106,13 @@ Layout for every list-type screen: sidebar (220–240px) · list pane (300–360
 
 The first launch shows the user's own Claude Code numbers in the whole window under the title bar, in place of the sidebar and the screen: "Your Claude Code since <month>", the 26-week heat map, then messages (or prompts), sessions, longest session and top model, from the same stats as Share stats. The heat map fills in week by week and the numbers count up, 1.2 s in all and once (nothing moves under Reduce Motion); the buttons work from the start. Connect to Claude Code opens the card's Connect sheet, Not now shows the window as usual (Today), Share opens the Share stats dialog. On Windows, where Connect doesn't run yet, the one button is Continue. With no recorded sessions the heat map stays empty and "No sessions yet" replaces the numbers. It shows once, to anyone with neither Connect part on; leaving it any way (a button, a navigation from ⌘K or the menu bar, or an error in it) sets `revealed` in prefs.json, and it never comes back.
 
+## Profiles
+
+A profile is a Claude Code config folder (what `CLAUDE_CONFIG_DIR` names) shown under a name; Claudock never reads or swaps the logins inside one. The launch folder is always a profile. The title bar's folder is the switcher: its menu lists every profile (name, folder, its higher limit or today's tokens, a clay dot while one of its sessions waits), the command that starts Claude Code on the open one (`CLAUDE_CONFIG_DIR=~/.claude-work claude`, or `claude` for `~/.claude`) with Copy, and Add profile…; right-click a profile to rename it, show its folder or remove it (forget it, never delete the folder; not the open one or the launch folder). The profile's name shows in the title bar once there are several. Add profile lists the Claude Code folders found beside the launch folder (`~/.claude-*`), New folder (an empty `~/.claude-<name>`; Claude Code asks to log in the first time it runs there) and Choose folder… (the system picker, hidden folders shown), with a name filled in from the folder. Opening a profile reloads every screen on its folder (asking first about unsaved edits). Each profile connects to Claude Code on its own. Started with `CLAUDE_CONFIG_DIR`, Claudock opens that folder; otherwise the profile open last.
+
 ## Menu bar
 
-On by default on macOS and Linux, off on Windows until Connect works there (View › Show in Menu Bar / Show in Tray; Open at Login is there too). The item shows the Claudock mark and the higher of the 5-hour and weekly percentages, only when Claude Code reported them and the window hasn't reset; while a session waits, the mark turns clay with a dot. Clicking it opens a 320px popover: sessions (waiting first), both limits, today's tokens, "Search sessions" (opens the window with ⌘K), Pause 1 h, a gear for the settings view (reminder, done alert, limit alert %, limit reset alert, sound, Open at login, Show in menu bar, Quit) and Open Claudock. Right-click gives a native menu (Open Claudock, Pause, Quit). With the item shown, closing the window keeps Claudock running on macOS (the Dock icon goes with the window) and Windows; Linux quits as before, since many desktops show no tray and Electron can't tell.
+On by default on macOS and Linux, off on Windows until Connect works there (View › Show in Menu Bar / Show in Tray; Open at Login is there too). The item shows the Claudock mark and the higher of the 5-hour and weekly percentages, only when Claude Code reported them and the window hasn't reset; while a session waits, the mark turns clay with a dot. With several profiles the number is the open profile's, the clay mark lights for a session waiting in any profile, and limit alerts name the profile. Clicking it opens a 320px popover: sessions (waiting first; every profile's, each naming its profile when there are several), both limits (the open profile's), one line per other profile (its limits or today's tokens; clicking it opens that profile in the window), today's tokens, "Search sessions" (opens the window with ⌘K), Pause 1 h, a gear for the settings view (reminder, done alert, limit alert %, limit reset alert, sound, Open at login, Show in menu bar, Quit) and Open Claudock. Right-click gives a native menu (Open Claudock, Pause, Quit). With the item shown, closing the window keeps Claudock running on macOS (the Dock icon goes with the window) and Windows; Linux quits as before, since many desktops show no tray and Electron can't tell.
 
 Scanning 8+ GB must not block the UI: size scans run async in the main process with a concurrency limit, stream progress, and cache results by path + mtime.
 

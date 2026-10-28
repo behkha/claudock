@@ -4,10 +4,10 @@ import fsp from 'node:fs/promises'
 import path from 'node:path'
 import type { LimitHits, LimitWindow, LimitsApi, LimitsState, LiveLimits, TokenWindow, TokenWindows } from '@shared/api/limits'
 import { quotaHit } from '@shared/limits'
-import { connectDir, readConnectState, writeOwn, type ConnectState } from '../connect/folder'
+import { connectDir, connectDirFor, folderKey, readConnectState, writeOwn, type ConnectState } from '../connect/folder'
 import { shQuote } from '../connect/hookScript'
 import { defineDomain, emit } from '../ipcx'
-import { configDir } from '../paths'
+import { configDir, onConfigDirChanged, openConfigDir, samePath } from '../paths'
 import type { UsageFile } from '../today/activity'
 import { isObj, readSettings } from './extendShared'
 
@@ -25,13 +25,13 @@ const WIN = process.platform === 'win32'
 const SCRIPT = 'statusline.sh'
 const LIVE = 'limits.json'
 
-/** The statusLine.command while the step is on. */
-export function stepCommand(): string {
-  return `sh ${shQuote(path.join(connectDir(), SCRIPT))}`
+/** The statusLine.command while the step is on. `conn`: a profile's connect folder (the open one by default). */
+export function stepCommand(conn = connectDir()): string {
+  return `sh ${shQuote(path.join(conn, SCRIPT))}`
 }
 
 /** settings.json's statusLine runs the step. */
-export const isStepOn = (statusLine: unknown): boolean => isObj(statusLine) && statusLine.command === stepCommand()
+export const isStepOn = (statusLine: unknown, conn = connectDir()): boolean => isObj(statusLine) && statusLine.command === stepCommand(conn)
 
 /* ------------------------------------------------------------------ the status line step */
 
@@ -89,12 +89,12 @@ END {
 }`
 
 /** The step's script. `original` is the previous statusLine.command, run with the same stdin, cwd and env. */
-export function stepScript(original: string | null): string {
+export function stepScript(original: string | null, conn = connectDir()): string {
   return [
     '#!/bin/sh',
     '# Claudock live limits. Claude Code runs this as your status line: it saves the rate_limits it receives into',
     '# this folder, then runs the status line you had before. Disconnect in Claudock to put that back.',
-    `dir=${shQuote(connectDir())}`,
+    `dir=${shQuote(conn)}`,
     `cmd=${shQuote(original ?? '')}`,
     'in="$dir/.in.$$"',
     `trap 'rm -f "$in" "$dir/.limits.$$"; exit 143' HUP INT TERM`,
@@ -151,12 +151,13 @@ export async function retireStepFiles(): Promise<void> {
 }
 
 /** The script is regenerated from state.json if it went missing while settings.json still points at it. */
-async function ensureScript(): Promise<void> {
+async function ensureScript(dir: string): Promise<void> {
   if (WIN) return
-  const st = await readConnectState()
-  if (!st?.statusLine || fs.existsSync(path.join(connectDir(), SCRIPT))) return
-  if (!isStepOn((await readSettings()).data.statusLine)) return
-  await writeOwn(SCRIPT, stepScript(commandOf(st)), 0o755)
+  const conn = connectDirFor(dir)
+  const st = await readConnectState(conn)
+  if (!st?.statusLine || fs.existsSync(path.join(conn, SCRIPT))) return
+  if (!isStepOn((await readSettings(dir)).data.statusLine, conn)) return
+  await writeOwn(SCRIPT, stepScript(commandOf(st), conn), 0o755, conn)
 }
 
 /* ------------------------------------------------------------------ live limits (from the step) */
@@ -169,9 +170,9 @@ function windowOf(v: unknown): LimitWindow | null {
   return { usedPercentage: p, resetsAt: r * 1000 }
 }
 
-async function readLive(): Promise<LiveLimits | null> {
+async function readLive(conn: string): Promise<LiveLimits | null> {
   try {
-    const o = JSON.parse(await fsp.readFile(path.join(connectDir(), LIVE), 'utf8')) as unknown
+    const o = JSON.parse(await fsp.readFile(path.join(conn, LIVE), 'utf8')) as unknown
     if (!isObj(o) || o.v !== 1 || typeof o.at !== 'number' || !isObj(o.rate_limits)) return null
     const fiveHour = windowOf(o.rate_limits.five_hour)
     const sevenDay = windowOf(o.rate_limits.seven_day)
@@ -204,7 +205,19 @@ interface FileScan {
   hits: LimitHits
 }
 
-const scans = new Map<string, FileScan>()
+/** One profile's transcripts, read incrementally: the open profile's for Today, every profile's for the menu bar. */
+interface Scanned {
+  files: Map<string, FileScan>
+  scanning: Promise<void> | null
+  at: number
+}
+const scanned = new Map<string, Scanned>()
+const scansOf = (dir: string): Scanned => {
+  const k = folderKey(dir)
+  let s = scanned.get(k)
+  if (!s) scanned.set(k, (s = { files: new Map(), scanning: null, at: 0 }))
+  return s
+}
 const CHUNK = 1024 * 1024
 const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0)
 
@@ -273,8 +286,8 @@ async function readFrom(abs: string, from: number, to: number, cutoff: number, s
 }
 
 /** Transcripts changed since `cutoff`: projects/<p>/*.jsonl and projects/<p>/<session>/subagents/*.jsonl. */
-async function recentTranscripts(cutoff: number): Promise<{ abs: string; size: number; mtimeMs: number }[]> {
-  const root = path.join(configDir(), 'projects')
+async function recentTranscripts(dir: string, cutoff: number): Promise<{ abs: string; size: number; mtimeMs: number }[]> {
+  const root = path.join(dir, 'projects')
   const out: { abs: string; size: number; mtimeMs: number }[] = []
   const add = async (abs: string): Promise<void> => {
     const st = await fsp.stat(abs).catch(() => null)
@@ -298,9 +311,9 @@ async function recentTranscripts(cutoff: number): Promise<{ abs: string; size: n
   return out
 }
 
-async function scanTranscripts(now: number): Promise<void> {
+async function scanTranscripts(dir: string, scans: Map<string, FileScan>, now: number): Promise<void> {
   const cutoff = now - 7 * DAY
-  const files = await recentTranscripts(cutoff)
+  const files = await recentTranscripts(dir, cutoff)
   const live = new Set(files.map((f) => f.abs))
   for (const k of scans.keys()) if (!live.has(k)) scans.delete(k)
   for (const f of files) {
@@ -320,7 +333,7 @@ async function scanTranscripts(now: number): Promise<void> {
   for (const s of scans.values()) if (s.entries.length && s.entries[0].t < cutoff) s.entries = s.entries.filter((e) => e.t >= cutoff)
 }
 
-function tokenWindows(now: number): TokenWindows {
+function tokenWindows(scans: Map<string, FileScan>, now: number): TokenWindows {
   const midnight = new Date(now)
   midnight.setHours(0, 0, 0, 0)
   const starts = { fiveHour: now - 5 * HOUR, today: midnight.getTime(), sevenDay: now - 7 * DAY }
@@ -345,26 +358,17 @@ function tokenWindows(now: number): TokenWindows {
   return { fiveHour: out('fiveHour'), today: out('today'), sevenDay: out('sevenDay') }
 }
 
-let scanning: Promise<void> | null = null
-let scannedAt = 0
-let scannedDir = ''
-
 /** Scans are incremental and shared: callers within 5 s reuse the last one. */
-async function currentTokens(): Promise<TokenWindows> {
-  const now = Date.now()
-  if (scannedDir !== configDir()) {
-    scans.clear()
-    scannedDir = configDir()
-    scannedAt = 0
-  }
-  if (now - scannedAt > 5000) {
-    scanning ??= scanTranscripts(now).finally(() => {
-      scannedAt = Date.now()
-      scanning = null
+async function scan(dir: string): Promise<Map<string, FileScan>> {
+  const s = scansOf(dir)
+  if (Date.now() - s.at > 5000) {
+    s.scanning ??= scanTranscripts(dir, s.files, Date.now()).finally(() => {
+      s.at = Date.now()
+      s.scanning = null
     })
-    await scanning
+    await s.scanning
   }
-  return tokenWindows(Date.now())
+  return s.files
 }
 
 /**
@@ -372,7 +376,7 @@ async function currentTokens(): Promise<TokenWindows> {
  * session each file belongs to (a subagent's file sits in its session's folder), its folder and its token lines.
  */
 export async function transcriptUsage(): Promise<UsageFile[]> {
-  await currentTokens()
+  const scans = await scan(configDir())
   const root = path.join(configDir(), 'projects')
   const out: UsageFile[] = []
   for (const [abs, s] of scans) {
@@ -386,7 +390,7 @@ export async function transcriptUsage(): Promise<UsageFile[]> {
 /* ------------------------------------------------------------------ state, watching, events */
 
 /** The newest reached limit per window across the scanned transcripts, while its window hasn't reset. */
-function currentHits(now: number): LimitHits {
+function currentHits(scans: Map<string, FileScan>, now: number): LimitHits {
   const out: LimitHits = { fiveHour: null, sevenDay: null }
   for (const s of scans.values())
     for (const k of ['fiveHour', 'sevenDay'] as const) {
@@ -396,14 +400,20 @@ function currentHits(now: number): LimitHits {
   return out
 }
 
-/** Everything the limits card and the menu bar glance show. */
-export async function currentLimits(): Promise<LimitsState> {
-  const tokens = await currentTokens()
-  const hits = currentHits(Date.now())
+/** Everything the limits card and the menu bar glance show, for one profile's folder. */
+export async function limitsIn(dir: string): Promise<LimitsState> {
+  const scans = await scan(dir)
+  const now = Date.now()
+  const tokens = tokenWindows(scans, now)
+  const hits = currentHits(scans, now)
   if (WIN) return { step: 'unsupported', live: null, tokens, hits }
-  const on = isStepOn((await readSettings()).data.statusLine)
-  return { step: on ? 'on' : 'off', live: on ? await readLive() : null, tokens, hits }
+  const conn = connectDirFor(dir)
+  const on = isStepOn((await readSettings(dir)).data.statusLine, conn)
+  return { step: on ? 'on' : 'off', live: on ? await readLive(conn) : null, tokens, hits }
 }
+
+/** The open profile's limits. */
+export const currentLimits = (): Promise<LimitsState> => limitsIn(configDir())
 
 /** The statusLine command to show people: their own one while the step wraps it, else what settings.json says. */
 export async function displayedStatusLine(statusLine: unknown): Promise<string | null> {
@@ -412,40 +422,76 @@ export async function displayedStatusLine(statusLine: unknown): Promise<string |
   return commandOf(await readConnectState())
 }
 
-type Listener = (s: LimitsState) => void
+type Listener = (dir: string) => void
 const listeners = new Set<Listener>()
 
-/** For main-process surfaces (the menu bar glance). Returns the unsubscribe function. */
+/** For main-process surfaces (the menu bar glance): a profile's limits changed. Returns the unsubscribe function. */
 export function onLimitsChanged(cb: Listener): () => void {
   listeners.add(cb)
   return () => listeners.delete(cb)
 }
 
-let notifyTimer: NodeJS.Timeout | null = null
-function notifySoon(): void {
-  if (notifyTimer) clearTimeout(notifyTimer)
-  notifyTimer = setTimeout(() => {
-    notifyTimer = null
-    void currentLimits().then((s) => {
-      emit('limits:changed', s)
-      for (const l of listeners) l(s)
-    }, () => undefined)
-  }, 250)
+const notifyTimers = new Map<string, NodeJS.Timeout>()
+function notifySoon(dir: string): void {
+  const k = folderKey(dir)
+  clearTimeout(notifyTimers.get(k))
+  notifyTimers.set(
+    k,
+    setTimeout(() => {
+      notifyTimers.delete(k)
+      // checked again after the read: a quick switch away and back sends only the folder still open
+      if (samePath(dir, openConfigDir())) void limitsIn(dir).then((s) => samePath(dir, openConfigDir()) && emit('limits:changed', s), () => undefined)
+      for (const l of listeners) l(dir)
+    }, 250)
+  )
 }
 
-let watcher: fs.FSWatcher | null = null
-function watch(on: boolean): void {
-  watcher?.close()
-  watcher = null
+/** A watcher on each profile's connect folder whose step is on, for the limits.json the status line step writes. */
+const watchers = new Map<string, { dir: string; w: fs.FSWatcher | null }>()
+
+function watch(dir: string, on: boolean): void {
+  const k = folderKey(dir)
+  const had = watchers.get(k)
+  had?.w?.close()
+  watchers.delete(k)
   if (!on) return
+  const entry: { dir: string; w: fs.FSWatcher | null } = { dir, w: null }
+  watchers.set(k, entry)
   try {
-    watcher = fs.watch(connectDir(), (_ev, name) => {
-      if (name === null || name === LIVE) notifySoon()
+    entry.w = fs.watch(connectDirFor(dir), (_ev, name) => {
+      if (name === null || name === LIVE) notifySoon(dir)
     })
-    watcher.on('error', () => watch(false))
+    entry.w.on('error', () => {
+      entry.w?.close()
+      entry.w = null
+    })
   } catch {
     /* folder missing: nothing to watch */
   }
+}
+
+/** Start watching a profile's folder if its step is on (making sure its script is there). */
+async function follow(dir: string): Promise<void> {
+  if (WIN) return
+  const { data } = await readSettings(dir)
+  const on = isStepOn(data.statusLine, connectDirFor(dir))
+  if (on) await ensureScript(dir).catch(() => undefined)
+  watch(dir, on)
+}
+
+/**
+ * The profiles the menu bar reads (src/main/domains/profiles.ts). Folders no longer listed stop being watched and their scans
+ * are dropped, except the open one's.
+ */
+export function watchLimitFolders(dirs: string[]): void {
+  const keep = new Set([...dirs, openConfigDir()].map(folderKey))
+  for (const [k, e] of watchers) {
+    if (keep.has(k)) continue
+    e.w?.close()
+    watchers.delete(k)
+  }
+  for (const k of scanned.keys()) if (!keep.has(k)) scanned.delete(k)
+  for (const d of dirs) if (!watchers.has(folderKey(d))) void follow(d).catch(() => undefined)
 }
 
 /* ------------------------------------------------------------------ after Connect or Disconnect */
@@ -456,19 +502,20 @@ export function wrappable(statusLine: unknown): statusLine is undefined | { comm
   return isObj(statusLine) && (statusLine.type === undefined || statusLine.type === 'command') && typeof statusLine.command === 'string'
 }
 
-/** Watch for new limits while the step is on, and tell every surface the step changed. */
+/** Watch for new limits while the open profile's step is on, and tell every surface the step changed. */
 export function stepChanged(on: boolean): void {
-  watch(on)
-  notifySoon()
+  watch(configDir(), on)
+  notifySoon(configDir())
 }
 
 export function register(ipcMain: IpcMain): void {
   const impl: LimitsApi = { get: currentLimits }
   defineDomain(ipcMain, 'limits', impl)
-  if (WIN) return
-  void readSettings().then(async ({ data }) => {
-    const on = isStepOn(data.statusLine)
-    if (on) await ensureScript()
-    watch(on)
-  }, () => undefined)
+  // another profile opened: the window gets its limits
+  onConfigDirChanged(() => {
+    const dir = openConfigDir()
+    if (!watchers.has(folderKey(dir))) void follow(dir).catch(() => undefined)
+    notifySoon(dir)
+  })
+  void follow(configDir()).catch(() => undefined)
 }

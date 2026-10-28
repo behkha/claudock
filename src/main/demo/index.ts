@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { buildFixture } from './fixture'
+import { buildWorkFixture } from './workFixture'
 
 /**
  * `--demo` (`npx claudock --demo`): Claudock on a made-up config, for filming without showing real projects. It runs as
@@ -18,4 +19,8 @@ export function startDemo(userData: string): void {
   process.env.CLAUDE_CONFIG_DIR = dir
   fs.rmSync(dir, { recursive: true, force: true })
   buildFixture(dir)
+  // a second account beside it, for filming profiles: Add profile finds it there
+  const work = path.join(userData, 'claude-work')
+  fs.rmSync(work, { recursive: true, force: true })
+  buildWorkFixture(work)
 }

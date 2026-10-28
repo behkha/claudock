@@ -55,6 +55,9 @@ export function buildFixture(dir: string): void {
     if (mtime) fs.utimesSync(p, new Date(mtime), new Date(mtime))
   }
 
+  // a synthetic folder: a development build may write here and make new profile folders beside it (src/main/paths.ts)
+  w('.claudock-fixture', '')
+
   /* ------------------------------------------------------------------ settings */
   const marketplace = 'fixture-market'
   w(

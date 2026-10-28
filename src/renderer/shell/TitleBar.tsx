@@ -7,6 +7,7 @@ import { api, isMac, useApi } from '@/lib/api'
 import { onRefreshCounts } from '@/lib/counts'
 import { useNav } from '@/lib/nav'
 import { useThemePref } from '@/lib/theme'
+import { ProfileMenu } from './ProfileMenu'
 
 const THEME_ICON: Record<ThemePref, JSX.Element> = { system: <Monitor aria-hidden />, light: <Sun aria-hidden />, dark: <Moon aria-hidden /> }
 const THEME_LABEL: Record<ThemePref, string> = { system: 'System', light: 'Light', dark: 'Dark' }
@@ -36,9 +37,8 @@ export function TitleBar(): JSX.Element {
   return (
     <header className={mac ? 'titlebar titlebar--mac' : 'titlebar'}>
       <span className="titlebar__name">Claudock</span>
-      <span className="titlebar__path selectable" title={info.data ? dir : undefined}>
-        {dir} · {sizeText}
-      </span>
+      <ProfileMenu dir={info.data?.configDir ?? dir} home={info.data?.home ?? ''} size={sizeText} />
+      <span className="titlebar__grow" />
       <button type="button" className="titlebar__search" onClick={() => setPaletteOpen(true)} aria-label="Search (command palette)" aria-keyshortcuts={mac ? 'Meta+K' : 'Control+K'}>
         <Search size={15} strokeWidth={1.8} aria-hidden />
         <span className="titlebar__search-text">Search skills, rules, sessions…</span>

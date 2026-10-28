@@ -10,6 +10,7 @@ import { menuBarShown, onMenuBarChanged, openedAtLogin, startMenuBar } from './m
 import { installKind } from './paths'
 import { createMainWindow, mainWindow, showMainWindow } from './windows'
 import { DEMO_APP_DATA_NAME, demoMode, startDemo } from './demo'
+import { loadProfiles } from './domains/profiles'
 import icon from '../../resources/icon.png?asset'
 
 // Keep app data separate from the Electron default and from other apps. CLAUDOCK_USER_DATA lets tests/screenshots isolate it.
@@ -56,6 +57,8 @@ void app.whenReady().then(async () => {
     cb({ responseHeaders: headers })
   })
   await initTheme()
+  // the profile to open, before any domain reads the config folder
+  await loadProfiles()
   registerAll(ipcMain)
   startSettingsDocsFetch()
   onThemeChanged(buildMenu)

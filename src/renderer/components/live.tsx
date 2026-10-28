@@ -33,6 +33,8 @@ export function SessionRow({ s, now }: { s: LiveSession; now: number }): JSX.Ele
   const show = (): void => void api.sessions.show(s.id).catch((e: Error) => toast(e.message, { kind: 'error' }))
   const what = s.status === 'waiting' ? waitText(s) : s.status === 'working' && s.activity ? `${activityText(s.activity.tool)} ${ago(now - s.activity.at)}` : null
   const label = s.title ?? s.name
+  // beside the title: the profile (when the list holds several) and the folder
+  const where = [s.profile, s.title ? s.name : null].filter(Boolean).join(' · ')
   return (
     <li>
       <button
@@ -40,12 +42,12 @@ export function SessionRow({ s, now }: { s: LiveSession; now: number }): JSX.Ele
         className={cx('cc__row', `cc__row--${s.status}`)}
         onClick={show}
         title={s.cwd ?? undefined}
-        aria-label={`${label}${s.title ? ` in ${s.name}` : ''}, ${s.status === 'waiting' ? `waiting ${waited(now - s.since)}` : s.status}${what ? `: ${what}` : ''}`}
+        aria-label={`${label}${where ? ` in ${where}` : ''}, ${s.status === 'waiting' ? `waiting ${waited(now - s.since)}` : s.status}${what ? `: ${what}` : ''}`}
       >
         <span className="cc__dot" aria-hidden />
         <span className="cc__name">
           {label}
-          {s.title ? <span className="cc__folder">{s.name}</span> : null}
+          {where ? <span className="cc__folder">{where}</span> : null}
         </span>
         <span className="cc__when">{s.status === 'waiting' ? waited(now - s.since) : s.status}</span>
         {what ? <span className="cc__what">{what}</span> : null}

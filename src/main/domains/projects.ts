@@ -343,9 +343,9 @@ const transcriptDirs = new Map<string, string>()
 
 /**
  * A session's transcript: `projects/<cwd with every other character as ->/<id>.jsonl`, as Claude Code names it, else
- * the project folder that holds `<id>.jsonl`. Null when there is none (yet).
+ * the project folder that holds `<id>.jsonl`. Null when there is none (yet). `root`: another profile's projects folder.
  */
-export async function findTranscript(id: string, cwd: string | null): Promise<string | null> {
+export async function findTranscript(id: string, cwd: string | null, root = projectsDir()): Promise<string | null> {
   let sid: string
   try {
     sid = sessionFileId(id)
@@ -355,13 +355,13 @@ export async function findTranscript(id: string, cwd: string | null): Promise<st
   const known = transcriptDirs.get(sid)
   const guesses = [known, cwd ? cwd.replace(/[^A-Za-z0-9]/g, '-') : undefined].filter((d): d is string => !!d && SAFE_NAME.test(d))
   for (const d of guesses) {
-    const abs = path.join(projectsDir(), d, `${sid}.jsonl`)
+    const abs = path.join(root, d, `${sid}.jsonl`)
     if ((await stat(abs))?.isFile) return (transcriptDirs.set(sid, d), abs)
   }
-  const dirs = await fsp.readdir(projectsDir(), { withFileTypes: true }).catch(() => [])
+  const dirs = await fsp.readdir(root, { withFileTypes: true }).catch(() => [])
   for (const d of dirs) {
     if (!d.isDirectory()) continue
-    const abs = path.join(projectsDir(), d.name, `${sid}.jsonl`)
+    const abs = path.join(root, d.name, `${sid}.jsonl`)
     if ((await stat(abs))?.isFile) return (transcriptDirs.set(sid, d.name), abs)
   }
   return null
@@ -491,13 +491,13 @@ async function buildList(): Promise<ProjectSummary[]> {
   return out
 }
 
-let listCache: { at: number; value: Promise<ProjectSummary[]> } | null = null
+let listCache: { dir: string; at: number; value: Promise<ProjectSummary[]> } | null = null
 
-/** Project list, cached for 5 s so Memory / Search / the Projects screen share one scan. */
+/** Project list, cached for 5 s so Memory / Search / the Projects screen share one scan (of the same profile). */
 export function listProjectSummaries(fresh = false): Promise<ProjectSummary[]> {
-  if (!fresh && listCache && Date.now() - listCache.at < 5000) return listCache.value
+  if (!fresh && listCache && listCache.dir === configDir() && Date.now() - listCache.at < 5000) return listCache.value
   const value = buildList()
-  listCache = { at: Date.now(), value }
+  listCache = { dir: configDir(), at: Date.now(), value }
   value.catch(() => {
     if (listCache?.value === value) listCache = null
   })

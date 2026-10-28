@@ -26,6 +26,8 @@ interface Entry {
 }
 
 interface Cache {
+  /** history.jsonl of the profile it was read from. */
+  file: string
   mtimeMs: number
   size: number
   entries: Entry[]
@@ -35,18 +37,21 @@ interface Cache {
 
 let cache: Cache | null = null
 let loading: Promise<Cache> | null = null
+let loadingFile = ''
 
 const historyFile = (): string => path.join(configDir(), 'history.jsonl')
 
 async function load(): Promise<Cache> {
   const st = await stat(historyFile())
   if (!st) {
-    cache = { mtimeMs: 0, size: 0, entries: [], byId: new Map(), projects: [] }
+    cache = { file: historyFile(), mtimeMs: 0, size: 0, entries: [], byId: new Map(), projects: [] }
     return cache
   }
-  if (cache && cache.mtimeMs === st.mtimeMs && cache.size === st.size) return cache
-  if (loading) return loading
-  loading = (async () => {
+  if (cache && cache.file === historyFile() && cache.mtimeMs === st.mtimeMs && cache.size === st.size) return cache
+  // a load of another profile's file still running doesn't answer for this one
+  if (loading && loadingFile === historyFile()) return loading
+  loadingFile = historyFile()
+  const run: Promise<Cache> = (async () => {
     const entries: Entry[] = []
     const counts = new Map<string, number>()
     try {
@@ -71,13 +76,14 @@ async function load(): Promise<Cache> {
       if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e
     }
     const projects = [...counts.entries()].map(([p, count]) => ({ path: p, count })).sort((a, b) => b.count - a.count || a.path.localeCompare(b.path))
-    const next: Cache = { mtimeMs: st.mtimeMs, size: st.size, entries, byId: new Map(entries.map((e) => [e.id, e])), projects }
+    const next: Cache = { file: historyFile(), mtimeMs: st.mtimeMs, size: st.size, entries, byId: new Map(entries.map((e) => [e.id, e])), projects }
     cache = next
     return next
   })().finally(() => {
-    loading = null
+    if (loading === run) loading = null
   })
-  return loading
+  loading = run
+  return run
 }
 
 /** Project paths mentioned in history (used by Projects / Search to name folders). */

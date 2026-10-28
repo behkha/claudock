@@ -39,6 +39,60 @@ body.pop-body {
   font-size: var(--fs-small);
   color: var(--text-2);
 }
+/* several profiles (item 42): whose meters these are, then one line per other profile */
+.pop__label {
+  margin-bottom: -6px;
+  font-size: var(--fs-caption);
+  color: var(--text-3);
+}
+.pop__others {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: var(--hair) solid var(--border);
+}
+.pop__other {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 32px;
+  padding: 0 4px;
+  border: 0;
+  border-bottom: var(--hair) solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-small);
+  text-align: left;
+}
+.pop__other:hover {
+  background: var(--hover);
+}
+.pop__other .pop__mono {
+  color: var(--text-2);
+  font-size: var(--fs-caption);
+  white-space: nowrap;
+}
+.pop__other-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pop__other-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+}
 .pop__mono {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;

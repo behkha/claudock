@@ -147,8 +147,9 @@ export interface SettingsRead {
   error?: string
 }
 
-export async function readSettings(): Promise<SettingsRead> {
-  const r = await tryReadJson<unknown>(path.join(configDir(), SETTINGS_REL))
+/** settings.json of the open profile, or of another profile's folder (the menu bar reads every profile). */
+export async function readSettings(dir = configDir()): Promise<SettingsRead> {
+  const r = await tryReadJson<unknown>(path.join(dir, SETTINGS_REL))
   if (!r.ok) return r.missing ? { data: {} } : { data: {}, error: `settings.json could not be read: ${r.error}` }
   if (!isObj(r.value)) return { data: {}, error: 'settings.json is not a JSON object' }
   return { data: r.value }

@@ -200,9 +200,15 @@ export function sessionName(cwd: string | null, id: string): string {
 }
 
 /** Sessions to show, in order: waiting (longest first), working, done (latest first). */
+const RANK: Record<SessionStatus, number> = { waiting: 0, working: 1, done: 2 }
+
+/** Waiting (longest first), then working, then done (latest first). */
+export const sortLive = (list: LiveSession[]): LiveSession[] =>
+  list.sort((a, b) => RANK[a.status] - RANK[b.status] || (a.status === 'waiting' ? a.since - b.since : b.since - a.since) || a.id.localeCompare(b.id))
+
 export function toLiveSessions(folds: readonly SessionFold[]): LiveSession[] {
-  const rank: Record<SessionStatus, number> = { waiting: 0, working: 1, done: 2 }
-  return folds
+  return sortLive(
+    folds
     .map(
       (f): LiveSession => ({
         id: f.id,
@@ -217,7 +223,7 @@ export function toLiveSessions(folds: readonly SessionFold[]): LiveSession[] {
         activity: f.status === 'working' ? f.lastTool : null
       })
     )
-    .sort((a, b) => rank[a.status] - rank[b.status] || (a.status === 'waiting' ? a.since - b.since : b.since - a.since) || a.id.localeCompare(b.id))
+  )
 }
 
 export interface Transitions {
@@ -248,7 +254,8 @@ const list = (names: string[]): string => (names.length < 2 ? names.join('') : `
 /** Title and body of one alert for one or more sessions. */
 export function alertText(sessions: readonly LiveSession[], what: 'waiting' | 'reminder' | 'done'): { title: string; body: string } {
   const one = sessions.length === 1
-  const names = sessions.map((s) => s.name)
+  // with several profiles: "Work · api"
+  const names = sessions.map((s) => (s.profile ? `${s.profile} · ${s.name}` : s.name))
   if (what === 'done') return one ? { title: `${names[0]} is done`, body: 'Claude finished' } : { title: `${sessions.length} sessions are done`, body: list(names) }
   const title = one ? `${names[0]} ${what === 'reminder' ? 'is still waiting' : 'is waiting'} for you` : `${sessions.length} sessions are ${what === 'reminder' ? 'still ' : ''}waiting for you`
   return { title, body: one ? waitText(sessions[0]) : list(names) }

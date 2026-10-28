@@ -16,6 +16,8 @@ interface NavValue {
   navigate: (screen: ScreenId, selectId?: string) => void
   paletteOpen: boolean
   setPaletteOpen: (open: boolean) => void
+  /** Runs `fn` now, or after asking when a screen has unsaved edits (opening another profile reloads every screen). */
+  whenClean: (fn: () => void) => void
 }
 
 const NavContext = createContext<NavValue | null>(null)
@@ -26,7 +28,7 @@ type Target = { screen: ScreenId; selectId?: string; seq: number }
 export function NavProvider({ children }: { children: ReactNode }): JSX.Element {
   const [state, setState] = useState<Target>({ screen: 'today', seq: 0 })
   const [paletteOpen, setPaletteOpen] = useState(false)
-  const [pending, setPending] = useState<Omit<Target, 'seq'> | null>(null)
+  const [pending, setPending] = useState<Omit<Target, 'seq'> | { run: () => void } | null>(null)
   const seqRef = useRef(0)
   const guards = useRef(new Set<{ current: boolean }>()).current
 
@@ -38,9 +40,16 @@ export function NavProvider({ children }: { children: ReactNode }): JSX.Element 
     },
     [guards]
   )
+  const whenClean = useCallback(
+    (fn: () => void) => {
+      if ([...guards].some((g) => g.current)) setPending({ run: fn })
+      else fn()
+    },
+    [guards]
+  )
   const value = useMemo<NavValue>(
-    () => ({ screen: state.screen, selectId: state.selectId, seq: state.seq, navigate, paletteOpen, setPaletteOpen }),
-    [state, navigate, paletteOpen]
+    () => ({ screen: state.screen, selectId: state.selectId, seq: state.seq, navigate, paletteOpen, setPaletteOpen, whenClean }),
+    [state, navigate, paletteOpen, whenClean]
   )
   return (
     <GuardContext.Provider value={guards}>
@@ -54,7 +63,8 @@ export function NavProvider({ children }: { children: ReactNode }): JSX.Element 
           cancelLabel="Stay"
           tone="danger"
           onConfirm={() => {
-            if (pending) setState({ ...pending, seq: ++seqRef.current })
+            if (pending && 'run' in pending) pending.run()
+            else if (pending) setState({ ...pending, seq: ++seqRef.current })
             setPending(null)
           }}
           onCancel={() => setPending(null)}

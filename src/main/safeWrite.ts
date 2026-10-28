@@ -12,6 +12,7 @@ import {
   globalStateFile,
   isSecret,
   isSecretReal,
+  legacySnapshotDir,
   resolveInside,
   samePath,
   snapshotsDir
@@ -107,7 +108,8 @@ export async function snapshot(relPaths: string[], reason: string): Promise<Snap
     return null
   }
   const info: SnapshotInfo = { id, at, reason, files: copied }
-  await fsp.writeFile(path.join(dir, 'manifest.json'), JSON.stringify({ at, reason, files: copied }, null, 2) + '\n')
+  // the folder it came from: Backups lists each profile's own, and a restore never writes into another profile
+  await fsp.writeFile(path.join(dir, 'manifest.json'), JSON.stringify({ at, reason, files: copied, dir: configDir() }, null, 2) + '\n')
   invalidateSnapshotIndex()
   return info
 }
@@ -115,7 +117,9 @@ export async function snapshot(relPaths: string[], reason: string): Promise<Snap
 /* ---- snapshot index: cached, keyed on the snapshots folder's mtime, invalidated on create / trash */
 
 const MANIFEST_CONCURRENCY = 16
-let indexCache: { mtimeMs: number; list: SnapshotInfo[] } | null = null
+/** A snapshot and the config folder it was taken in (null: taken before profiles, see `legacySnapshotDir`). */
+type Stored = SnapshotInfo & { dir: string | null }
+let indexCache: { mtimeMs: number; list: Stored[] } | null = null
 let indexGen = 0
 
 function invalidateSnapshotIndex(): void {
@@ -136,7 +140,13 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promis
   return out
 }
 
+/** The open profile's snapshots, newest first. */
 export async function listSnapshots(): Promise<SnapshotInfo[]> {
+  const here = configDir()
+  return (await allSnapshots()).filter((s) => (s.dir === null ? samePath(here, legacySnapshotDir()) : samePath(here, s.dir))).map(({ dir: _dir, ...info }) => info)
+}
+
+async function allSnapshots(): Promise<Stored[]> {
   const dirStat = await fsp.stat(snapshotsDir()).catch(() => null)
   if (!dirStat) return []
   if (indexCache && indexCache.mtimeMs === dirStat.mtimeMs) return indexCache.list
@@ -148,19 +158,20 @@ export async function listSnapshots(): Promise<SnapshotInfo[]> {
     return []
   }
   const valid = ids.filter((id) => SNAPSHOT_ID_RE.test(id))
-  const found = await mapLimit(valid, MANIFEST_CONCURRENCY, async (id): Promise<SnapshotInfo | null> => {
+  const found = await mapLimit(valid, MANIFEST_CONCURRENCY, async (id): Promise<Stored | null> => {
     try {
       const m = JSON.parse(await fsp.readFile(path.join(snapshotsDir(), id, 'manifest.json'), 'utf8')) as {
         at: string
         reason: string
         files: string[]
+        dir?: unknown
       }
-      return { id, at: m.at, reason: m.reason, files: m.files }
+      return { id, at: m.at, reason: m.reason, files: m.files, dir: typeof m.dir === 'string' && m.dir ? m.dir : null }
     } catch {
       return null /* not a snapshot folder (or still being written) */
     }
   })
-  const list = found.filter((x): x is SnapshotInfo => x !== null).sort((a, b) => b.at.localeCompare(a.at))
+  const list = found.filter((x): x is Stored => x !== null).sort((a, b) => b.at.localeCompare(a.at))
   // A folder that exists without a manifest is a snapshot being written: do not cache that state.
   if (gen === indexGen && list.length === valid.length) indexCache = { mtimeMs: dirStat.mtimeMs, list }
   return list

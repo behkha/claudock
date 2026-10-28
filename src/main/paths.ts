@@ -1,4 +1,5 @@
 import { app } from 'electron'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import fs from 'node:fs'
 import fsp from 'node:fs/promises'
 import os from 'node:os'
@@ -15,18 +16,72 @@ function envConfigDir(): string | null {
   return v || null
 }
 
-/** Config dir: CLAUDE_CONFIG_DIR if set, else ~/.claude (same rule as Claude Code). */
-export function configDir(): string {
+/** The folder Claudock was started on: CLAUDE_CONFIG_DIR if set, else ~/.claude (same rule as Claude Code). */
+export function launchConfigDir(): string {
   return path.resolve(envConfigDir() ?? path.join(os.homedir(), '.claude'))
 }
 
-export function isCustomConfigDir(): boolean {
-  return envConfigDir() !== null
+/** CLAUDE_CONFIG_DIR as Claudock was started with it, for a login item that starts it the same way. */
+export const launchEnv = (): Record<string, string> => (envConfigDir() !== null ? { CLAUDE_CONFIG_DIR: launchConfigDir() } : {})
+
+/** The folder of the profile open in the window (src/main/domains/profiles.ts); null until profiles load: the launch folder. */
+let active: string | null = null
+const dirListeners = new Set<() => void>()
+/** The folder an IPC call started on, kept for all of that call (`withConfigDir`). */
+const pinned = new AsyncLocalStorage<string>()
+
+/**
+ * Config dir: the folder the running IPC call started on, else the open profile's folder (the launch folder until
+ * another profile is opened). So a write that is under way when another profile opens finishes in its own folder.
+ */
+export function configDir(): string {
+  return pinned.getStore() ?? openConfigDir()
 }
 
-/** Global state file: $CLAUDE_CONFIG_DIR/.claude.json when the env var is set, else ~/.claude.json. */
+/** The folder open in the window right now, whatever folder the running call started on. */
+export function openConfigDir(): string {
+  return active ?? launchConfigDir()
+}
+
+/** Run `fn` (an IPC handler) on the folder open now, to the end of it, even if another profile opens meanwhile. */
+export const withConfigDir = <T>(fn: () => T): T => pinned.run(openConfigDir(), fn)
+
+/** Open another profile's folder. Modules that cache per folder clear themselves through `onConfigDirChanged`. */
+export function setConfigDir(dir: string): void {
+  const next = path.resolve(dir)
+  if (active !== null && samePath(active, next)) return
+  active = next
+  // outside any call's pinned folder: the listeners work on the folder now open
+  pinned.exit(() => {
+    for (const cb of dirListeners) cb()
+  })
+}
+
+/** The folder snapshots taken before profiles (no `dir` in their manifest) belong to: the launch folder profiles first saw. */
+let legacy: string | null = null
+export const setLegacySnapshotDir = (dir: string): void => void (legacy = path.resolve(dir))
+export const legacySnapshotDir = (): string => legacy ?? launchConfigDir()
+
+export const onConfigDirChanged = (cb: () => void): void => void dirListeners.add(cb)
+
+/**
+ * Claude Code keeps its global state in `~/.claude.json` only for `~/.claude` started without CLAUDE_CONFIG_DIR; any
+ * folder given through the env var keeps it inside. A profile on `~/.claude` is started with plain `claude`, unless it is
+ * the launch folder and the env var named it (then the app was started the way Claude Code is).
+ */
+export function usesHomeState(dir: string): boolean {
+  if (!samePath(dir, path.join(os.homedir(), '.claude'))) return false
+  return envConfigDir() === null || !samePath(dir, launchConfigDir())
+}
+
+/** The global state file lives inside the config dir (it isn't `~/.claude.json`). */
+export function isCustomConfigDir(): boolean {
+  return !usesHomeState(configDir())
+}
+
+/** Global state file: `~/.claude.json` for `~/.claude` started without the env var, else `.claude.json` inside the folder. */
 export function globalStateFile(): string {
-  return isCustomConfigDir() ? path.join(configDir(), '.claude.json') : path.join(os.homedir(), '.claude.json')
+  return usesHomeState(configDir()) ? path.join(os.homedir(), '.claude.json') : path.join(configDir(), '.claude.json')
 }
 
 /** Key used for the global state file inside snapshots and in `rel` arguments. */
@@ -58,15 +113,21 @@ function detectInstallKind(): InstallKind {
 }
 
 /**
- * Development safety (SPEC rule 7): a development build (not an installer, not from npm) refuses to write unless
- * CLAUDE_CONFIG_DIR is set (point it at ./.fixture/claude) or CLAUDOCK_ALLOW_REAL_WRITES=1 is set explicitly.
+ * Development safety (SPEC rule 7): a development build (not an installer, not from npm) refuses to write unless the open
+ * folder is the one CLAUDE_CONFIG_DIR named (point it at ./.fixture/claude) or a synthetic one (FIXTURE_MARK, like
+ * ./.fixture/claude-work), or CLAUDOCK_ALLOW_REAL_WRITES=1 is set explicitly.
  * CLAUDOCK_READONLY=1 refuses every write, however it was installed.
  */
 export function writesAllowed(): boolean {
   if (process.env.CLAUDOCK_READONLY === '1') return false
   if (installKind() !== 'dev') return true
-  return isCustomConfigDir() || process.env.CLAUDOCK_ALLOW_REAL_WRITES === '1'
+  if (process.env.CLAUDOCK_ALLOW_REAL_WRITES === '1') return true
+  // the folder CLAUDE_CONFIG_DIR named, or a synthetic profile beside it (never a real folder added as a profile)
+  return (envConfigDir() !== null && samePath(configDir(), launchConfigDir())) || fs.existsSync(path.join(configDir(), FIXTURE_MARK))
 }
+
+/** In a folder the fixture generators (or a development build's "New folder") made: a development build may write there. */
+export const FIXTURE_MARK = '.claudock-fixture'
 
 export function assertWritable(): void {
   if (!writesAllowed()) {

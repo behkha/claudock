@@ -17,7 +17,7 @@ import { driver, sleep } from './shotDrive'
 /**
  * Screenshot mode (CLAUDOCK_SHOT=1, driven by scripts/shot.mjs): visits every screen in light then dark through the
  * normal `system:navigate` / `system:theme` events, waits until each is loaded and painted in that theme, saves
- * `<dir>/<theme>-<screen>.png` (plus `connect`, the Connect sheet, `connected`, the Today card after connecting with one played status line run and three sessions played through the real hooks, which must post exactly one alert, `connected-hooks`, the Hooks screen then, where Claudock's hooks are one row and out of the counts, and `disconnect`, the confirm dialog that row's Disconnect… opens, which must leave settings.json byte for byte as it was, `palette`, `settings-json`, `mods-draft`, the Mods screen with the fixture's draft selected, and `share`, the Today share dialog, and `card.png`, the card itself, and `reveal`, `reveal-connect`, `reveal-connected` and `reveal-empty`, the first-run reveal), prints renderer console errors as `CONSOLE_ERROR ...` and failed shots as
+ * `<dir>/<theme>-<screen>.png` (plus `connect`, the Connect sheet, `connected`, the Today card after connecting with one played status line run and three sessions played through the real hooks, which must post exactly one alert, `connected-hooks`, the Hooks screen then, where Claudock's hooks are one row and out of the counts, and `disconnect`, the confirm dialog that row's Disconnect… opens, which must leave settings.json byte for byte as it was, `profiles-add`, `profiles-menu` and `profiles-menubar`, profiles with a second folder added and removed again, `palette`, `settings-json`, `mods-draft`, the Mods screen with the fixture's draft selected, and `share`, the Today share dialog, and `card.png`, the card itself, and `reveal`, `reveal-connect`, `reveal-connected` and `reveal-empty`, the first-run reveal), prints renderer console errors as `CONSOLE_ERROR ...` and failed shots as
  * `SHOT_FAILED ...`, and exits 0 (clean) or 1 (errors).
  */
 export async function runShots(win: BrowserWindow, opts: { dir: string; only: string[] }): Promise<void> {
@@ -247,6 +247,70 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
   }
 
   /**
+   * Profiles (item 42), on the fixture with `~/.claude-work` beside it: connect the default profile, one status line run
+   * and three sessions -> the title bar menu -> Add profile, the sheet with the work folder found (shot `profiles-add`)
+   * -> Add opens Work -> the menu with both profiles, Default's limit and its waiting dot (shot `profiles-menu`) -> the
+   * popover: Default's waiting session named with its profile, Work's Connect, Default as one line (shot
+   * `profiles-menubar`) -> back to Default from the menu, Disconnect, Work removed from its row's right-click menu, and
+   * settings.json byte for byte as before.
+   */
+  async function profilesFlow(theme: 'light' | 'dark'): Promise<void> {
+    const file = path.join(configDir(), 'settings.json')
+    const before = await fsp.readFile(file)
+    await click('Connect to Claude Code')
+    await waitFor(`document.querySelector('dialog[open] .diff')`, 'the Connect sheet')
+    await click('Connect', `document.querySelector('dialog[open]')`)
+    await waitFor(`!document.querySelector('dialog[open]') && [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Disconnect')`, 'the connection')
+    await js(`document.querySelectorAll('.toast__close').forEach((b) => b.click())`)
+    await playStatusLine()
+    const [a] = await playSessions(await hookSteps())
+    const toggleMenu = (): Promise<unknown> => js(`document.querySelector('.titlebar__profile').click()`)
+    await toggleMenu()
+    await click('Add profile…', `document.querySelector('.profile-menu')`)
+    await waitFor(
+      `document.querySelector('dialog[open] .add-profile__opt input:checked') && [...document.querySelectorAll('dialog[open] .add-profile__dir')].some((d) => d.textContent.endsWith('.claude-work'))`,
+      'the Add profile sheet with the work folder'
+    )
+    await shoot(theme, 'profiles-add')
+    await click('Add', `document.querySelector('dialog[open]')`)
+    await waitFor(`!document.querySelector('dialog[open]') && document.querySelector('.titlebar__profile-name')?.textContent === 'Work' && document.querySelector('.today')`, 'Work open on Today')
+    await js(`document.querySelectorAll('.toast__close').forEach((b) => b.click())`)
+    await toggleMenu()
+    await waitFor(`document.querySelectorAll('.profile-row').length === 2 && document.querySelector('.profile-row__dot') && [...document.querySelectorAll('.profile-row__end')].some((e) => e.textContent.includes('61%'))`, 'both profiles, Default waiting at 61%')
+    await shoot(theme, 'profiles-menu')
+    await toggleMenu()
+    const pop = await popoverForShots()
+    emit('menubar:opened', null)
+    await jsOn(
+      pop,
+      `(async () => {
+        const t = Date.now()
+        while (Date.now() - t < 15000) {
+          if (document.querySelector('.cc__row--waiting')?.textContent.includes(${JSON.stringify(`Default · ${path.basename(a.cwd)}`)}) && document.querySelector('.pop__other')?.textContent.includes('5-hour 42% · Weekly 61%')) return
+          await new Promise((r) => setTimeout(r, 100))
+        }
+        throw new Error('profiles: timed out waiting for the popover with both profiles')
+      })()`
+    )
+    await shoot(theme, 'profiles-menubar', pop)
+    await toggleMenu()
+    await js(`[...document.querySelectorAll('.profile-row')].find((r) => r.textContent.includes('Default'))?.click()`)
+    await waitFor(`document.querySelector('.titlebar__profile-name')?.textContent === 'Default' && [...document.querySelectorAll('.lim button')].some((b) => b.textContent.trim() === 'Disconnect')`, 'Default open again')
+    await click('Disconnect')
+    await waitFor(`document.querySelector('dialog[open] .diff')`, 'the Disconnect dialog')
+    await click('Disconnect', `document.querySelector('dialog[open]')`)
+    await waitFor(`!document.querySelector('dialog[open]') && [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Connect to Claude Code')`, 'the disconnect')
+    await js(`document.querySelectorAll('.toast__close').forEach((b) => b.click())`)
+    await toggleMenu()
+    await js(`[...document.querySelectorAll('.profile-row')].find((r) => r.textContent.includes('Work'))?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))`)
+    await click('Remove from Claudock', `document.querySelector('.profile-menu')`)
+    await waitFor(`!document.querySelector('.titlebar__profile-name')`, 'Work removed')
+    await toggleMenu()
+    await js(`document.querySelectorAll('.toast__close').forEach((b) => b.click())`)
+    if (!before.equals(await fsp.readFile(file))) throw new Error('profiles: settings.json is not byte for byte what it was before connecting')
+  }
+
+  /**
    * The first-run reveal, shown through `system:reveal` (screenshot mode never shows it on its own): the reveal with the
    * fixture's numbers once they have counted up (shot `reveal`), the Connect sheet over it (`reveal-connect`), Connect
    * -> Today with the card connected (`reveal-connected`), then Disconnect with settings.json byte for byte as before.
@@ -333,6 +397,11 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
         emit('system:navigate', { screen: 'today' })
         await sleep(150)
         await menubarFlow(theme).catch(fail)
+      }
+      if (process.platform !== 'win32' && (opts.only.length === 0 || opts.only.includes('profiles'))) {
+        emit('system:navigate', { screen: 'today' })
+        await sleep(150)
+        await profilesFlow(theme).catch(fail)
       }
       if (process.platform !== 'win32' && (opts.only.length === 0 || opts.only.includes('reveal'))) {
         emit('system:navigate', { screen: 'today' })

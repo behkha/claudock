@@ -27,6 +27,7 @@ import * as limits from './limits'
 import * as sessions from './sessions'
 import * as connect from './connect'
 import * as menubar from './menubar'
+import * as profiles from './profiles'
 
 /** Every domain. Do not edit when adding methods: just implement them in `domains/<name>.ts`. */
 export const domainModules: Record<DomainName, DomainModule> = {
@@ -53,7 +54,8 @@ export const domainModules: Record<DomainName, DomainModule> = {
   limits,
   sessions,
   connect,
-  menubar
+  menubar,
+  profiles
 }
 
 export function registerAll(ipcMain: IpcMain): void {

@@ -1,6 +1,6 @@
 /**
- * Limits domain contract: usage limits and token counts. Read by Overview now and by the menu bar glance next
- * (main can call `currentLimits()` and `onLimitsChanged()` in src/main/domains/limits.ts directly).
+ * Limits domain contract: usage limits and token counts of the open profile, for Today. The menu bar reads every
+ * profile's through `limitsIn()` in src/main/domains/limits.ts (put together by `currentGlance()` in profiles.ts).
  *
  * Three sources, each where it is true:
  *   - `tokens`: summed from the session transcripts under projects/, always available.
