@@ -1,0 +1,137 @@
+/* First-run reveal (Reveal.tsx): the whole window under the title bar, in place of the sidebar and the screen. Tokens only. */
+.reveal {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  padding: 48px 40px;
+  background: var(--bg);
+}
+.reveal__inner {
+  margin: auto;
+  width: min(880px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+.reveal__title {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: clamp(var(--fs-display), 4.6vw, 56px);
+  font-weight: 330;
+  line-height: 1.1;
+  text-wrap: balance;
+  outline: none;
+}
+
+/* 26 weekly columns of 7 days, as on the share card */
+.reveal__heat {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(7, auto);
+  grid-template-columns: repeat(26, minmax(0, 1fr));
+  gap: 4px;
+}
+.reveal__cell {
+  aspect-ratio: 1.6;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+}
+.reveal__cell--1 {
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.reveal__cell--2 {
+  background: color-mix(in srgb, var(--accent) 65%, transparent);
+}
+.reveal__cell--3 {
+  background: var(--accent);
+}
+
+.reveal__stats {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 24px;
+  padding-top: 24px;
+  border-top: var(--hair) solid var(--border);
+}
+.reveal__stat {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 2px;
+  min-width: 0;
+}
+.reveal__stat dd {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 36px;
+  font-weight: 330;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* a model id Claudock doesn't know can be long: it wraps instead of being cut off */
+.reveal__stat--text dd {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.reveal__stat dt {
+  font-size: var(--fs-small);
+  color: var(--text-2);
+}
+.reveal__none {
+  margin: 0;
+  padding-top: 24px;
+  border-top: var(--hair) solid var(--border);
+  font-size: var(--fs-body-lg);
+  color: var(--text-2);
+}
+/* the numbers' room while they load, so nothing jumps */
+.reveal__slot {
+  min-height: 90px;
+}
+.reveal__error {
+  margin: 0;
+  padding-top: 24px;
+  border-top: var(--hair) solid var(--border);
+}
+
+.reveal__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.reveal__share {
+  margin-left: auto;
+}
+
+@media (max-width: 1040px) {
+  .reveal__stat dd {
+    font-size: 30px;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .reveal__heat--in .reveal__cell {
+    animation: reveal-cell 360ms ease-out both;
+    animation-delay: calc(var(--w) * 22ms);
+  }
+  .reveal__late {
+    animation: reveal-fade 300ms ease-out 900ms both;
+  }
+}
+@keyframes reveal-cell {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+@keyframes reveal-fade {
+  from {
+    opacity: 0;
+  }
+}

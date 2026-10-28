@@ -1,5 +1,6 @@
 import type { WrappedStats } from '@shared/api/overview'
 import { formatCount } from '@shared/format'
+import { heatLevels } from '@shared/heat'
 import { HEATMAP_WEEKS, REPO_LABEL, addDays, formatDuration, formatHour, formatSince, heatmapStart, weekday } from '@shared/wrapped'
 
 /**
@@ -34,15 +35,6 @@ function stacks(): Stack {
     sans: get('--font-sans', 'system-ui, sans-serif'),
     mono: get('--font-mono', 'Menlo, monospace')
   }
-}
-
-/** 0 = empty day, 1-3 = how busy, by thirds of the days that had any activity. */
-function levels(counts: number[]): (n: number) => number {
-  const busy = counts.filter((n) => n > 0).sort((a, b) => a - b)
-  if (busy.length === 0) return () => 0
-  const at = (q: number): number => busy[Math.min(busy.length - 1, Math.floor(q * busy.length))]
-  const [t1, t2] = [at(1 / 3), at(2 / 3)]
-  return (n) => (n <= 0 ? 0 : n <= t1 ? 1 : n <= t2 ? 2 : 3)
 }
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
@@ -124,7 +116,7 @@ export async function drawCard(canvas: HTMLCanvasElement, stats: WrappedStats): 
   const cellW = (inner - (HEATMAP_WEEKS - 1) * gap) / HEATMAP_WEEKS
   const start = heatmapStart(stats.asOf)
   const days = (HEATMAP_WEEKS - 1) * 7 + weekday(stats.asOf) + 1
-  const level = levels(Object.values(stats.daily))
+  const level = heatLevels(Object.values(stats.daily))
   for (let i = 0; i < days; i++) {
     const date = addDays(start, i)
     const col = Math.floor(i / 7)

@@ -19,7 +19,7 @@ const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms
 /**
  * Screenshot mode (CLAUDOCK_SHOT=1, driven by scripts/shot.mjs): visits every screen in light then dark through the
  * normal `system:navigate` / `system:theme` events, waits until each is loaded and painted in that theme, saves
- * `<dir>/<theme>-<screen>.png` (plus `connect`, the Connect sheet, `connected`, the Overview card after connecting with one played status line run and three sessions played through the real hooks, which must post exactly one alert, `connected-hooks`, the Hooks screen then, where Claudock's hooks are one row and out of the counts, and `disconnect`, the confirm dialog that row's Disconnect… opens, which must leave settings.json byte for byte as it was, `palette`, `settings-json`, `mods-draft`, the Mods screen with the fixture's draft selected, and `share`, the Overview share dialog, and `card.png`, the card itself), prints renderer console errors as `CONSOLE_ERROR ...` and failed shots as
+ * `<dir>/<theme>-<screen>.png` (plus `connect`, the Connect sheet, `connected`, the Overview card after connecting with one played status line run and three sessions played through the real hooks, which must post exactly one alert, `connected-hooks`, the Hooks screen then, where Claudock's hooks are one row and out of the counts, and `disconnect`, the confirm dialog that row's Disconnect… opens, which must leave settings.json byte for byte as it was, `palette`, `settings-json`, `mods-draft`, the Mods screen with the fixture's draft selected, and `share`, the Overview share dialog, and `card.png`, the card itself, and `reveal`, `reveal-connect`, `reveal-connected` and `reveal-empty`, the first-run reveal), prints renderer console errors as `CONSOLE_ERROR ...` and failed shots as
  * `SHOT_FAILED ...`, and exits 0 (clean) or 1 (errors).
  */
 export async function runShots(win: BrowserWindow, opts: { dir: string; only: string[] }): Promise<void> {
@@ -391,6 +391,47 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
     if (!before.equals(await fsp.readFile(file))) throw new Error('menubar: settings.json is not byte for byte what it was before connecting')
   }
 
+  /**
+   * The first-run reveal, shown through `system:reveal` (screenshot mode never shows it on its own): the reveal with the
+   * fixture's numbers once they have counted up (shot `reveal`), the Connect sheet over it (`reveal-connect`), Connect
+   * -> Overview with the card connected (`reveal-connected`), then Disconnect with settings.json byte for byte as before.
+   * In light only, the empty version (`reveal-empty`): the fixture copy's stats-cache.json and history.jsonl moved aside
+   * and put back, never in a run on a real folder.
+   */
+  async function revealFlow(theme: 'light' | 'dark'): Promise<void> {
+    const file = path.join(configDir(), 'settings.json')
+    const before = await fsp.readFile(file)
+    emit('system:reveal', null)
+    await waitFor(`document.querySelector('.reveal__stats[aria-busy="false"]') && !document.querySelector('.sidebar')`, 'the reveal with its numbers')
+    await shoot(theme, 'reveal')
+    await click('Connect to Claude Code', `document.querySelector('.reveal')`)
+    await waitFor(`document.querySelector('dialog[open] .diff') && document.querySelectorAll('dialog[open] input[type=checkbox]:checked').length === 2`, 'the Connect sheet over the reveal')
+    await shoot(theme, 'reveal-connect')
+    await click('Connect', `document.querySelector('dialog[open]')`)
+    await waitFor(`!document.querySelector('.reveal') && !document.querySelector('dialog[open]') && [...document.querySelectorAll('.lim button')].some((b) => b.textContent.trim() === 'Disconnect')`, 'Overview, connected')
+    await js(`document.querySelectorAll('.toast__close').forEach((b) => b.click())`)
+    await shoot(theme, 'reveal-connected')
+    await click('Disconnect')
+    await waitFor(`document.querySelector('dialog[open] .diff')`, 'the Disconnect dialog')
+    await click('Disconnect', `document.querySelector('dialog[open]')`)
+    await waitFor(`!document.querySelector('dialog[open]') && [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Connect to Claude Code')`, 'the disconnect')
+    await js(`document.querySelectorAll('.toast__close').forEach((b) => b.click())`)
+    if (!before.equals(await fsp.readFile(file))) throw new Error('reveal: settings.json is not byte for byte what it was before connecting')
+
+    if (theme !== 'light' || process.env.CLAUDOCK_READONLY === '1' || !configDir().includes(`${path.sep}.shots${path.sep}.tmp-`)) return
+    const hidden = ['stats-cache.json', 'history.jsonl'].map((n) => path.join(configDir(), n))
+    await Promise.all(hidden.map((f) => fsp.rename(f, `${f}.shot`)))
+    try {
+      emit('system:reveal', null)
+      await waitFor(`document.querySelector('.reveal__none') && document.querySelector('.reveal__share')?.disabled`, 'the empty reveal')
+      await shoot(theme, 'reveal-empty')
+      await click('Not now', `document.querySelector('.reveal')`)
+      await waitFor(`!document.querySelector('.reveal') && document.querySelector('.sidebar')`, 'Overview after Not now')
+    } finally {
+      await Promise.all(hidden.map((f) => fsp.rename(`${f}.shot`, f)))
+    }
+  }
+
   const fail = (e: unknown): void => {
     errors.push(`SHOT_FAILED ${(e as Error).message}`)
     console.log(`SHOT_FAILED ${(e as Error).message}`)
@@ -437,6 +478,11 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
         emit('system:navigate', { screen: 'overview' })
         await sleep(150)
         await menubarFlow(theme).catch(fail)
+      }
+      if (process.platform !== 'win32' && (opts.only.length === 0 || opts.only.includes('reveal'))) {
+        emit('system:navigate', { screen: 'overview' })
+        await sleep(150)
+        await revealFlow(theme).catch(fail)
       }
       if (opts.only.length === 0 || opts.only.includes('mods') || opts.only.includes('mods-draft')) {
         emit('system:navigate', { screen: 'mods' })

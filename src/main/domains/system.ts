@@ -9,9 +9,18 @@ import { defineDomain, emit } from '../ipcx'
 import { configDir, globalStateFile, assertNotSecretReal, installKind, isCustomConfigDir, isSecret, resolveInside, userDataDir, writesAllowed } from '../paths'
 import { checkUpdate } from '../update'
 import { currentTheme, setTheme } from '../theme'
+import { shouldReveal } from '../firstRun'
+import { loadPrefs, savePrefs } from '../prefs'
+import { status as connectStatus } from './connect'
 import { collectCounts } from './index'
 
 declare const __APP_VERSION__: string
+
+const SHOT = process.env.CLAUDOCK_SHOT === '1'
+/** CLAUDOCK_REVEAL=1: show the first-run reveal on every launch, without writing that it was seen (development). */
+const REVEAL = process.env.CLAUDOCK_REVEAL === '1'
+/** settings.json unreadable: count as not connected, so the reveal still offers Connect (the sheet explains). */
+const OFF = { statusLine: 'off', hooks: 'off' } as const
 
 /** Extensions we are willing to hand to the OS default app. Never scripts or executables. */
 const OPENABLE = new Set(['.md', '.markdown', '.mdx', '.json', '.jsonl', '.txt', '.yml', '.yaml', '.toml', '.log', '.ini', '.cfg', '.csv'])
@@ -92,6 +101,15 @@ const impl: SystemApi = {
 
   async sidebarCounts() {
     return collectCounts()
+  },
+
+  async firstRun() {
+    const [prefs, connect] = await Promise.all([loadPrefs(), connectStatus().catch(() => OFF)])
+    return shouldReveal({ revealed: prefs.revealed, connect, forced: REVEAL, shot: SHOT })
+  },
+
+  async finishFirstRun() {
+    if (!REVEAL) await savePrefs({ revealed: true })
   }
 }
 

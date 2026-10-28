@@ -56,6 +56,7 @@ export function useEvent<K extends keyof ClaudockEvents>(name: K, cb: (payload: 
 }
 
 export const isMac = (): boolean => window.claudock?.platform === 'darwin'
+export const isWindows = (): boolean => window.claudock?.platform === 'win32'
 
 export interface ApiState<T> {
   data: T | undefined

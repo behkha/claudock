@@ -17,6 +17,10 @@ export interface SystemApi {
   setTheme(pref: ThemePref): Promise<ThemePref>
   /** Assembled in main from each domain module's optional exported `count()`. */
   sidebarCounts(): Promise<SidebarCounts>
+  /** Show the first-run reveal: once, to anyone with neither Connect part on (src/main/firstRun.ts). */
+  firstRun(): Promise<boolean>
+  /** The reveal was left (Connect, Not now, Continue or a navigation): it doesn't show again. */
+  finishFirstRun(): Promise<void>
 }
 
 export interface SystemEvents {
@@ -25,4 +29,6 @@ export interface SystemEvents {
   'system:sizeProgress': SizeProgress
   /** Open the command palette (screenshot mode, menu). */
   'system:openPalette': null
+  /** Show the first-run reveal (screenshot mode). */
+  'system:reveal': null
 }

@@ -30,7 +30,8 @@ function assertSupported(): void {
   if (WIN) throw new Error('Connecting to Claude Code is not available on Windows yet')
 }
 
-async function status(): Promise<ConnectStatus> {
+/** Which parts are in settings.json now (also the first-run rule, src/main/firstRun.ts). */
+export async function status(): Promise<ConnectStatus> {
   if (WIN) return { statusLine: 'unsupported', hooks: 'unsupported' }
   const { data } = await readSettings()
   return { statusLine: isStepOn(data.statusLine) ? 'on' : 'off', hooks: hooksInstalled(data) ? 'on' : 'off' }

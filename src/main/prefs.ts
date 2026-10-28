@@ -13,9 +13,11 @@ interface Prefs {
   /** The menu bar item (the tray icon on Windows and Linux) is shown. On by default, except on Windows, where Connect
    *  (sessions and live limits) isn't available yet and the icon would show nothing but its tooltip. */
   menuBar: boolean
+  /** The first-run reveal was left (Connect, Not now, Continue, a navigation, or an error in it), so it never shows again (src/main/firstRun.ts). */
+  revealed: boolean
 }
 
-const DEFAULTS: Prefs = { theme: 'system', alerts: DEFAULT_ALERT_PREFS, menuBar: process.platform !== 'win32' }
+const DEFAULTS: Prefs = { theme: 'system', alerts: DEFAULT_ALERT_PREFS, menuBar: process.platform !== 'win32', revealed: false }
 let cache: Prefs | null = null
 
 const file = (): string => path.join(userDataDir(), 'prefs.json')
@@ -28,7 +30,8 @@ export async function loadPrefs(): Promise<Prefs> {
       ...DEFAULTS,
       ...(THEME_PREFS.includes(raw.theme as ThemePref) ? { theme: raw.theme as ThemePref } : {}),
       alerts: normalizeAlertPrefs(raw.alerts),
-      ...(typeof raw.menuBar === 'boolean' ? { menuBar: raw.menuBar } : {})
+      ...(typeof raw.menuBar === 'boolean' ? { menuBar: raw.menuBar } : {}),
+      ...(raw.revealed === true ? { revealed: true } : {})
     }
   } catch {
     cache = { ...DEFAULTS }

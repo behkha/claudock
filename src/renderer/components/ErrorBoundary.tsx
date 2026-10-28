@@ -7,6 +7,8 @@ export interface ErrorBoundaryProps {
   children: ReactNode
   /** 'screen' (default): "Reload screen" remounts the children. 'app': the whole window, "Reload app" reloads the page. */
   scope?: 'screen' | 'app'
+  /** Called once an error is caught, for a parent that can do better than the error screen (the first-run reveal). */
+  onError?: (error: Error) => void
 }
 
 interface State {
@@ -25,6 +27,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, State> {
 
   override componentDidCatch(error: Error, info: ErrorInfo): void {
     console.error('Render error caught by ErrorBoundary:', error, info.componentStack)
+    this.props.onError?.(error)
   }
 
   override render(): ReactNode {

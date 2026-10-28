@@ -289,34 +289,3 @@
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
-/* the step's path is long: wrap it inside the confirm dialog instead of scrolling sideways */
-.lim__diff .diff__row {
-  min-width: 0;
-}
-.lim__diff .diff__text {
-  flex: 1;
-  min-width: 0;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-/* Claude Code card: sessions from the session hooks, above the limits (item 7, decision 2 A) */
-.cc__sheet {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.cc__check {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--text);
-}
-.cc__sheet .find__error {
-  margin: -4px 0 0 24px;
-}
-/* nine hooks with long paths: the change scrolls so the dialog's buttons stay in view (Connect and Disconnect) */
-.cc__diff {
-  max-height: min(42vh, 360px);
-  overflow: auto;
-}
