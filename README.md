@@ -58,7 +58,7 @@ With Node.js 22.12 or later (you likely have it for Claude Code):
 npx claudock
 ```
 
-npm downloads Claudock and Electron the first time, then opens the app. Nothing is code-signed, but files npm downloads aren't flagged by macOS Gatekeeper or Windows SmartScreen, so there's no warning to click through. To update, run `npx claudock@latest`; the app tells you in the sidebar when a newer release is out. On macOS, npx keeps a `Claudock.app` made from that Electron in Claudock's app data folder, so alerts, the Dock and the menu say Claudock and Open at login works.
+The first time, npm downloads Claudock and Electron (about 125 MB, under 2 minutes on a 10 Mbit/s connection), then opens the app. Nothing is code-signed, but files npm downloads aren't flagged by macOS Gatekeeper or Windows SmartScreen, so there's no warning to click through. To update, run `npx claudock@latest`; the app tells you in the sidebar when a newer release is out. On macOS, npx keeps a `Claudock.app` made from that Electron in Claudock's app data folder, so alerts, the Dock and the menu say Claudock and Open at login works.
 
 Or download an installer from the [latest release](https://github.com/behkha/claudock/releases/latest):
 
