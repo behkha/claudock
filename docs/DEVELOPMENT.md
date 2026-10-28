@@ -26,6 +26,8 @@ The first-run reveal (`src/renderer/shell/Reveal.tsx`) replaces the sidebar and 
 
 At launch the main process downloads Anthropic's settings docs for the Settings JSON editor (`src/main/settingsDocs.ts`). `CLAUDOCK_OFFLINE=1` skips that fetch, so the editor uses the cache or the copy bundled with the app (screenshots skip it too). Installed copies also check for a newer release to show a new-version notice (`src/main/update.ts`): a stable build asks GitHub for the latest release, a beta build (a version with `-`) asks npm for the `latest` and `beta` dist-tags. `CLAUDOCK_OFFLINE=1` skips that too. `CLAUDOCK_LATEST_VERSION=9.9.9 npm run dev` shows the notice without a request (a pre-release value counts as the newest beta, so a stable build ignores it).
 
+The one-line install scripts live on the site: `site/install.sh` (macOS: the DMG's app into `/Applications`, or `~/Applications`; Linux: the AppImage into `~/.local/bin/claudock`) and `site/install.ps1` (Windows: runs the Setup EXE). They build the download URL from the latest release's tag and the `artifactName` patterns in `electron-builder.yml`, so a renamed installer needs the scripts changed too. `CLAUDOCK_VERSION=0.1.1` pins a release and `CLAUDOCK_INSTALL_DIR=<folder>` installs somewhere else (install.sh only), which is how to try one without touching `/Applications`.
+
 ## Scripts
 
 | Script | What it does |
