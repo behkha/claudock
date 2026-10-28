@@ -43,7 +43,7 @@ export interface SessionsState {
   waiting: number
 }
 
-/** The "needs me" alert rule's settings, kept in Claudock's prefs.json. */
+/** The alert settings, kept in Claudock's prefs.json: the "needs me" rule and the limit alerts (src/main/menubar/limitAlert.ts). */
 export interface AlertPrefs {
   /** Alerts are paused until this time (ms since the epoch); null = not paused. */
   pausedUntil: number | null
@@ -53,6 +53,10 @@ export interface AlertPrefs {
   doneAlert: boolean
   /** Play the system sound with an alert. Off by default. */
   sound: boolean
+  /** Alert once per window when the 5-hour or weekly limit reaches this percentage; null = off (the default). */
+  limitPercent: number | null
+  /** Alert when a limit resets, only if Claude Code reported 100% in that window. Off by default. */
+  limitReset: boolean
 }
 
 export interface SessionsApi {

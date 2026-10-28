@@ -1,10 +1,13 @@
-import { BrowserWindow, app, ipcMain, session, shell } from 'electron'
+import { app, ipcMain, session } from 'electron'
 import path from 'node:path'
 import { registerAll } from './domains'
 import { buildMenu } from './menu'
 import { initTheme, onThemeChanged } from './theme'
 import { runShots } from './shot'
 import { startSettingsDocsFetch } from './settingsDocs'
+import { menuBarShown, onMenuBarChanged, openedAtLogin, startMenuBar } from './menubar'
+import { installKind } from './paths'
+import { createMainWindow, mainWindow, showMainWindow } from './windows'
 import icon from '../../resources/icon.png?asset'
 
 // Keep app data separate from the Electron default and from other apps. CLAUDOCK_USER_DATA lets tests/screenshots isolate it.
@@ -16,7 +19,7 @@ const shotMode = process.env.CLAUDOCK_SHOT === '1'
 /**
  * Content-Security-Policy for the renderer. Production (file://): scripts, styles, images and fonts from the app only,
  * no network, no frames, no plugins. Dev adds what Vite's HMR needs (inline preamble script, websocket to the dev
- * server), and only for the dev server's own origin. The built index.html carries the same strict policy in a meta tag.
+ * server), and only for the dev server's own origin. The built pages (index.html, popover.html) carry the same strict policy in a meta tag.
  */
 function cspFor(devUrl: string | undefined): string {
   const base = ["default-src 'self'", "img-src 'self' data:", "font-src 'self' data:", "object-src 'none'", "frame-src 'none'", "worker-src 'self'", "base-uri 'none'", "form-action 'none'"]
@@ -26,41 +29,16 @@ function cspFor(devUrl: string | undefined): string {
 }
 const mac = process.platform === 'darwin'
 
-function createWindow(): BrowserWindow {
-  const win = new BrowserWindow({
-    width: 1280,
-    height: 820,
-    minWidth: 960,
-    minHeight: 640,
-    show: !shotMode,
-    title: 'Claudock',
-    backgroundColor: '#FAF9F5',
-    // macOS takes the icon from the bundle; Windows and Linux windows need it set (Linux has no icon otherwise).
-    ...(mac ? { titleBarStyle: 'hiddenInset' as const, trafficLightPosition: { x: 16, y: 16 } } : { icon }),
-    webPreferences: {
-      preload: path.join(__dirname, '../preload/index.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-      backgroundThrottling: !shotMode
-    }
-  })
-
-  // The renderer never navigates and never opens windows; http(s) links go to the system browser.
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    if (/^https?:\/\//i.test(url)) void shell.openExternal(url)
-    return { action: 'deny' }
-  })
-  win.webContents.on('will-navigate', (e, url) => {
-    if (url !== win.webContents.getURL()) e.preventDefault()
-  })
-
-  if (process.env['ELECTRON_RENDERER_URL']) void win.loadURL(process.env['ELECTRON_RENDERER_URL'])
-  else void win.loadFile(path.join(__dirname, '../renderer/index.html'))
-  return win
-}
+// One copy per user: a second `npx claudock` (or a login launch while it runs) brings the first one forward instead of
+// adding a second menu bar item. A git clone skips this, so `npm run dev` can run beside an installed copy.
+const single = !shotMode && installKind() !== 'dev'
+const primary = !single || app.requestSingleInstanceLock()
+if (!primary) app.quit()
+app.on('second-instance', () => void app.whenReady().then(showMainWindow))
 
 void app.whenReady().then(async () => {
+  // the second copy only hands over to the first: no tray, no window, no login item rewrite
+  if (!primary) return
   session.defaultSession.setPermissionRequestHandler((_wc, _perm, cb) => cb(false))
   const policy = cspFor(process.env['ELECTRON_RENDERER_URL'])
   session.defaultSession.webRequest.onHeadersReceived((details, cb) => {
@@ -73,11 +51,14 @@ void app.whenReady().then(async () => {
   registerAll(ipcMain)
   startSettingsDocsFetch()
   onThemeChanged(buildMenu)
-  buildMenu()
+  onMenuBarChanged(buildMenu)
   // A packaged app gets its Dock icon from the bundle; `npm run dev` would show Electron's.
   if (mac && !app.isPackaged) app.dock?.setIcon(icon)
-  const win = createWindow()
-  if (shotMode) {
+  await startMenuBar()
+  buildMenu()
+  // started at login: only the menu bar item, unless it is hidden (then there would be nothing to see)
+  const win = openedAtLogin() && menuBarShown() ? null : createMainWindow()
+  if (shotMode && win) {
     win.webContents.once('did-finish-load', () => {
       void runShots(win, {
         dir: process.env.CLAUDOCK_SHOT_DIR || path.join(process.cwd(), '.shots'),
@@ -86,11 +67,16 @@ void app.whenReady().then(async () => {
     })
   }
 
+  // the Dock icon (macOS): reopen the window
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    if (!mainWindow()) showMainWindow()
   })
 })
 
+// With the menu bar item shown, macOS and Windows keep running for the alerts. Linux quits as before: many desktops
+// show no tray at all, and Electron can't tell, so a closed window could leave Claudock running with nothing on screen.
 app.on('window-all-closed', () => {
-  if (!mac) app.quit()
+  if (mac) return
+  if (process.platform === 'win32' && menuBarShown()) return
+  app.quit()
 })

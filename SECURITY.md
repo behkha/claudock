@@ -15,6 +15,10 @@ Claudock works on the Claude Code config folder (`~/.claude`, or the folder in `
 - Deletes go to the OS Trash.
 - It doesn't run, update or sign in to Claude Code, and it doesn't touch the `.claude/` folders inside your repositories.
 - "Connect to Claude Code" is the one change that makes Claude Code run something of Claudock's. You see the exact settings.json change first. It adds a status line step and nine hooks, small `sh` scripts in Claudock's own app data folder. The status line step saves the 5-hour and weekly limits Claude Code sends, then runs your own status line unchanged. The hooks save each running session's state (working, waiting for you or done), its folder, and Claude Code's short notification text. They never save prompts or tool output, print nothing, and use no network. Claudock shows a system notification when a session starts waiting. Clicking it brings that session's terminal app forward (`open -b` on macOS). Disconnect removes both parts and puts settings.json back exactly as it was, or removes only Claudock's keys if something else changed the file in between.
+- With the menu bar item shown (the default on macOS and Linux), closing the window on macOS or Windows leaves Claudock running in the menu bar or tray so alerts can arrive; Linux quits as before. Quit it from the item's menu, or turn the item off in View › Show in Menu Bar.
+- The menu bar alerts are system notifications too: a session waiting, and, only if you turn them on, a limit reaching the % you chose or a limit resetting.
+- **Open at login**, only when you turn it on, writes `~/Library/LaunchAgents/app.claudock.login.plist` on macOS or `~/.config/autostart/claudock.desktop` on Linux (Windows: the usual Run entry). Turning it off deletes the file.
+- On macOS, `npx claudock` copies npm's Electron to `Claudock.app` in Claudock's app data folder, renames it Claudock and signs it ad hoc on your Mac, as npm's Electron already is. `CLAUDOCK_PLAIN_ELECTRON=1` runs npm's Electron instead.
 
 ## What it never reads
 

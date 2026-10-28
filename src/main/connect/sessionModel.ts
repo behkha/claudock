@@ -247,7 +247,7 @@ export function alertText(sessions: readonly LiveSession[], what: 'waiting' | 'r
   return { title, body: one ? waitText(sessions[0]) : list(names) }
 }
 
-export const DEFAULT_ALERT_PREFS: AlertPrefs = { pausedUntil: null, reminderMinutes: null, doneAlert: false, sound: false }
+export const DEFAULT_ALERT_PREFS: AlertPrefs = { pausedUntil: null, reminderMinutes: null, doneAlert: false, sound: false, limitPercent: null, limitReset: false }
 
 /** Alert prefs from untrusted input (prefs.json or the renderer), keeping `base` for anything missing or invalid. */
 export function normalizeAlertPrefs(raw: unknown, base: AlertPrefs = DEFAULT_ALERT_PREFS): AlertPrefs {
@@ -259,6 +259,10 @@ export function normalizeAlertPrefs(raw: unknown, base: AlertPrefs = DEFAULT_ALE
   }
   if (typeof r.doneAlert === 'boolean') out.doneAlert = r.doneAlert
   if (typeof r.sound === 'boolean') out.sound = r.sound
+  if (r.limitPercent === null || (typeof r.limitPercent === 'number' && Number.isInteger(r.limitPercent) && r.limitPercent >= 1 && r.limitPercent <= 100)) {
+    out.limitPercent = r.limitPercent as number | null
+  }
+  if (typeof r.limitReset === 'boolean') out.limitReset = r.limitReset
   return out
 }
 

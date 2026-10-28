@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="171 294 670 446">
+  <!-- Menu bar item while a session waits, macOS: the mark in clay with a clay dot. Not a template, so it keeps its
+       colour; clay reads on a light and a dark menu bar alike. -->
+  <path d="M 236 552 C 282 458, 372 452, 442 512 C 512 572, 602 568, 650 474" fill="none" stroke="#D97757" stroke-width="104" stroke-linecap="round"/>
+  <rect x="716" y="372" width="100" height="284" rx="22" fill="#D97757"/>
+  <circle cx="236" cy="354" r="60" fill="#D97757"/>
+</svg>

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * `npx claudock`: runs the built app (package.json `main`, out/main/index.js) with the Electron that npm installed beside
- * it as a peer dependency. Files npm downloads carry no macOS quarantine flag or Windows Mark of the Web, so there is no
+ * it as a peer dependency; on macOS through a Claudock.app made from that Electron (bin/macApp.js). Files npm downloads carry no macOS quarantine flag or Windows Mark of the Web, so there is no
  * Gatekeeper or SmartScreen prompt. Arguments go through to the app; its exit code and termination signals come back.
  */
 'use strict'
@@ -19,14 +19,22 @@ try {
   process.exit(1)
 }
 
+const appRoot = path.join(__dirname, '..')
+// macOS: a Claudock.app made from this Electron, so the app is named Claudock (bin/macApp.js); else Electron itself
+const { macApp } = require('./macApp')
+const own = macApp(electron, appRoot)
+
 const env = { ...process.env }
 // Set by some editors' terminals; it would make Electron run as plain Node and ignore the app.
 delete env.ELECTRON_RUN_AS_NODE
 
-const child = spawn(electron, [path.join(__dirname, '..'), ...process.argv.slice(2)], { stdio: 'inherit', env, windowsHide: false })
+// Claudock.app loads its own copy of the app folder; plain Electron is told where the app is
+const child = own
+  ? spawn(own, process.argv.slice(2), { stdio: 'inherit', env, windowsHide: false })
+  : spawn(electron, [appRoot, ...process.argv.slice(2)], { stdio: 'inherit', env, windowsHide: false })
 
 child.on('error', (e) => {
-  console.error(`claudock: could not start Electron at ${electron}: ${e.message}`)
+  console.error(`claudock: could not start ${own ?? electron}: ${e.message}`)
   process.exit(1)
 })
 child.on('exit', (code, signal) => {

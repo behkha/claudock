@@ -6,7 +6,9 @@ import { app } from 'electron'
 import { spawn } from 'node:child_process'
 import { connectDir } from './connect/folder'
 import { GROUP_MS } from './connect/sessionModel'
-import { postedAlerts } from './domains/sessions'
+import { postedAlerts } from './alerts'
+import { alertPrefs, setAlertPrefs } from './domains/sessions'
+import { popoverForShots } from './menubar'
 import { countHooks } from './domains/settings'
 import { emit } from './ipcx'
 import { configDir } from './paths'
@@ -35,7 +37,8 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
     console.log(`RENDERER_GONE ${details.reason}`)
   })
 
-  const js = <T,>(code: string): Promise<T> => win.webContents.executeJavaScript(code) as Promise<T>
+  const jsOn = <T,>(w: BrowserWindow, code: string): Promise<T> => w.webContents.executeJavaScript(code) as Promise<T>
+  const js = <T,>(code: string): Promise<T> => jsOn<T>(win, code)
 
   /**
    * Wait until the screen is really ready: the requested theme is on <html> and in prefers-color-scheme, no API call
@@ -43,12 +46,13 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
    * the compositor has painted it. A cold first run can take seconds to answer, so fixed sleeps captured half-loaded
    * screens in the previous theme.
    */
-  async function settle(theme: 'light' | 'dark', what: string): Promise<void> {
+  async function settle(theme: 'light' | 'dark', what: string, w: BrowserWindow = win): Promise<void> {
     const deadline = Date.now() + 30_000
     let quietSince = 0
     let last = ''
     while (Date.now() < deadline) {
-      last = await js<string>(
+      last = await jsOn<string>(
+        w,
         `JSON.stringify({ theme: document.documentElement.dataset.theme, dark: matchMedia('(prefers-color-scheme: dark)').matches, ` +
           `pending: window.__claudockPending ?? 0, busy: document.querySelectorAll('.spinner, [aria-busy="true"]').length })`
       )
@@ -59,8 +63,8 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
       else if (Date.now() - quietSince >= 300) {
         // A hidden window can stop drawing (no vsync while the display sleeps or the machine is busy), and capturePage
         // then returns its first frame. Force a repaint and wait two frames; the timeout keeps a stalled rAF from hanging.
-        win.webContents.invalidate()
-        await js(`new Promise((r) => { const t = setTimeout(r, 1000); requestAnimationFrame(() => requestAnimationFrame(() => { clearTimeout(t); r() })) })`)
+        w.webContents.invalidate()
+        await jsOn(w, `new Promise((r) => { const t = setTimeout(r, 1000); requestAnimationFrame(() => requestAnimationFrame(() => { clearTimeout(t); r() })) })`)
         return
       }
       await sleep(100)
@@ -73,8 +77,10 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
    * there, so a stale frame from before the theme switch is retried instead of saved. Skipped under a translucent
    * overlay (the palette scrim or a modal dialog's backdrop), where the DOM colour is not what gets painted.
    */
-  async function capture(theme: 'light' | 'dark', what: string): Promise<void> {
-    const want = await js<number[]>(`(() => {
+  async function capture(theme: 'light' | 'dark', what: string, w: BrowserWindow = win): Promise<void> {
+    const want = await jsOn<number[]>(
+      w,
+      `(() => {
       if (document.querySelector('dialog[open]')) return [] // a modal's backdrop dims the page: the DOM colour is not what is painted
       for (let el = document.elementFromPoint(innerWidth - 4, innerHeight - 4); el; el = el.parentElement) {
         const [r, g, b, a = 1] = (getComputedStyle(el).backgroundColor.match(/[\\d.]+/g) ?? []).map(Number)
@@ -84,9 +90,9 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
       return []
     })()`)
     for (let attempt = 1; ; attempt++) {
-      const img = await win.webContents.capturePage()
+      const img = await w.webContents.capturePage()
       const { width, height } = img.getSize()
-      const scale = width / win.getContentSize()[0]
+      const scale = width / w.getContentSize()[0]
       const o = ((height - Math.ceil(4 * scale)) * width + width - Math.ceil(4 * scale)) * 4
       const bgra = img.toBitmap()
       const got = [bgra[o + 2], bgra[o + 1], bgra[o]]
@@ -98,7 +104,7 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
       }
       if (attempt === 20) throw new Error(`${theme}-${what}: captured pixel ${got.join(',')} never matched ${want.join(',')}`)
       console.log(`SHOT_RETRY ${theme}-${what}: stale frame (pixel ${got.join(',')}, page ${want.join(',')})`)
-      win.webContents.invalidate()
+      w.webContents.invalidate()
       await sleep(250)
     }
   }
@@ -182,7 +188,7 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
     })()`)
 
   /** Play Claude Code: run the configured statusLine command once with a status JSON that carries rate_limits. */
-  async function playStatusLine(): Promise<void> {
+  async function playStatusLine(fiveHour = 42): Promise<void> {
     const settings = JSON.parse(await fsp.readFile(path.join(configDir(), 'settings.json'), 'utf8')) as { statusLine?: { command?: string } }
     const command = settings.statusLine?.command
     if (!command) throw new Error('limits: no statusLine command after turning on')
@@ -195,7 +201,7 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
       model: { id: 'claude-opus-5-5', display_name: 'Opus 5.5' },
       workspace: { current_dir: '/tmp/"rate_limits": {}', project_dir: '/tmp' },
       rate_limits: {
-        five_hour: { used_percentage: 42, resets_at: Math.floor((now + 148 * 60_000) / 1000) },
+        five_hour: { used_percentage: fiveHour, resets_at: Math.floor((now + 148 * 60_000) / 1000) },
         seven_day: { used_percentage: 61.4, resets_at: Math.floor(monday.getTime() / 1000) }
       }
     })
@@ -243,6 +249,36 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
       .slice(0, 3)
   }
 
+  /** Claudock's hook commands in settings.json, by step. */
+  async function hookSteps(): Promise<Map<string, string>> {
+    const settings = JSON.parse(await fsp.readFile(path.join(configDir(), 'settings.json'), 'utf8')) as { hooks?: Record<string, { hooks?: { command?: string }[] }[]> }
+    const steps = new Map<string, string>()
+    for (const groups of Object.values(settings.hooks ?? {})) {
+      for (const g of groups) for (const h of g.hooks ?? []) {
+        const m = /hook\.sh' (\w+)$/.exec(h.command ?? '')
+        if (m) steps.set(m[1], h.command as string)
+      }
+    }
+    for (const step of ['prompt', 'ask', 'notify', 'stop', 'question', 'tool', 'end']) if (!steps.has(step)) throw new Error(`connect: no ${step} hook in settings.json`)
+    return steps
+  }
+
+  /** Three sessions through the real hooks: the first ends up waiting on a Bash permission prompt, the second working, the third done. */
+  async function playSessions(steps: Map<string, string>): Promise<{ id: string; cwd: string }[]> {
+    const [a, b, c] = await fixtureSessions()
+    const input = (x: { id: string; cwd: string }, extra: object): object => ({ session_id: x.id, cwd: x.cwd, transcript_path: '', permission_mode: 'default', ...extra })
+    for (const x of [a, b, c]) await playHook(steps.get('prompt') as string, input(x, { hook_event_name: 'UserPromptSubmit', prompt: 'Fix the flaky checkout test' }))
+    await waitFor(`document.querySelectorAll('.cc__row--working').length === 3`, 'three working sessions')
+    await playHook(steps.get('stop') as string, input(c, { hook_event_name: 'Stop', stop_hook_active: false }))
+    await playHook(steps.get('ask') as string, input(a, { hook_event_name: 'PermissionRequest', tool_name: 'Bash', tool_input: { command: 'npm test' } }))
+    // a tool from another agent finishing leaves the wait alone
+    await playHook(steps.get('tool') as string, input(a, { hook_event_name: 'PostToolUse', tool_name: 'Read', agent_id: 'sub-1', tool_response: {} }))
+    await playHook(steps.get('notify') as string, input(a, { hook_event_name: 'Notification', notification_type: 'permission_prompt', message: 'Claude needs your permission to use Bash' }))
+    // idle_prompt arrives a minute after a finished turn: it must not count as waiting
+    await playHook(steps.get('notify') as string, input(c, { hook_event_name: 'Notification', notification_type: 'idle_prompt', message: 'Claude is waiting for your input' }))
+    return [a, b, c]
+  }
+
   /**
    * Overview -> Connect to Claude Code -> the sheet (shot) -> Connect -> one status line run and three sessions through
    * the real hooks (one ends up waiting on a permission prompt, one working, one done) -> exactly one alert -> the card
@@ -260,27 +296,9 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
     await waitFor(`!document.querySelector('dialog[open]') && [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Disconnect')`, 'the connection')
     await js(`document.querySelectorAll('.toast__close').forEach((b) => b.click())`)
     await playStatusLine()
-    const settings = JSON.parse(await fsp.readFile(file, 'utf8')) as { hooks?: Record<string, { hooks?: { command?: string }[] }[]> }
-    const steps = new Map<string, string>()
-    for (const groups of Object.values(settings.hooks ?? {})) {
-      for (const g of groups) for (const h of g.hooks ?? []) {
-        const m = /hook\.sh' (\w+)$/.exec(h.command ?? '')
-        if (m) steps.set(m[1], h.command as string)
-      }
-    }
-    for (const step of ['prompt', 'ask', 'notify', 'stop', 'question', 'tool', 'end']) if (!steps.has(step)) throw new Error(`connect: no ${step} hook in settings.json`)
-    const [a, b, c] = await fixtureSessions()
+    const steps = await hookSteps()
     const alerts = postedAlerts().length
-    const input = (x: { id: string; cwd: string }, extra: object): object => ({ session_id: x.id, cwd: x.cwd, transcript_path: '', permission_mode: 'default', ...extra })
-    for (const x of [a, b, c]) await playHook(steps.get('prompt') as string, input(x, { hook_event_name: 'UserPromptSubmit', prompt: 'Fix the flaky checkout test' }))
-    await waitFor(`document.querySelectorAll('.cc__row--working').length === 3`, 'three working sessions')
-    await playHook(steps.get('stop') as string, input(c, { hook_event_name: 'Stop', stop_hook_active: false }))
-    await playHook(steps.get('ask') as string, input(a, { hook_event_name: 'PermissionRequest', tool_name: 'Bash', tool_input: { command: 'npm test' } }))
-    // a tool from another agent finishing leaves the wait alone
-    await playHook(steps.get('tool') as string, input(a, { hook_event_name: 'PostToolUse', tool_name: 'Read', agent_id: 'sub-1', tool_response: {} }))
-    await playHook(steps.get('notify') as string, input(a, { hook_event_name: 'Notification', notification_type: 'permission_prompt', message: 'Claude needs your permission to use Bash' }))
-    // idle_prompt arrives a minute after a finished turn: it must not count as waiting
-    await playHook(steps.get('notify') as string, input(c, { hook_event_name: 'Notification', notification_type: 'idle_prompt', message: 'Claude is waiting for your input' }))
+    const [a] = await playSessions(steps)
     await waitFor(
       `document.querySelectorAll('.cc__row--waiting').length === 1 && document.querySelectorAll('.cc__row--done').length === 1 && [...document.querySelectorAll('.lim__top b')].map((b) => b.textContent).join(' ') === '42% 61%'`,
       'one waiting, one working, one done session and the limits'
@@ -314,11 +332,71 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
     if (!(await fsp.readFile(path.join(connectDir(), 'hook.sh'), 'utf8')).includes('exit 0\n')) throw new Error('connect: hook.sh was not made a no-op')
   }
 
+  /**
+   * The menu bar popover, on the fixture: connect, one status line run and three sessions -> the popover with the
+   * waiting session first and both limits (shot `menubar`) -> its settings view (shot `menubar-settings`). In light
+   * only, the limit alert at 80%: a reading of 85% posts exactly one alert, a second one at 90% none. Then Disconnect,
+   * with settings.json byte for byte as before. The popover is never shown; it is captured like the main window.
+   */
+  async function menubarFlow(theme: 'light' | 'dark'): Promise<void> {
+    const file = path.join(configDir(), 'settings.json')
+    const before = await fsp.readFile(file)
+    await click('Connect to Claude Code')
+    await waitFor(`document.querySelector('dialog[open] .diff')`, 'the Connect sheet')
+    await click('Connect', `document.querySelector('dialog[open]')`)
+    await waitFor(`!document.querySelector('dialog[open]') && [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Disconnect')`, 'the connection')
+    await js(`document.querySelectorAll('.toast__close').forEach((b) => b.click())`)
+    await playStatusLine()
+    const [a] = await playSessions(await hookSteps())
+    const pop = await popoverForShots()
+    const inPop = (code: string): Promise<unknown> => jsOn(pop, code)
+    const waitPop = (cond: string, what: string): Promise<unknown> =>
+      inPop(`(async () => {
+        const t = Date.now()
+        while (Date.now() - t < 15000) { if (${cond}) return; await new Promise((r) => setTimeout(r, 100)) }
+        throw new Error('menubar: timed out waiting for ' + ${JSON.stringify(what)})
+      })()`)
+    emit('menubar:opened', null)
+    await waitPop(
+      `document.querySelector('.cc__row--waiting')?.textContent.includes(${JSON.stringify(path.basename(a.cwd))}) && document.querySelectorAll('.cc__row').length === 3 && [...document.querySelectorAll('.lim__top b')].map((b) => b.textContent).join(' ') === '42% 61%'`,
+      'the waiting session and both limits'
+    )
+    await shoot(theme, 'menubar', pop)
+    await inPop(`document.querySelector('[aria-label="Alert settings"]').click()`)
+    await waitPop(`document.querySelector('.pop__back') && document.querySelectorAll('.pop__row').length >= 5`, 'the settings view')
+    await shoot(theme, 'menubar-settings', pop)
+    await inPop(`document.querySelector('.pop__back').click()`)
+    if (theme === 'light') {
+      const was = await alertPrefs()
+      await setAlertPrefs({ limitPercent: 80 })
+      const alerts = postedAlerts().length
+      try {
+        await playStatusLine(85)
+        await waitFor(`[...document.querySelectorAll('.lim__top b')][0]?.textContent === '85%'`, 'the 85% reading')
+        await sleep(1000)
+        await playStatusLine(90)
+        await waitFor(`[...document.querySelectorAll('.lim__top b')][0]?.textContent === '90%'`, 'the 90% reading')
+        await sleep(1000)
+      } finally {
+        await setAlertPrefs({ limitPercent: was.limitPercent })
+      }
+      const posted = postedAlerts().slice(alerts).filter((t) => t.includes('limit'))
+      if (posted.length !== 1 || posted[0] !== '5-hour limit at 85%') throw new Error(`menubar: expected one alert "5-hour limit at 85%", got ${JSON.stringify(posted)}`)
+    }
+    await click('Disconnect')
+    await waitFor(`document.querySelector('dialog[open] .diff')`, 'the Disconnect dialog')
+    await click('Disconnect', `document.querySelector('dialog[open]')`)
+    await waitFor(`!document.querySelector('dialog[open]') && [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Connect to Claude Code')`, 'the disconnect')
+    await js(`document.querySelectorAll('.toast__close').forEach((b) => b.click())`)
+    if (!before.equals(await fsp.readFile(file))) throw new Error('menubar: settings.json is not byte for byte what it was before connecting')
+  }
+
   const fail = (e: unknown): void => {
     errors.push(`SHOT_FAILED ${(e as Error).message}`)
     console.log(`SHOT_FAILED ${(e as Error).message}`)
   }
-  const shoot = (theme: 'light' | 'dark', what: string): Promise<void> => settle(theme, what).then(() => capture(theme, what)).catch(fail)
+  const shoot = (theme: 'light' | 'dark', what: string, w: BrowserWindow = win): Promise<void> =>
+    settle(theme, what, w).then(() => capture(theme, what, w)).catch(fail)
 
   await fsp.mkdir(opts.dir, { recursive: true })
   const screens = SCREENS.filter((s) => opts.only.length === 0 || opts.only.includes(s.id))
@@ -354,6 +432,11 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
         emit('system:navigate', { screen: 'overview' })
         await sleep(150)
         await connectFlow(theme).catch(fail)
+      }
+      if (process.platform !== 'win32' && (opts.only.length === 0 || opts.only.includes('menubar'))) {
+        emit('system:navigate', { screen: 'overview' })
+        await sleep(150)
+        await menubarFlow(theme).catch(fail)
       }
       if (opts.only.length === 0 || opts.only.includes('mods') || opts.only.includes('mods-draft')) {
         emit('system:navigate', { screen: 'mods' })

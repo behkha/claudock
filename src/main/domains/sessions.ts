@@ -1,4 +1,4 @@
-import { BrowserWindow, Notification, app, type IpcMain } from 'electron'
+import { type IpcMain } from 'electron'
 import { execFile } from 'node:child_process'
 import fs from 'node:fs'
 import fsp from 'node:fs/promises'
@@ -8,7 +8,9 @@ import { connectDir, connectSerial, removeOwn, writeOwn } from '../connect/folde
 import { HOOKS, hookCommand, hookEntry, hookScript } from '../connect/hookScript'
 import { AlertRule, SESSION_FILE_RE, applyLines, isGone, normalizeAlertPrefs, toLiveSessions, transitions, type SessionFold } from '../connect/sessionModel'
 import { hasHooks, type HookGroup } from '../connect/settingsHooks'
+import { postAlert } from '../alerts'
 import { defineDomain, emit } from '../ipcx'
+import { showMainWindow } from '../windows'
 import { loadPrefs, savePrefs } from '../prefs'
 import { readSettings } from './extendShared'
 
@@ -24,7 +26,6 @@ import { readSettings } from './extendShared'
 
 const WIN = process.platform === 'win32'
 const MAC = process.platform === 'darwin'
-const SHOT = process.env.CLAUDOCK_SHOT === '1'
 const TICK_MS = 30_000
 
 /* ------------------------------------------------------------------ the hooks in settings.json */
@@ -211,49 +212,23 @@ let prefs: AlertPrefs = normalizeAlertPrefs(undefined)
 /** Stored prefs, loaded once; changes wait for it so they never save over values not read yet. */
 let prefsReady: Promise<void> | null = null
 const ready = (): Promise<void> => (prefsReady ??= loadPrefs().then((p) => void (prefs = p.alerts), () => undefined))
-/** Alerts posted in screenshot mode, where nothing is shown (src/main/shot.ts checks them). */
-const shotAlerts: string[] = []
-/** Notifications stay referenced until closed, or Electron may collect them before a click arrives. */
-const shown = new Set<Notification>()
 
 function post(text: { title: string; body: string }, id: string): void {
-  if (SHOT) {
-    shotAlerts.push(text.title)
-    console.log(`ALERT ${text.title} | ${text.body}`)
-    return
-  }
-  if (!Notification.isSupported()) return
-  const n = new Notification({ title: text.title, body: text.body, silent: !prefs.sound })
-  shown.add(n)
-  n.on('click', () => void show(id))
-  n.on('close', () => shown.delete(n))
-  n.show()
+  postAlert(text, { sound: prefs.sound, onClick: () => void show(id) })
 }
 
 const rule = new AlertRule({ now: Date.now, setTimeout: (fn, ms) => setTimeout(fn, ms), clearTimeout: (t) => clearTimeout(t as NodeJS.Timeout) }, () => prefs, post)
 
-/** Alert titles posted so far in screenshot mode. */
-export const postedAlerts = (): string[] => [...shotAlerts]
-
 /* ------------------------------------------------------------------ show */
-
-function focusClaudock(): void {
-  const w = BrowserWindow.getAllWindows()[0]
-  if (!w) return
-  if (w.isMinimized()) w.restore()
-  w.show()
-  w.focus()
-  if (MAC) app.focus({ steal: true })
-}
 
 /** Bring the session's terminal app forward (macOS, when the hook knew it), else Claudock's own window. */
 export async function show(id: string): Promise<void> {
   if (typeof id !== 'string') throw new Error('Unknown session')
   const bundle = apps.get(id)
-  if (!MAC || !bundle || !/^[A-Za-z0-9.-]+$/.test(bundle)) return focusClaudock()
+  if (!MAC || !bundle || !/^[A-Za-z0-9.-]+$/.test(bundle)) return showMainWindow()
   await new Promise<void>((resolve) => {
     execFile('/usr/bin/open', ['-b', bundle], (err) => {
-      if (err) focusClaudock()
+      if (err) showMainWindow()
       resolve()
     })
   })
@@ -309,7 +284,10 @@ export function hooksChanged(): void {
   refreshSoon()
 }
 
-/** The alert settings (for the menu bar's "Pause alerts"). */
+/** The alert settings as last loaded or set, for the limit alert rule's tick (src/main/menubar.ts). */
+export const currentAlertPrefs = (): AlertPrefs => prefs
+
+/** The alert settings (the menu bar popover's settings view and "Pause 1 h"). */
 export async function alertPrefs(): Promise<AlertPrefs> {
   await ready()
   return prefs

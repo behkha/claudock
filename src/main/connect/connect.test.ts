@@ -422,10 +422,11 @@ test('alertText: one session names it, several are grouped', () => {
 })
 
 test('normalizeAlertPrefs: defaults are the approved rule; bad values keep the previous ones', () => {
-  assert.deepEqual(normalizeAlertPrefs(undefined), { pausedUntil: null, reminderMinutes: null, doneAlert: false, sound: false })
-  const p = normalizeAlertPrefs({ pausedUntil: 5000, reminderMinutes: 10, doneAlert: true, sound: true })
-  assert.deepEqual(p, { pausedUntil: 5000, reminderMinutes: 10, doneAlert: true, sound: true })
-  assert.deepEqual(normalizeAlertPrefs({ pausedUntil: -1, reminderMinutes: 0.5, doneAlert: 'yes', sound: 1 }, p), p)
+  assert.deepEqual(normalizeAlertPrefs(undefined), { pausedUntil: null, reminderMinutes: null, doneAlert: false, sound: false, limitPercent: null, limitReset: false })
+  const p = normalizeAlertPrefs({ pausedUntil: 5000, reminderMinutes: 10, doneAlert: true, sound: true, limitPercent: 80, limitReset: true })
+  assert.deepEqual(p, { pausedUntil: 5000, reminderMinutes: 10, doneAlert: true, sound: true, limitPercent: 80, limitReset: true })
+  assert.deepEqual(normalizeAlertPrefs({ pausedUntil: -1, reminderMinutes: 0.5, doneAlert: 'yes', sound: 1, limitPercent: 101, limitReset: 'on' }, p), p)
+  assert.equal(normalizeAlertPrefs({ limitPercent: null }, p).limitPercent, null)
   assert.deepEqual(normalizeAlertPrefs({ pausedUntil: null, reminderMinutes: null }, p), { ...p, pausedUntil: null, reminderMinutes: null })
   assert.equal(normalizeAlertPrefs({ reminderMinutes: 100_000 }).reminderMinutes, null)
 })

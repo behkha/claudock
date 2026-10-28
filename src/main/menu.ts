@@ -1,6 +1,7 @@
-import { Menu, type MenuItemConstructorOptions } from 'electron'
+import { Menu, type MenuItem, type MenuItemConstructorOptions } from 'electron'
 import { THEME_PREFS, type ThemePref } from '@shared/types'
 import { installKind } from './paths'
+import { menuBarShown, openAtLoginShown, setMenuBar } from './menubar'
 import { currentTheme, setTheme } from './theme'
 
 const LABEL: Record<ThemePref, string> = { system: 'System', light: 'Light', dark: 'Dark' }
@@ -25,6 +26,16 @@ export function buildMenu(): void {
             })
           )
         },
+        {
+          label: mac ? 'Show in Menu Bar' : 'Show in Tray',
+          type: 'checkbox',
+          checked: menuBarShown(),
+          click: (item) => void setMenuBar({ shown: item.checked })
+        },
+        // also here, not only in the popover: Linux trays mostly offer just a menu, and the item may be hidden
+        ...(openAtLoginShown() === null
+          ? []
+          : [{ label: 'Open at Login', type: 'checkbox' as const, checked: openAtLoginShown() === true, click: (item: MenuItem) => void setMenuBar({ openAtLogin: item.checked }) }]),
         { type: 'separator' },
         { role: 'reload' },
         { role: 'forceReload' },
