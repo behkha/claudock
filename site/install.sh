@@ -99,10 +99,20 @@ install_linux() {
     *":$dest:"*) printf '\nRun it: claudock\n' ;;
     *) printf '\n%s is not on your PATH. Run it: %s/claudock\n' "$dest" "$dest" ;;
   esac
-  # AppImages need FUSE 2, which Ubuntu 22.04 and later leave out.
-  if command -v ldconfig >/dev/null 2>&1 && ! ldconfig -p 2>/dev/null | grep -q 'libfuse\.so\.2'; then
-    printf 'If it does not start, install FUSE 2 (Ubuntu: sudo apt install libfuse2t64, or libfuse2 before 24.04).\n'
-  fi
+  # AppImages mount themselves with FUSE. 0.1.x needs FUSE 2's library, which Ubuntu 22.04 and later leave out; later
+  # releases carry their own and need only the fusermount tool.
+  case $version in
+    0.1.*)
+      if command -v ldconfig >/dev/null 2>&1 && ! ldconfig -p 2>/dev/null | grep -q 'libfuse\.so\.2'; then
+        printf 'If it does not start, install FUSE 2 (Ubuntu: sudo apt install libfuse2t64, or libfuse2 before 24.04).\n'
+      fi
+      ;;
+    *)
+      if ! command -v fusermount3 >/dev/null 2>&1 && ! command -v fusermount >/dev/null 2>&1; then
+        printf 'If it does not start, install FUSE (Ubuntu: sudo apt install fuse3).\n'
+      fi
+      ;;
+  esac
 }
 
 main "$@"

@@ -26,7 +26,7 @@ Design source of truth: the "Claudock design options" canvas, Option A (three-pa
 3. **Snapshot store**: `<app userData>/snapshots/<ISO timestamp>/<path relative to config dir>`, plus a `manifest.json` per snapshot (`{ at, reason, files: [rel paths] }`). Snapshots never go into `~/.claude` itself.
 4. **Deletes go to the OS Trash** via `shell.trashItem`, never `fs.rm`.
 5. **`.claude.json` is written by Claude Code constantly.** Re-read it immediately before writing, change only the key being edited (e.g. `mcpServers`), and write atomically.
-6. **The renderer has no Node access.** `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`. Every file path coming from the renderer is resolved and checked to be inside the config dir (or the global state file) before use.
+6. **The renderer has no Node access.** `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`. On Linux systems that block Chromium's OS sandbox for unpackaged apps (Ubuntu 24.04), `npx claudock` and the AppImage start with `--no-sandbox`, like electron-builder's AppImage launcher; the `.deb` keeps it. Every file path coming from the renderer is resolved and checked to be inside the config dir (or the global state file) before use.
 7. **Development and tests never write to the real `~/.claude`.** Use `npm run fixture` to build `./.fixture/claude` (a synthetic config dir) and run with `CLAUDE_CONFIG_DIR=./.fixture/claude`. Reading the real folder for a look is fine; writing to it is not.
 
 ## Architecture

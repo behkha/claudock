@@ -14,6 +14,9 @@ import icon from '../../resources/icon.png?asset'
 // Keep app data separate from the Electron default and from other apps. CLAUDOCK_USER_DATA lets tests/screenshots isolate it.
 app.setName('Claudock')
 app.setPath('userData', process.env.CLAUDOCK_USER_DATA || path.join(app.getPath('appData'), 'Claudock'))
+// Windows names alerts after the Start menu shortcut with this id (electron-builder's appId); without it they say
+// "electron.app.Claudock"
+if (process.platform === 'win32' && installKind() === 'installer') app.setAppUserModelId('app.claudock')
 
 const shotMode = process.env.CLAUDOCK_SHOT === '1'
 

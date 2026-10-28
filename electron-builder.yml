@@ -43,3 +43,7 @@ linux:
   syncDesktopName: true
   maintainer: Claudock
   artifactName: ${productName}-${version}-${arch}.${ext}
+toolsets:
+  # The static AppImage runtime: needs no FUSE 2 library (Ubuntu 22.04 and later leave it out), and the legacy arm64
+  # runtime linked libz.so, which only zlib1g-dev provides. Still a beta in electron-builder 26.
+  appimage: '1.0.3'

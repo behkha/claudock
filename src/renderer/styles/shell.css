@@ -61,6 +61,11 @@
 }
 .titlebar__search-text {
   flex: 1;
+  min-width: 0;
+  /* one line with wider fonts too (Linux's DejaVu Sans wrapped it) */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ---------- Sidebar ---------- */

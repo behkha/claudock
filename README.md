@@ -78,6 +78,14 @@ To build an installer yourself from the clone above, run `npm run dist:mac` (or 
 
 Either way the app reads and writes `~/.claude`, or the folder in `CLAUDE_CONFIG_DIR` if you set it.
 
+### Troubleshooting
+
+- **`claudock: could not find Electron`:** npm's `legacy-peer-deps` setting is on, so npm skipped Electron. Run `npx --legacy-peer-deps=false claudock@latest`.
+- **`npm warn EBADENGINE` on Node 20:** harmless. Claudock runs on Electron's own Node; Node 22.12 or later removes the warning.
+- **Linux, "this system blocks Chromium's sandbox":** Ubuntu 24.04 blocks Chromium's sandbox for apps outside a package, so `npx claudock` and the AppImage start without it. The `.deb` keeps the sandbox.
+- **Linux, the AppImage doesn't start:** install FUSE with `sudo apt install fuse3` (for v0.1.x, `libfuse2t64`).
+- **Ubuntu, `curl: command not found`:** run `sudo apt install curl`, then the install line again.
+
 ## Status
 
 Beta (v0.1.0), actively maintained. Bug reports are welcome in [Issues](https://github.com/behkha/claudock/issues).

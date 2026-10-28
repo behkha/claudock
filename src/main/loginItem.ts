@@ -26,7 +26,9 @@ function command(): string[] | null {
   if ([exe, appPath, ...Object.values(env())].some((p) => [...p].some((c) => c.charCodeAt(0) < 0x20))) return null
   // a packaged app, or a macOS bundle with the app folder inside it, loads its app by itself
   const loadsItself = app.isPackaged || (MAC && isInside(path.resolve(path.dirname(exe), '..', 'Resources'), appPath))
-  return [exe, ...(loadsItself ? [] : [appPath]), LOGIN_ARG]
+  // Linux: started without Chromium's sandbox because the system blocks it (bin/claudock.js), so at login too
+  const noSandbox = process.platform === 'linux' && !process.env.APPIMAGE && process.argv.includes('--no-sandbox')
+  return [exe, ...(noSandbox ? ['--no-sandbox'] : []), ...(loadsItself ? [] : [appPath]), LOGIN_ARG]
 }
 
 const env = (): Record<string, string> => (isCustomConfigDir() ? { CLAUDE_CONFIG_DIR: configDir() } : {})

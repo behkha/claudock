@@ -1,10 +1,12 @@
 'use strict'
 /**
- * macOS only: the Claudock.app that `npx claudock` runs, so alerts, the Dock, the app menu and ⌘Tab say "Claudock"
- * instead of "Electron", and so Open at login has a path that doesn't change between runs (npx's cache folder does).
+ * macOS only: the Claudock.app that `npx claudock` runs, so alerts, the Dock, the app menu, ⌘Tab, About and Activity
+ * Monitor say "Claudock" instead of "Electron", and so Open at login has a path that doesn't change between runs (npx's
+ * cache folder does).
  *
  * <userData>/Claudock.app is npm's Electron.app copied as an APFS clone (no extra disk; a plain copy on other volumes),
- * with Claudock's name, bundle id and icon in its Info.plist, this package's app folder in Contents/Resources/app, and
+ * with Claudock's name, version, bundle id and icon in its Info.plist, its binary and helper apps renamed to Claudock
+ * (Electron finds helpers named after the app), this package's app folder in Contents/Resources/app, and
  * an ad-hoc signature (npm's Electron is signed ad hoc too; files made on this Mac carry no quarantine flag). It is
  * rebuilt only when Electron, Claudock or the built app changes. `claudock-npm-copy.json` in the app folder records
  * that and tells the app it is still the npm copy (installKind() in src/main/paths.ts).
@@ -19,6 +21,7 @@ const path = require('node:path')
 const MARKER = 'claudock-npm-copy.json'
 // not the installer's app.claudock: two bundles with one id confuse LaunchServices and Notification Center
 const BUNDLE_ID = 'app.claudock.npm'
+const NAME = 'Claudock'
 const PLIST_BUDDY = '/usr/libexec/PlistBuddy'
 
 const run = (cmd, args) => execFileSync(cmd, args, { stdio: ['ignore', 'ignore', 'pipe'] })
@@ -52,7 +55,7 @@ function running(bin) {
   }
 }
 
-function build(electronApp, appRoot, target, stamp) {
+function build(electronApp, electronBin, appRoot, target, stamp) {
   const tmp = `${target}.tmp-${process.pid}`
   // what an interrupted build or swap left behind
   const base = path.basename(target)
@@ -65,8 +68,24 @@ function build(electronApp, appRoot, target, stamp) {
     const res = path.join(tmp, 'Contents', 'Resources')
     const plist = path.join(tmp, 'Contents', 'Info.plist')
     setPlist(plist, 'CFBundleIdentifier', BUNDLE_ID)
-    setPlist(plist, 'CFBundleName', 'Claudock')
-    setPlist(plist, 'CFBundleDisplayName', 'Claudock')
+    setPlist(plist, 'CFBundleName', NAME)
+    setPlist(plist, 'CFBundleDisplayName', NAME)
+    // About Claudock reads these; npm's Electron.app has Electron's version in them
+    setPlist(plist, 'CFBundleShortVersionString', stamp.version)
+    setPlist(plist, 'CFBundleVersion', stamp.version)
+    const macos = path.join(tmp, 'Contents', 'MacOS')
+    fs.renameSync(path.join(macos, electronBin), path.join(macos, NAME))
+    setPlist(plist, 'CFBundleExecutable', NAME)
+    // "Electron Helper (Renderer).app" → "Claudock Helper (Renderer).app", its binary and name with it
+    const frameworks = path.join(tmp, 'Contents', 'Frameworks')
+    for (const name of fs.readdirSync(frameworks)) {
+      const m = /^Electron( Helper.*)\.app$/.exec(name)
+      if (!m) continue
+      const helper = path.join(frameworks, `${NAME}${m[1]}.app`)
+      fs.renameSync(path.join(frameworks, name), helper)
+      fs.renameSync(path.join(helper, 'Contents', 'MacOS', `Electron${m[1]}`), path.join(helper, 'Contents', 'MacOS', `${NAME}${m[1]}`))
+      setPlist(path.join(helper, 'Contents', 'Info.plist'), 'CFBundleName', `${NAME}${m[1]}`)
+    }
     fs.copyFileSync(path.join(appRoot, 'resources', 'icon.icns'), path.join(res, 'electron.icns'))
     fs.rmSync(path.join(res, 'default_app.asar'), { force: true })
     const app = path.join(res, 'app')
@@ -105,7 +124,9 @@ function macApp(electron, appRoot) {
     if (!electronApp.endsWith('.app')) return null
     const userData = process.env.CLAUDOCK_USER_DATA || path.join(os.homedir(), 'Library', 'Application Support', 'Claudock')
     const target = path.join(userData, 'Claudock.app')
-    const bin = path.join(target, 'Contents', 'MacOS', path.basename(electron))
+    const bin = path.join(target, 'Contents', 'MacOS', NAME)
+    // copies built before the binary was renamed
+    const unrenamed = path.join(target, 'Contents', 'MacOS', path.basename(electron))
     const pkg = JSON.parse(fs.readFileSync(path.join(appRoot, 'package.json'), 'utf8'))
     const electronVersion = JSON.parse(fs.readFileSync(path.join(electronApp, '..', '..', 'package.json'), 'utf8')).version
     const stamp = { version: pkg.version, electron: electronVersion, built: Math.round(fs.statSync(path.join(appRoot, 'out', 'main', 'index.js')).mtimeMs) }
@@ -117,13 +138,14 @@ function macApp(electron, appRoot) {
     }
     const current = have && have.version === stamp.version && have.electron === stamp.electron && have.built === stamp.built && fs.existsSync(bin)
     if (!current) {
-      if (fs.existsSync(bin) && running(bin)) {
+      const live = [bin, unrenamed].find((b) => fs.existsSync(b) && running(b))
+      if (live) {
         // replacing a running app under it would break it: the running copy comes forward instead
         console.error(`claudock: Claudock ${have ? have.version : ''} is running. Quit it, then run npx claudock again to start ${stamp.version}.`)
-        return bin
+        return live
       }
       fs.mkdirSync(userData, { recursive: true })
-      build(electronApp, appRoot, target, stamp)
+      build(electronApp, path.basename(electron), appRoot, target, stamp)
     }
     return bin
   } catch (e) {
