@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claudock vs CC Switch: which Claude Code manager to use</title>
+<meta name="description" content="CC Switch manages providers, MCP and skills across 12 coding CLIs. Claudock covers every part of ~/.claude for Claude Code alone. When to use each, or both.">
+<link rel="canonical" href="https://behkha.github.io/claudock/compare/cc-switch/">
+<meta name="theme-color" content="#faf9f5" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#262624" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../../apple-touch-icon.png">
+
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Claudock">
+<meta property="og:title" content="Claudock vs CC Switch: which Claude Code manager to use">
+<meta property="og:description" content="CC Switch manages providers, MCP and skills across 12 coding CLIs. Claudock covers every part of ~/.claude for Claude Code alone. When to use each, or both.">
+<meta property="og:url" content="https://behkha.github.io/claudock/compare/cc-switch/">
+<meta property="og:image" content="https://behkha.github.io/claudock/og.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="stylesheet" href="../../style.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Does Claudock switch API providers?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. It edits Claude Code's config, but it has no provider presets, proxy or failover. Use CC Switch for that."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does Claudock work with Codex or Gemini CLI?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. Only Claude Code."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Can I use Claudock and CC Switch together?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. CC Switch changes only its provider keys in settings.json and leaves the rest alone. Claudock re-reads the file before each change and won't save over a newer version of it."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Are either of them official?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. Neither is made by or affiliated with Anthropic."
+      }
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": "Claudock",
+      "item": "https://behkha.github.io/claudock/"
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "name": "Compare",
+      "item": "https://behkha.github.io/claudock/alternatives/claude-code-gui/"
+    },
+    {
+      "@type": "ListItem",
+      "position": 3,
+      "name": "Claudock vs CC Switch",
+      "item": "https://behkha.github.io/claudock/compare/cc-switch/"
+    }
+  ]
+}
+</script>
+<script src="../../app.js" defer></script>
+</head>
+<body>
+
+<header class="bar">
+  <a class="brand" href="../../" aria-label="Claudock home">
+    <svg class="mark" viewBox="0 0 1024 1024" width="28" height="28" aria-hidden="true">
+      <rect x="32" y="32" width="960" height="960" rx="216" fill="#141413"/>
+      <g transform="translate(512 512) scale(1.165) translate(-512 -512)">
+        <path d="M 236 552 C 282 458, 372 452, 442 512 C 512 572, 602 568, 650 474" fill="none" stroke="#FAF9F5" stroke-width="80" stroke-linecap="round"/>
+        <rect x="716" y="372" width="100" height="284" rx="16" fill="#D97757"/>
+      </g>
+    </svg>
+    <span>Claudock</span>
+  </a>
+  <a class="bar-link" href="https://github.com/behkha/claudock">GitHub</a>
+</header>
+
+<main class="doc">
+<h1>Claudock vs CC Switch</h1>
+<p>CC Switch manages twelve coding CLIs, including Claude Code, Codex and Gemini CLI. It switches API providers in one click and keeps MCP servers, skills and prompts in sync across them. It's the most widely used tool in this space, with a release every day or two.</p>
+<p>Claudock works with Claude Code only and covers every part of its config folder, <code>~/.claude</code>, including the parts CC Switch leaves alone: hooks, permission rules, agents, slash commands, plugins, memory and plans. Pick CC Switch if you switch providers or use more than one CLI. Pick Claudock to see and change everything Claude Code loads. Many people will want both.</p>
+
+<div class="tbl stack">
+  <table>
+    <caption>As of 28 October 2026</caption>
+    <thead><tr><th scope="col"><span class="visually-hidden">Topic</span></th><th scope="col">Claudock</th><th scope="col">CC Switch</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">Built for</th><td data-col="Claudock"><span>Every part of <code>~/.claude</code></span></td><td data-col="CC Switch"><span>Providers and shared config across 12 CLIs</span></td></tr>
+      <tr><th scope="row">Tools covered</th><td data-col="Claudock"><span>Claude Code</span></td><td data-col="CC Switch"><span>Claude Code, Claude Desktop, Codex, Gemini CLI, OpenCode and 7 more</span></td></tr>
+      <tr><th scope="row">Switch API providers</th><td data-col="Claudock"><span>No</span></td><td data-col="CC Switch"><span>Yes, 90+ presets, from the tray too</span></td></tr>
+      <tr><th scope="row">Local proxy and failover</th><td data-col="Claudock"><span>No</span></td><td data-col="CC Switch"><span>Yes</span></td></tr>
+      <tr><th scope="row">Settings (<code>settings.json</code>)</th><td data-col="Claudock"><span>Form or raw JSON, schema suggestions, history</span></td><td data-col="CC Switch"><span>Changes the provider keys when you switch</span></td></tr>
+      <tr><th scope="row">Hooks</th><td data-col="Claudock"><span>Add, edit, remove, grouped by event</span></td><td data-col="CC Switch"><span>Left as they are</span></td></tr>
+      <tr><th scope="row">Permissions</th><td data-col="Claudock"><span>Allow, ask and deny rules, default mode</span></td><td data-col="CC Switch"><span>Left as they are</span></td></tr>
+      <tr><th scope="row">Agents and slash commands</th><td data-col="Claudock"><span>Create, edit, duplicate, Trash</span></td><td data-col="CC Switch"><span><span class="ns">Not in their README</span></span></td></tr>
+      <tr><th scope="row">Plugins</th><td data-col="Claudock"><span>Turn on or off</span></td><td data-col="CC Switch"><span><span class="ns">Not in their README</span></span></td></tr>
+      <tr><th scope="row">Skills</th><td data-col="Claudock"><span>Turn on or off, edit, duplicate, Trash</span></td><td data-col="CC Switch"><span>Install from skills.sh, GitHub or a ZIP; update checks; sync across tools</span></td></tr>
+      <tr><th scope="row">MCP servers</th><td data-col="Claudock"><span>Add, edit, remove; writes only the changed key</span></td><td data-col="CC Switch"><span>One panel for all tools, import, deep links</span></td></tr>
+      <tr><th scope="row">CLAUDE.md</th><td data-col="Claudock"><span>Edit <code>CLAUDE.md</code> and <code>rules/</code></span></td><td data-col="CC Switch"><span>Prompt library that writes <code>CLAUDE.md</code></span></td></tr>
+      <tr><th scope="row">Memory, plans, prompt history</th><td data-col="Claudock"><span>A screen each</span></td><td data-col="CC Switch"><span><span class="ns">Not in their README</span></span></td></tr>
+      <tr><th scope="row">Sessions</th><td data-col="Claudock"><span>Running and waiting sessions live; past ones listed, readable, Trash</span></td><td data-col="CC Switch"><span>List, search, read, export to Markdown, resume</span></td></tr>
+      <tr><th scope="row">Alert when a session waits for you</th><td data-col="Claudock"><span>Yes (macOS, Linux)</span></td><td data-col="CC Switch"><span><span class="ns">Not in their README</span></span></td></tr>
+      <tr><th scope="row">5-hour and weekly limits</th><td data-col="Claudock"><span>As Claude Code reports them, in the menu bar; token counts otherwise</span></td><td data-col="CC Switch"><span>Subscription quota with a reset countdown, in the tray</span></td></tr>
+      <tr><th scope="row">Cost</th><td data-col="Claudock"><span>No</span></td><td data-col="CC Switch"><span>Tokens, cache hit rate, spend, heat map</span></td></tr>
+      <tr><th scope="row">Disk use of <code>~/.claude</code></th><td data-col="Claudock"><span>Per folder, with cleanup suggestions</span></td><td data-col="CC Switch"><span><span class="ns">Not in their README</span></span></td></tr>
+      <tr><th scope="row">Backups</th><td data-col="Claudock"><span>Snapshot before every write; diff and restore</span></td><td data-col="CC Switch"><span>Backup on the first rewrite of each file; full backup every 24 hours; WebDAV or S3 sync</span></td></tr>
+      <tr><th scope="row">Menu bar or tray</th><td data-col="Claudock"><span>Yes</span></td><td data-col="CC Switch"><span>Yes</span></td></tr>
+      <tr><th scope="row">Install</th><td data-col="Claudock"><span><code>npx claudock</code>, a one-line script, or an installer (not signed)</span></td><td data-col="CC Switch"><span>Homebrew, <code>.dmg</code> (signed and notarized), <code>.msi</code>, <code>.deb</code>, <code>.rpm</code>, AppImage, AUR</span></td></tr>
+      <tr><th scope="row">Updates</th><td data-col="Claudock"><span>Tells you when a new version is out</span></td><td data-col="CC Switch"><span>Updates itself</span></td></tr>
+      <tr><th scope="row">Latest release</th><td data-col="Claudock"><span>v0.2.0, 3 Dec 2026</span></td><td data-col="CC Switch"><span>v4.0.21, 26 Oct 2026</span></td></tr>
+      <tr><th scope="row">License</th><td data-col="Claudock"><span>MIT</span></td><td data-col="CC Switch"><span>MIT</span></td></tr>
+      <tr><th scope="row">Stack</th><td data-col="Claudock"><span>Electron</span></td><td data-col="CC Switch"><span>Tauri</span></td></tr>
+      <tr><th scope="row">Price</th><td data-col="Claudock"><span>Free</span></td><td data-col="CC Switch"><span>Free</span></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<h2>One CLI in depth, or many CLIs</h2>
+<p>CC Switch is built around what coding CLIs share: an API provider, MCP servers, skills and a prompt file. It keeps one list of each and syncs it to the tools you choose. That's the right shape if you use Claude Code and Codex, or move between Anthropic's API and a relay.</p>
+<p>Claudock is built around what only Claude Code has. Hooks run by event and matcher. Permission rules come in allow, ask and deny lists. There are agents, slash commands, plugins, memory and plans, and two settings files with dozens of keys. Claudock gives each of these its own screen. CC Switch's README says hooks, plugins and permissions are left alone when you switch providers, and doesn't describe a way to edit them.</p>
+
+<h2>Skills and MCP servers</h2>
+<p>CC Switch finds and installs skills from skills.sh, GitHub or a ZIP, checks them for updates and syncs them to several tools. Its MCP panel shares servers across tools and imports the ones you have.</p>
+<p>Claudock doesn't install skills. It shows the ones you have, turns each on or off through Claude Code's <code>skillOverrides</code> setting, and lets you edit, duplicate or Trash them. For MCP it edits the servers in <code>~/.claude.json</code>. Claude Code rewrites that file while it runs, so Claudock re-reads it just before writing and changes only the server you edited.</p>
+
+<h2>Limits and usage</h2>
+<p>Both put your limits in the menu bar or tray. CC Switch shows how much subscription quota is left, with a reset countdown. Claudock shows the 5-hour and weekly percentages exactly as Claude Code reports them, after one Connect step, and never estimates one. Without it, or on Windows, it shows the tokens used in each window, counted from your transcripts.</p>
+<p>CC Switch also turns your session logs into cost: tokens, cache hit rate, spend and a heat map. Claudock doesn't show cost. It shows activity instead, with a 26-week heat map and stats you can post as an image.</p>
+
+<h2>Sessions</h2>
+<p>CC Switch is the better session browser: search, a reading view, Markdown export and resume.</p>
+<p>Claudock watches the sessions running now. Once connected, it shows which ones are working, done, or waiting for you, and sends one alert when a session starts waiting for a permission or an answer. Past sessions are listed per project, where you can read them, Trash one, or clear out old ones.</p>
+
+<h2>Safety and undo</h2>
+<p>CC Switch backs up each config file the first time it rewrites it, makes a full backup every 24 hours, and can sync to WebDAV or S3.</p>
+<p>Claudock saves a snapshot every time it writes a file, so every change can be undone, and you can diff any snapshot against the current file. Writes are atomic, JSON is checked before it's saved, and deletes go to the OS Trash. Its one Connect step comes off with one Disconnect, which leaves <code>settings.json</code> byte for byte as it was if nothing else has changed it since. It never reads <code>.credentials.json</code>.</p>
+
+<h2>Install and maturity</h2>
+<p>CC Switch has signed and notarized macOS builds, installers for every OS and package manager, and it updates itself. If you want something proven, that's CC Switch.</p>
+<p>Claudock is a young beta. It runs with <code>npx claudock</code>, and npm downloads don't carry the macOS quarantine flag or the Windows Mark of the Web, so there's no security warning. Its installers aren't signed, so their first launch needs one extra click. It tells you when a newer release is out but doesn't update itself.</p>
+
+<h2>Who CC Switch is best for</h2>
+<ul>
+  <li>You switch between Anthropic's API, Bedrock, relays or other providers.</li>
+  <li>You use Codex, Gemini CLI or another CLI alongside Claude Code.</li>
+  <li>You want to install skills from a store and keep MCP servers in sync across tools.</li>
+  <li>You want cost numbers, or session export.</li>
+</ul>
+
+<h2>Who Claudock is best for</h2>
+<ul>
+  <li>You use Claude Code only and have customised it: hooks, permission rules, agents, commands, plugins.</li>
+  <li>You want to read and edit <code>settings.json</code> as a form, with undo for every change.</li>
+  <li>You run several sessions and want to know when one is waiting for you.</li>
+  <li>Your <code>~/.claude</code> has grown and you want to see what's taking the space.</li>
+</ul>
+
+<h2>Using both</h2>
+<p>They change different parts of the same files. When you switch providers, CC Switch reads <code>settings.json</code> and changes only the provider keys, such as the endpoint, key and model, in place. Claudock re-reads the file before each change, writes only the key you edited, and won't save a whole file over a newer version of it. So a hook you add in Claudock survives a provider switch, and the other way round.</p>
+
+<h2>Switching from CC Switch</h2>
+<p>There's nothing to move. Claudock reads <code>~/.claude</code> and <code>~/.claude.json</code> directly, so whatever CC Switch has written there shows up in Claudock. CC Switch's own data, such as its provider list, prompt library and backups, stays in CC Switch's folder.</p>
+<p>To look before you trust it with your real folder, clone the repo and run <code>npm run dev</code>. It opens on a generated fake config. <code>npm run dev:real</code> opens your real <code>~/.claude</code> with every write turned off.</p>
+
+<h2>Coming to Claudock</h2>
+<p>Planned, not shipped, and not part of the comparison above.</p>
+<ul>
+  <li>Profiles: separate Claude Code setups you switch between</li>
+  <li>An archive that keeps sessions before Claude Code's cleanup deletes them</li>
+  <li>What each MCP server and skill costs in context</li>
+</ul>
+
+<h2>FAQ</h2>
+<h3>Does Claudock switch API providers?</h3>
+<p>No. It edits Claude Code's config, but it has no provider presets, proxy or failover. Use CC Switch for that.</p>
+<h3>Does Claudock work with Codex or Gemini CLI?</h3>
+<p>No. Only Claude Code.</p>
+<h3>Can I use Claudock and CC Switch together?</h3>
+<p>Yes. CC Switch changes only its provider keys in <code>settings.json</code> and leaves the rest alone. Claudock re-reads the file before each change and won't save over a newer version of it.</p>
+<h3>Are either of them official?</h3>
+<p>No. Neither is made by or affiliated with Anthropic.</p>
+
+<p>See also <a href="../../alternatives/claude-code-gui/">Claude Code GUIs in 2026</a> and <a href="../../alternatives/ccusage-gui/">ccusage with a GUI</a>.</p>
+
+
+<div class="get">
+  <div class="npx">
+    <code id="npx-cmd"><b aria-hidden="true">$ </b>npx claudock</code>
+    <button class="npx-copy" id="npx-copy" type="button" hidden>Copy</button>
+  </div>
+  <p class="inst">
+    <a href="https://github.com/behkha/claudock/releases/latest">Download an installer</a>
+    <a class="note" href="https://github.com/behkha/claudock#install">Not signed yet: first-launch steps</a>
+  </p>
+</div>
+
+
+<p class="fine">Facts about CC Switch come from <a href="https://github.com/farion1231/cc-switch">github.com/farion1231/cc-switch</a> (README, releases, SECURITY.md and the code that writes <code>settings.json</code>), checked 28 October 2026. If something here is wrong or out of date, <a href="https://github.com/behkha/claudock/issues">open an issue</a> and it will be fixed.</p>
+</main>
+
+<footer class="foot">
+  <nav aria-label="Project">
+    <a href="https://github.com/behkha/claudock">GitHub</a>
+    <a href="../../alternatives/claude-code-gui/">Compare</a>
+    <a href="../../privacy/">Privacy</a>
+    <a href="../../terms/">Terms</a>
+    <a href="https://github.com/behkha/claudock/blob/main/LICENSE.md">Free and open source (MIT)</a>
+  </nav>
+  <p>Unofficial, not affiliated with Anthropic</p>
+</footer>
+
+</body>
+</html>
