@@ -4,7 +4,7 @@
  * The renderer folder for each screen is `src/renderer/screens/<folder>/index.tsx`.
  */
 export type ScreenId =
-  | 'overview'
+  | 'today'
   | 'settings'
   | 'rules'
   | 'hooks'
@@ -35,7 +35,7 @@ export interface ScreenDef {
 export const NAV_GROUPS: NavGroup[] = ['Home', 'Configure', 'Extend', 'Your data', 'Maintain']
 
 export const SCREENS: ScreenDef[] = [
-  { id: 'overview', label: 'Overview', group: 'Home', folder: 'Overview' },
+  { id: 'today', label: 'Today', group: 'Home', folder: 'Today' },
   { id: 'settings', label: 'Settings', group: 'Configure', folder: 'Settings' },
   { id: 'rules', label: 'CLAUDE.md & rules', group: 'Configure', folder: 'Rules' },
   { id: 'hooks', label: 'Hooks', group: 'Configure', folder: 'Hooks' },

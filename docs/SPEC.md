@@ -45,7 +45,7 @@ src/
     paths.ts         config dir resolution + `resolveInside()` guard
     safeWrite.ts     snapshot + atomic write + JSON validation
     domains/         ONE file per domain; each exports `register(ipcMain)`
-      overview.ts storage.ts backups.ts settings.ts rules.ts hooks.ts
+      today.ts overview.ts storage.ts backups.ts settings.ts rules.ts hooks.ts
       permissions.ts skills.ts agents.ts commands.ts plugins.ts mods.ts mcp.ts
       projects.ts memory.ts plans.ts history.ts search.ts system.ts
       limits.ts sessions.ts connect.ts   (live limits, "needs me" sessions, Connect to Claude Code)
@@ -69,7 +69,7 @@ Each domain owns: `src/main/domains/<domain>.ts`, its slice of types in `src/sha
 
 ## Navigation (sidebar groups, in order)
 
-- **Home**: Overview
+- **Home**: Today
 - **Configure**: Settings, CLAUDE.md & rules, Hooks, Permissions
 - **Extend**: Skills, Agents, Commands, Plugins, Mods, MCP servers
 - **Your data**: Projects, Memory, Plans, History
@@ -79,12 +79,12 @@ Each item shows a count or size on the right when one is cheap to get. A search 
 
 ## Screens
 
-Layout for every list-type screen: sidebar (220–240px) · list pane (300–360px, title in serif 24px, filter chips, rows) · detail pane (title serif 28px, mono path line, body, action row). Overview, Settings and Storage use the full width instead of list + detail.
+Layout for every list-type screen: sidebar (220–240px) · list pane (300–360px, title in serif 24px, filter chips, rows) · detail pane (title serif 28px, mono path line, body, action row). Today, Settings and Storage use the full width instead of list + detail.
 
-- **Overview (home)**: storage bar by top-level folder; "Worth a look" list computed from real data (big project transcripts, large skills that are turned off, old CLI downloads, loose `*.bak*` files in the root, large logs, empty CLAUDE.md, etc.), each with a one-click action; "What you have" counts; "Settings at a glance".
+- **Today (home)**: one column, capped at a reading width. The headline is today's tokens and sessions, with the last 7 days of tokens as bars beside it (to scale, today in clay), a "Worth a look · <size>" chip that opens Storage (hidden when nothing is flagged) and Share (the Share stats dialog). Then the Claude Code card: running sessions (waiting, working with the last tool it finished, done), each named as Claude Code names it (else by its first prompt) with its folder beside it, both limits (the % Claude Code sent to the status line; "Limit reached" with the reset time when it refused a request; else the window's tokens, since desktop-app sessions never run the status line), and Connect / Disconnect. Then "Earlier today": today's other sessions (name, folder, first to last message, tokens), each opening its transcript in Projects; "No sessions yet today" when there are none. The sessions and the week come from the limits transcript scan (`today.get()`), so no number is invented. On Windows the card is left out.
 - **Settings**: `settings.json` and `settings.local.json` (tabs). Views: Form · JSON · History. Form covers model, effort, theme, status line, env vars, and links to Hooks / Permissions / Skills / Plugins for those keys; unknown keys stay intact and are editable in JSON view. History lists snapshots of the file and the loose `.bak` copies, with a diff and Restore.
 - **CLAUDE.md & rules**: `CLAUDE.md` plus every `rules/*.md`. Markdown editor with preview, new rule, rename, move to Trash.
-- **Hooks**: grouped by event; each hook shows matcher + command; add / edit / remove; writes `hooks` in `settings.json`. Claudock's own hooks (Connect to Claude Code) are one read-only "Connect to Claude Code" row whose Disconnect… opens the Overview card's Disconnect dialog; they are left out of every hook count (sidebar badge, Overview tile, Settings form).
+- **Hooks**: grouped by event; each hook shows matcher + command; add / edit / remove; writes `hooks` in `settings.json`. Claudock's own hooks (Connect to Claude Code) are one read-only "Connect to Claude Code" row whose Disconnect… opens the Disconnect dialog on Today; they are left out of every hook count (sidebar badge, Settings form).
 - **Permissions**: `defaultMode`, and allow / ask / deny rule lists with add / remove.
 - **Skills**: user skills (`skills/*/SKILL.md`), synced skills, and plugin skills (read-only). On/off toggle writes `skillOverrides`. Detail: frontmatter, SKILL.md (editable for user skills), file list, size, Reveal, Open in editor, Duplicate, Move to Trash.
 - **Agents** / **Commands**: `agents/*.md` and `commands/**/*.md`; list, edit with frontmatter form + body, new from template, Trash.
@@ -95,12 +95,12 @@ Layout for every list-type screen: sidebar (220–240px) · list pane (300–360
 - **Memory**: `projects/*/memory/*.md` grouped by project; view / edit / Trash; `MEMORY.md` index shown first.
 - **Plans**: `plans/*.md` with preview.
 - **History**: `history.jsonl` with search and project filter.
-- **Storage**: drill-down bars per folder with sizes, plus the cleanup actions from Overview.
+- **Storage**: drill-down bars per folder with sizes, plus the cleanup findings ("Worth a look": big project transcripts, large skills that are turned off, old CLI downloads, loose `*.bak*` files in the root, large logs, empty CLAUDE.md, etc.), each with a one-click action.
 - **Backups**: Claudock snapshots (restore / diff / delete) and loose `.bak` files found in the config dir (diff against current, restore, or tidy into `backups/`).
 
 ## First run
 
-The first launch shows the user's own Claude Code numbers in the whole window under the title bar, in place of the sidebar and the screen: "Your Claude Code since <month>", the 26-week heat map, then messages (or prompts), sessions, longest session and top model, from the same stats as Share stats. The heat map fills in week by week and the numbers count up, 1.2 s in all and once (nothing moves under Reduce Motion); the buttons work from the start. Connect to Claude Code opens the card's Connect sheet, Not now shows the window as usual (Overview), Share opens the Share stats dialog. On Windows, where Connect doesn't run yet, the one button is Continue. With no recorded sessions the heat map stays empty and "No sessions yet" replaces the numbers. It shows once, to anyone with neither Connect part on; leaving it any way (a button, a navigation from ⌘K or the menu bar, or an error in it) sets `revealed` in prefs.json, and it never comes back.
+The first launch shows the user's own Claude Code numbers in the whole window under the title bar, in place of the sidebar and the screen: "Your Claude Code since <month>", the 26-week heat map, then messages (or prompts), sessions, longest session and top model, from the same stats as Share stats. The heat map fills in week by week and the numbers count up, 1.2 s in all and once (nothing moves under Reduce Motion); the buttons work from the start. Connect to Claude Code opens the card's Connect sheet, Not now shows the window as usual (Today), Share opens the Share stats dialog. On Windows, where Connect doesn't run yet, the one button is Continue. With no recorded sessions the heat map stays empty and "No sessions yet" replaces the numbers. It shows once, to anyone with neither Connect part on; leaving it any way (a button, a navigation from ⌘K or the menu bar, or an error in it) sets `revealed` in prefs.json, and it never comes back.
 
 ## Menu bar
 

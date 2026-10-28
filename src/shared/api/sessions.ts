@@ -1,7 +1,7 @@
 /**
  * Sessions domain contract: which running Claude Code sessions are working, waiting for you or done. The data comes
  * from the session hooks "Connect to Claude Code" adds (see src/shared/api/connect.ts); without them the list is empty.
- * Read by the Overview card now and by the menu bar next: main can call `currentSessions()` and `onSessionsChanged()`
+ * Read by Today and the menu bar: main can call `currentSessions()` and `onSessionsChanged()`
  * in src/main/domains/sessions.ts directly.
  */
 
@@ -18,14 +18,18 @@ export interface LiveSession {
   since: number
   /** The session's working folder, as Claude Code reported it. */
   cwd: string | null
-  /** Last folder name of `cwd` (or the start of the id): how the session is named on screen. */
+  /** Last folder name of `cwd` (or the start of the id). */
   name: string
+  /** The session's own name in Claude Code (the title it shows, or one set with /rename), else its first prompt. */
+  title: string | null
   /** Set while waiting. */
   kind: WaitKind | null
   /** The tool a permission prompt is for ("Bash"), while waiting. */
   tool: string | null
   /** Claude Code's own notification text while waiting, when it sent one. Show `waitText()` from @shared/sessions. */
   message: string | null
+  /** While working: the last tool it finished (subagents' included) and when, so the row moves as Claude works. */
+  activity: { tool: string; at: number } | null
 }
 
 /**

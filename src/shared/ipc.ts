@@ -26,9 +26,11 @@ import type { LimitsApi, LimitsEvents } from './api/limits'
 import type { SessionsApi, SessionsEvents } from './api/sessions'
 import type { ConnectApi, ConnectEvents } from './api/connect'
 import type { MenubarApi, MenubarEvents } from './api/menubar'
+import type { TodayApi, TodayEvents } from './api/today'
 
 export const DOMAINS = [
   'system',
+  'today',
   'overview',
   'storage',
   'backups',
@@ -57,6 +59,7 @@ export type DomainName = (typeof DOMAINS)[number]
 
 export interface ClaudockApi {
   system: SystemApi
+  today: TodayApi
   overview: OverviewApi
   storage: StorageApi
   backups: BackupsApi
@@ -83,6 +86,7 @@ export interface ClaudockApi {
 
 /** Main -> renderer events. Each event name starts with `<domain>:`; the payload type is the value. */
 export type ClaudockEvents = SystemEvents &
+  TodayEvents &
   OverviewEvents &
   StorageEvents &
   BackupsEvents &

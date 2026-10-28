@@ -19,7 +19,7 @@ const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms
 /**
  * Screenshot mode (CLAUDOCK_SHOT=1, driven by scripts/shot.mjs): visits every screen in light then dark through the
  * normal `system:navigate` / `system:theme` events, waits until each is loaded and painted in that theme, saves
- * `<dir>/<theme>-<screen>.png` (plus `connect`, the Connect sheet, `connected`, the Overview card after connecting with one played status line run and three sessions played through the real hooks, which must post exactly one alert, `connected-hooks`, the Hooks screen then, where Claudock's hooks are one row and out of the counts, and `disconnect`, the confirm dialog that row's Disconnect… opens, which must leave settings.json byte for byte as it was, `palette`, `settings-json`, `mods-draft`, the Mods screen with the fixture's draft selected, and `share`, the Overview share dialog, and `card.png`, the card itself, and `reveal`, `reveal-connect`, `reveal-connected` and `reveal-empty`, the first-run reveal), prints renderer console errors as `CONSOLE_ERROR ...` and failed shots as
+ * `<dir>/<theme>-<screen>.png` (plus `connect`, the Connect sheet, `connected`, the Today card after connecting with one played status line run and three sessions played through the real hooks, which must post exactly one alert, `connected-hooks`, the Hooks screen then, where Claudock's hooks are one row and out of the counts, and `disconnect`, the confirm dialog that row's Disconnect… opens, which must leave settings.json byte for byte as it was, `palette`, `settings-json`, `mods-draft`, the Mods screen with the fixture's draft selected, and `share`, the Today share dialog, and `card.png`, the card itself, and `reveal`, `reveal-connect`, `reveal-connected` and `reveal-empty`, the first-run reveal), prints renderer console errors as `CONSOLE_ERROR ...` and failed shots as
  * `SHOT_FAILED ...`, and exits 0 (clean) or 1 (errors).
  */
 export async function runShots(win: BrowserWindow, opts: { dir: string; only: string[] }): Promise<void> {
@@ -137,7 +137,7 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
   const restoreSettingsJson = (): Promise<void> =>
     js(`(() => { const s = window.__shotJson; if (s) s.view.dispatch({ changes: { from: 0, to: s.view.state.doc.length, insert: s.text } }); window.__shotJson = undefined })()`)
 
-  /** Overview -> "Share stats" -> the dialog with the card drawn (the canvas says so with data-ready). */
+  /** Today -> "Share" -> the dialog with the card drawn (the canvas says so with data-ready). */
   const openShare = (): Promise<void> =>
     js(`(async () => {
       const wait = async (f, ms = 15000) => {
@@ -145,7 +145,7 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
         while (Date.now() - t < ms) { const v = f(); if (v) return v; await new Promise((r) => setTimeout(r, 100)) }
         throw new Error('share: timed out waiting for ' + f)
       }
-      const button = await wait(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Share stats' && !b.disabled))
+      const button = await wait(() => [...document.querySelectorAll('.today__actions button')].find((b) => b.textContent.trim() === 'Share' && !b.disabled))
       button.click()
       await wait(() => document.querySelector('.share__canvas[data-ready="true"]'))
     })()`)
@@ -276,15 +276,17 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
     await playHook(steps.get('notify') as string, input(a, { hook_event_name: 'Notification', notification_type: 'permission_prompt', message: 'Claude needs your permission to use Bash' }))
     // idle_prompt arrives a minute after a finished turn: it must not count as waiting
     await playHook(steps.get('notify') as string, input(c, { hook_event_name: 'Notification', notification_type: 'idle_prompt', message: 'Claude is waiting for your input' }))
+    // the working session finishes a tool: its row says what it did last
+    await playHook(steps.get('tool') as string, input(b, { hook_event_name: 'PostToolUse', tool_name: 'Edit', tool_response: {} }))
+    await waitFor(`document.querySelector('.cc__row--working .cc__what')?.textContent.startsWith('Edited a file')`, "the working session's last tool")
     return [a, b, c]
   }
 
   /**
-   * Overview -> Connect to Claude Code -> the sheet (shot) -> Connect -> one status line run and three sessions through
+   * Today -> Connect to Claude Code -> the sheet (shot) -> Connect -> one status line run and three sessions through
    * the real hooks (one ends up waiting on a permission prompt, one working, one done) -> exactly one alert -> the card
    * (shot) -> Hooks: one Claudock row, the list and sidebar counts as before (shot) -> its Disconnect… -> the card's
-   * dialog, with the Overview tile as before (shot) -> settings.json byte for byte as before, and the connect folder
-   * empty of scripts.
+   * dialog on Today (shot) -> settings.json byte for byte as before, and the connect folder empty of scripts.
    */
   async function connectFlow(theme: 'light' | 'dark'): Promise<void> {
     const file = path.join(configDir(), 'settings.json')
@@ -318,8 +320,8 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
     await shoot(theme, 'connected-hooks')
     await click('Disconnect…')
     await waitFor(
-      `document.querySelector('dialog[open] .diff') && document.querySelector('.ov__tile[aria-label^="Hooks: ${own}."]')`,
-      'the Disconnect dialog, with the Overview tile as before connecting'
+      `document.querySelector('dialog[open] .diff') && document.querySelector('.today')`,
+      'the Disconnect dialog on Today'
     )
     await shoot(theme, 'disconnect')
     await click('Disconnect', `document.querySelector('dialog[open]')`)
@@ -394,7 +396,7 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
   /**
    * The first-run reveal, shown through `system:reveal` (screenshot mode never shows it on its own): the reveal with the
    * fixture's numbers once they have counted up (shot `reveal`), the Connect sheet over it (`reveal-connect`), Connect
-   * -> Overview with the card connected (`reveal-connected`), then Disconnect with settings.json byte for byte as before.
+   * -> Today with the card connected (`reveal-connected`), then Disconnect with settings.json byte for byte as before.
    * In light only, the empty version (`reveal-empty`): the fixture copy's stats-cache.json and history.jsonl moved aside
    * and put back, never in a run on a real folder.
    */
@@ -408,7 +410,7 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
     await waitFor(`document.querySelector('dialog[open] .diff') && document.querySelectorAll('dialog[open] input[type=checkbox]:checked').length === 2`, 'the Connect sheet over the reveal')
     await shoot(theme, 'reveal-connect')
     await click('Connect', `document.querySelector('dialog[open]')`)
-    await waitFor(`!document.querySelector('.reveal') && !document.querySelector('dialog[open]') && [...document.querySelectorAll('.lim button')].some((b) => b.textContent.trim() === 'Disconnect')`, 'Overview, connected')
+    await waitFor(`!document.querySelector('.reveal') && !document.querySelector('dialog[open]') && [...document.querySelectorAll('.lim button')].some((b) => b.textContent.trim() === 'Disconnect')`, 'Today, connected')
     await js(`document.querySelectorAll('.toast__close').forEach((b) => b.click())`)
     await shoot(theme, 'reveal-connected')
     await click('Disconnect')
@@ -426,7 +428,7 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
       await waitFor(`document.querySelector('.reveal__none') && document.querySelector('.reveal__share')?.disabled`, 'the empty reveal')
       await shoot(theme, 'reveal-empty')
       await click('Not now', `document.querySelector('.reveal')`)
-      await waitFor(`!document.querySelector('.reveal') && document.querySelector('.sidebar')`, 'Overview after Not now')
+      await waitFor(`!document.querySelector('.reveal') && document.querySelector('.sidebar')`, 'Today after Not now')
     } finally {
       await Promise.all(hidden.map((f) => fsp.rename(`${f}.shot`, f)))
     }
@@ -464,23 +466,23 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
         await restoreSettingsJson().catch(() => undefined)
         // leave Settings so it remounts in the Form view, then return to where the loop ended (the start screen when it
         // visited none): the palette shot below sits over that screen
-        emit('system:navigate', { screen: 'overview' })
+        emit('system:navigate', { screen: 'today' })
         await sleep(150)
-        emit('system:navigate', { screen: (screens[screens.length - 1]?.id ?? 'overview') as ScreenId })
+        emit('system:navigate', { screen: (screens[screens.length - 1]?.id ?? 'today') as ScreenId })
         await sleep(150)
       }
       if (process.platform !== 'win32' && (opts.only.length === 0 || opts.only.includes('connect'))) {
-        emit('system:navigate', { screen: 'overview' })
+        emit('system:navigate', { screen: 'today' })
         await sleep(150)
         await connectFlow(theme).catch(fail)
       }
       if (process.platform !== 'win32' && (opts.only.length === 0 || opts.only.includes('menubar'))) {
-        emit('system:navigate', { screen: 'overview' })
+        emit('system:navigate', { screen: 'today' })
         await sleep(150)
         await menubarFlow(theme).catch(fail)
       }
       if (process.platform !== 'win32' && (opts.only.length === 0 || opts.only.includes('reveal'))) {
-        emit('system:navigate', { screen: 'overview' })
+        emit('system:navigate', { screen: 'today' })
         await sleep(150)
         await revealFlow(theme).catch(fail)
       }
@@ -497,7 +499,7 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
         await sleep(200)
       }
       if (opts.only.length === 0 || opts.only.includes('share')) {
-        emit('system:navigate', { screen: 'overview' })
+        emit('system:navigate', { screen: 'today' })
         await sleep(150)
         await openShare().then(() => shoot(theme, 'share'), fail)
         if (theme === 'light') await saveCard().catch(fail)

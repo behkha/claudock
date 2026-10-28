@@ -316,6 +316,10 @@ for (const p of projects) {
     })
   }
 
+  // the names Claude Code gives sessions (repeated custom-title and agent-name lines); every third session has none,
+  // so its first prompt shows instead
+  const names = ['Auth token refresh race', 'Rate limits for the public API', null, 'Billing module split', 'Idempotent webhook retries', null, 'Slow orders query']
+  let named = 0
   function recentSession(project, endMs, { running = false, subagent = false, minStart }) {
     const sessionId = uuid()
     const model = modelFor()
@@ -341,7 +345,9 @@ for (const p of projects) {
     const maxMs = Math.min(90 * MIN, endMs - minStart)
     const ts = stamp(specs, endMs, maxMs)
     const ctx = { cwd: project.cwd, sessionId, branch: pick(branches), sidechain: false }
-    w(`projects/${project.folder}/${sessionId}.jsonl`, serialize(specs, ts, ctx).join('\n') + '\n', endMs)
+    const name = names[named++ % names.length]
+    const titled = name ? ['custom-title', 'agent-name'].map((type) => JSON.stringify(type === 'custom-title' ? { type, customTitle: name, sessionId } : { type, agentName: name, sessionId })) : []
+    w(`projects/${project.folder}/${sessionId}.jsonl`, [...serialize(specs, ts, ctx), ...titled].join('\n') + '\n', endMs)
 
     if (subagent) {
       // what a Task tool call leaves behind: same session id, isSidechain, its own small Haiku conversation

@@ -7,7 +7,7 @@ import {
   FolderOpen,
   HardDrive,
   History,
-  LayoutDashboard,
+  CalendarDays,
   Brain,
   Plug,
   Puzzle,
@@ -21,7 +21,7 @@ import {
 import type { ScreenId } from '@shared/nav'
 
 export const SCREEN_ICONS: Record<ScreenId, LucideIcon> = {
-  overview: LayoutDashboard,
+  today: CalendarDays,
   settings: Settings,
   rules: FileText,
   hooks: Webhook,

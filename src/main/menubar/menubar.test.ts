@@ -10,10 +10,12 @@ import { autostartEntry, execArg, inNpxCache, launchAgent, unstablePath } from '
 const NOW = 1_800_000_000_000
 const H = 3_600_000
 const tokens = { fiveHour: { tokens: 0, sessions: 0 }, today: { tokens: 0, sessions: 0 }, sevenDay: { tokens: 0, sessions: 0 } }
+const hits = { fiveHour: null, sevenDay: null }
 
 const limits = (five: number | null, week: number | null, step: LimitsState['step'] = 'on', resetsIn = H): LimitsState => ({
   step,
   tokens,
+  hits,
   live: {
     at: NOW,
     fiveHour: five === null ? null : { usedPercentage: five, resetsAt: NOW + resetsIn },
@@ -27,6 +29,8 @@ const session = (name: string, status: LiveSession['status']): LiveSession => ({
   since: NOW - 60_000,
   cwd: `/work/${name}`,
   name,
+  title: null,
+  activity: null,
   kind: status === 'waiting' ? 'permission' : null,
   tool: status === 'waiting' ? 'Bash' : null,
   message: null
@@ -45,7 +49,7 @@ test('glance: the higher limit is the number; hover text names both', () => {
 
 test('glance: no number while the step is off, before Claude Code reports, or once a window has reset', () => {
   assert.equal(glance(limits(42, 61, 'off'), undefined, NOW).title, '')
-  assert.equal(glance({ step: 'on', live: null, tokens }, undefined, NOW).title, '')
+  assert.equal(glance({ step: 'on', live: null, tokens, hits }, undefined, NOW).title, '')
   assert.equal(glance(undefined, undefined, NOW).title, '')
   // the 5-hour window reset ten minutes ago: only the weekly reading is still true
   const g = glance(limits(99, 30, 'on', -10 * 60_000), undefined, NOW)

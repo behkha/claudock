@@ -6,8 +6,8 @@ import { Badge, Button, Card, ConfirmDialog, EmptyState, IconButton, PageLayout,
 import { api, isMac, useApi } from '@/lib/api'
 import { cx } from '@/lib/cx'
 import { useNav, type ScreenProps } from '@/lib/nav'
-import { FindingsList } from '../Overview/Findings'
-import { useFindings } from '../Overview/useFindings'
+import { FindingsList } from './Findings'
+import { useFindings } from './useFindings'
 import { useFolder } from './useFolder'
 import './storage.css'
 
@@ -31,7 +31,7 @@ export default function StorageScreen({ selectId }: ScreenProps): JSX.Element {
   const folder = useFolder(rel)
   const found = useFindings()
 
-  // arriving with a path (from Overview, a finding or the palette): open that folder, or the folder holding a file
+  // arriving with a path (from Today's chip, a finding or the palette): open that folder, or the folder holding a file
   useEffect(() => {
     if (!selectId) return
     let alive = true

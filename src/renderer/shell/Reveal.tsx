@@ -9,7 +9,7 @@ import { Button } from '@/components'
 import { ConnectSheet } from '@/components/ConnectSheet'
 import { api, isWindows, useApi } from '@/lib/api'
 import { cx } from '@/lib/cx'
-import { ShareDialog } from '@/screens/Overview/ShareDialog'
+import { ShareDialog } from '@/screens/Today/ShareDialog'
 import './reveal.css'
 
 /** The heat map fills in over about 0.9 s (reveal.css); the numbers count up after it starts, ending at 1.2 s. */

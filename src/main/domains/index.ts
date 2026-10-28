@@ -4,6 +4,7 @@ import { SCREENS } from '@shared/nav'
 import type { SidebarCounts } from '@shared/types'
 import type { DomainModule } from './types'
 import * as system from './system'
+import * as today from './today'
 import * as overview from './overview'
 import * as storage from './storage'
 import * as backups from './backups'
@@ -30,6 +31,7 @@ import * as menubar from './menubar'
 /** Every domain. Do not edit when adding methods: just implement them in `domains/<name>.ts`. */
 export const domainModules: Record<DomainName, DomainModule> = {
   system,
+  today,
   overview,
   storage,
   backups,

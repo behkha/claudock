@@ -1,4 +1,4 @@
-import type { LimitWindow } from './api/limits'
+import type { LimitHit, LimitHits, LimitWindow } from './api/limits'
 
 /** A reading older than this shows "as of <time>". */
 export const LIMITS_STALE_MS = 15 * 60_000
@@ -40,3 +40,33 @@ export function formatTokens(n: number): string {
 }
 
 const trim = (x: number): string => (x >= 100 ? String(Math.round(x)) : x.toFixed(1).replace(/\.0$/, ''))
+
+/**
+ * A limit Claude Code reported as reached, from a transcript line's `quotaLimits` (written when a request was refused):
+ * which window, and when it resets. Null for anything else, including model-specific weekly limits.
+ */
+export function quotaHit(q: unknown, at: number): { window: keyof LimitHits; hit: LimitHit } | null {
+  if (typeof q !== 'object' || q === null || !Number.isFinite(at)) return null
+  const r = q as Record<string, unknown>
+  if (r.status !== 'rejected' || typeof r.resetsAt !== 'number' || !Number.isFinite(r.resetsAt) || r.resetsAt <= 0) return null
+  const window = r.rateLimitType === 'five_hour' ? 'fiveHour' : r.rateLimitType === 'seven_day' ? 'sevenDay' : null
+  return window ? { window, hit: { at, resetsAt: r.resetsAt * 1000 } } : null
+}
+
+export type LimitShown =
+  /** Claude Code refused a request in this window and it hasn't reset yet. */
+  | { kind: 'reached'; resetsAt: number }
+  /** The percentage Claude Code sent to the status line. */
+  | { kind: 'percent'; view: LimitView }
+  /** No percentage: the window's tokens from the transcripts. */
+  | { kind: 'tokens' }
+
+/**
+ * What one window shows at `now`: a reached limit newer than the last percentage, else that percentage while its window
+ * hasn't reset, else tokens. Never a number Claude Code didn't send.
+ */
+export function limitShown(w: LimitWindow | null | undefined, liveAt: number | undefined, hit: LimitHit | null | undefined, now = Date.now()): LimitShown {
+  const view = limitView(w, now)
+  if (hit && hit.resetsAt > now && (view.percent === null || hit.at >= (liveAt ?? 0))) return { kind: 'reached', resetsAt: hit.resetsAt }
+  return view.percent === null ? { kind: 'tokens' } : { kind: 'percent', view }
+}

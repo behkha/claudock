@@ -6,7 +6,7 @@ import { Button, ConfirmDialog, Spinner, useToast } from '@/components'
 import { api } from '@/lib/api'
 import { cx } from '@/lib/cx'
 import { useNav } from '@/lib/nav'
-import './overview.css'
+import './findings.css'
 
 export interface FindingsListProps {
   findings: Finding[]

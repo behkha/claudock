@@ -51,8 +51,15 @@ export function Popover(): JSX.Element {
     const t = setInterval(() => setNow(Date.now()), TICK_MS)
     return () => clearInterval(t)
   }, [])
-  useEvent('limits:changed', setLimits)
-  useEvent('sessions:changed', setSessions)
+  // a new reading moves "just now" and the waiting times along with it
+  useEvent('limits:changed', (v) => {
+    setNow(Date.now())
+    setLimits(v)
+  })
+  useEvent('sessions:changed', (v) => {
+    setNow(Date.now())
+    setSessions(v)
+  })
   useEvent('menubar:changed', setBar)
   useEvent('menubar:opened', () => {
     setView('main')
@@ -141,8 +148,8 @@ function Main({
       ) : null}
       {limitsOn ? (
         <div className="pop__meters">
-          <LimitMeter label="5-hour" w={limits.live?.fiveHour} at={limits.live?.at} stale={stale} waiting={!limits.live} now={now} />
-          <LimitMeter label="Weekly" w={limits.live?.sevenDay} at={limits.live?.at} stale={stale} waiting={!limits.live} now={now} />
+          <LimitMeter label="5-hour" w={limits.live?.fiveHour} at={limits.live?.at} stale={stale} hit={limits.hits.fiveHour} tokens={limits.tokens.fiveHour.tokens} span="last 5 hours" now={now} />
+          <LimitMeter label="Weekly" w={limits.live?.sevenDay} at={limits.live?.at} stale={stale} hit={limits.hits.sevenDay} tokens={limits.tokens.sevenDay.tokens} span="last 7 days" now={now} />
         </div>
       ) : null}
       <div className="pop__today">

@@ -14,7 +14,7 @@ See inside your `~/.claude`. Claudock is a free desktop app that lists every ski
 
 Claudock opens the Claude Code config folder (`~/.claude`, or wherever `CLAUDE_CONFIG_DIR` points) and the MCP servers in `~/.claude.json`, with one screen for each part:
 
-- **Overview:** how much disk `~/.claude` takes, what's installed, and **Share stats**: your messages, sessions, longest session, peak hour, top model and 26 weeks of activity from Claude Code's own `stats-cache.json`, as a card to copy, save or post on X. It never shows project names or prompts.
+- **Today:** what each running Claude Code session is doing and which one waits for you, your 5-hour and weekly limits, today's sessions and this week's tokens, and **Share**: your messages, sessions, longest session, peak hour, top model and 26 weeks of activity from Claude Code's own `stats-cache.json`, as a card to copy, save or post on X. The card never shows project names or prompts.
 - **Configure:** `settings.json` and `settings.local.json` as a form or raw JSON with history, `CLAUDE.md` and `rules/`, hooks, permissions
 - **Extend:** skills (turn on or off, edit, duplicate), agents, commands, plugins, mods (what each one draws, hooks and reaches; keep the ones Claude drafts), MCP servers
 - **Your data:** projects and their session transcripts, memory, plans, prompt history

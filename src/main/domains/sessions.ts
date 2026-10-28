@@ -13,6 +13,7 @@ import { defineDomain, emit } from '../ipcx'
 import { showMainWindow } from '../windows'
 import { loadPrefs, savePrefs } from '../prefs'
 import { readSettings } from './extendShared'
+import { findTranscript, ownSessionName, sessionTitle } from './projects'
 
 /**
  * Sessions: which running Claude Code sessions are working, waiting for you or done, from the session hooks "Connect to
@@ -147,7 +148,7 @@ let published = ''
 
 const snapshot = (): SessionsState => ({ hooks, sessions, waiting: sessions.filter((s) => s.status === 'waiting').length })
 
-/** Everything the Overview card and the menu bar glance show. */
+/** Everything Today and the menu bar show. */
 export async function currentSessions(): Promise<SessionsState> {
   await refresh()
   return snapshot()
@@ -192,7 +193,7 @@ async function readOnce(): Promise<void> {
   if (on !== watching) await watch(on)
   const folds = on ? await readFolds() : []
   if (!on) reads.clear()
-  const next = toLiveSessions(folds)
+  const next = await withNames(toLiveSessions(folds))
   const changes = transitions(prev, next)
   prev = new Map(next.map((s) => [s.id, s]))
   apps = new Map(folds.map((f) => [f.id, f.app]))
@@ -204,6 +205,32 @@ async function readOnce(): Promise<void> {
   const state = snapshot()
   emit('sessions:changed', state)
   for (const l of listeners) l(state)
+}
+
+/** First prompts by session id: they never change, so each transcript's head is read once. */
+const firstPrompts = new Map<string, string>()
+
+/**
+ * Each session's own name from its transcript (cached there), else its first prompt, so rows say which session, not
+ * only which folder.
+ */
+async function withNames(list: LiveSession[]): Promise<LiveSession[]> {
+  const ids = new Set(list.map((s) => s.id))
+  for (const id of firstPrompts.keys()) if (!ids.has(id)) firstPrompts.delete(id)
+  return Promise.all(
+    list.map(async (s) => {
+      const abs = await findTranscript(s.id, s.cwd).catch(() => null)
+      if (!abs) return s
+      const own = await ownSessionName(abs)
+      if (own) return { ...s, title: own }
+      let first = firstPrompts.get(s.id)
+      if (first === undefined) {
+        first = await sessionTitle(abs)
+        if (first) firstPrompts.set(s.id, first)
+      }
+      return { ...s, title: first || null }
+    })
+  )
 }
 
 /* ------------------------------------------------------------------ alerts */

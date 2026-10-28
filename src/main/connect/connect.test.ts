@@ -255,6 +255,18 @@ test('state: a permission dialog becomes a wait only once Claude Code says it st
   assert.equal(waiting && shownWait(waiting)?.message, 'm')
 })
 
+test('state: a working session carries the last tool it finished, so it moves while Claude works', () => {
+  const t = (at: number): number => at * 1000
+  const f = fold({ e: 'prompt', at: 100 }, { e: 'tool', tool: 'Read', at: 101 }, { e: 'tool', tool: 'Bash', agent: 'sub-1', at: 105 })
+  assert.deepEqual(f?.lastTool, { tool: 'Bash', at: t(105) }, "a subagent's tool counts")
+  assert.deepEqual(toLiveSessions(f ? [f] : [])[0]?.activity, { tool: 'Bash', at: t(105) })
+  assert.equal(fold({ e: 'prompt', at: 100 }, { e: 'tool', tool: 'Bash', at: 101 }, { e: 'prompt', at: 102 })?.lastTool, null, 'a new turn starts empty')
+  assert.deepEqual(fold({ e: 'prompt', at: 100 }, { e: 'tool', tool: 'Bash', at: 105 }, { e: 'tool', tool: 'Read', at: 103 })?.lastTool, { tool: 'Bash', at: t(105) }, 'an async line that lands late')
+  assert.deepEqual(fold({ e: 'prompt', at: 100 }, { e: 'tool', tool: 'Bash', at: 101 }, { e: 'tool', tool: 'x y', at: 102 })?.lastTool, { tool: 'Bash', at: t(101) }, 'an unreadable name')
+  const done = fold({ e: 'prompt', at: 100 }, { e: 'tool', tool: 'Bash', at: 101 }, { e: 'stop', at: 102 }, { e: 'tool', tool: 'Read', at: 103 })
+  assert.equal(toLiveSessions(done ? [done] : [])[0]?.activity, null, 'none once done, and late lines after Stop are ignored')
+})
+
 test('state: a wait ends only when its own tool finishes, in the same agent', () => {
   const start = [{ e: 'prompt' }, { e: 'ask', tool: 'Bash' }, { e: 'notify', nt: 'permission_prompt' }]
   assert.equal(fold(...start, { e: 'tool', tool: 'Read' })?.status, 'waiting', 'another tool')
@@ -387,9 +399,11 @@ const ls = (id: string, status: SessionStatus, since: number, kind: WaitKind | n
   since,
   cwd,
   name: sessionName(cwd, id),
+  title: null,
   kind,
   tool: null,
-  message: null
+  message: null,
+  activity: null
 })
 
 test('sessions are ordered waiting (longest first), working, done (latest first); names come from the folder', () => {

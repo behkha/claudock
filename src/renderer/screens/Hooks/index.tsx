@@ -193,7 +193,7 @@ export default function HooksScreen({ selectId }: ScreenProps): JSX.Element {
               entries={ours}
               filePath={info.data ? `${info.data.configDir}${info.data.sep}${file}` : file}
               fileName={file}
-              onDisconnect={() => navigate('overview', 'disconnect')}
+              onDisconnect={() => navigate('today', 'disconnect')}
             />
           ) : creating || selected ? (
             <HookForm

@@ -2,7 +2,8 @@
 /**
  * Plays Claude Code running three sessions on the fixture, through the session hooks "Connect to Claude Code" added to
  * the fixture's settings.json: the first ends up waiting on a Bash permission prompt, the second working, the third done.
- * It stays running like Claude Code does (Claudock drops a session once its process exits); Ctrl+C ends the sessions.
+ * It stays running like Claude Code does (Claudock drops a session once its process exits), the working one finishing a
+ * tool every 6 s; Ctrl+C ends the sessions.
  *   npm run fixture:hooks [-- --group]   (--group: all three start waiting at once, for the grouped alert)
  * Run `npm run dev`, press "Connect to Claude Code", then run this. Refuses any config folder that is not
  * .fixture/claude, so the real ~/.claude is never involved.
@@ -119,4 +120,9 @@ async function end() {
 }
 process.on('SIGINT', end)
 process.on('SIGTERM', end)
-setInterval(() => {}, 60_000)
+// the working session keeps finishing tools, as Claude Code does, so its row shows what it did last
+const TOOLS = ['Read', 'Grep', 'Edit', 'Bash', 'mcp__claude-in-chrome__navigate']
+let next = 0
+setInterval(() => {
+  if (!group && !ending) void fire('tool', b, { hook_event_name: 'PostToolUse', tool_name: TOOLS[next++ % TOOLS.length], tool_input: {}, tool_response: {} })
+}, 6000)

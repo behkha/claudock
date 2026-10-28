@@ -44,6 +44,17 @@
 .cc__row--working .cc__dot {
   border: 1.5px solid var(--text-2);
 }
+@media (prefers-reduced-motion: no-preference) {
+  .cc__row--working .cc__dot {
+    animation: cc-working 1.6s ease-in-out infinite;
+  }
+}
+@keyframes cc-working {
+  50% {
+    opacity: 0.35;
+    transform: scale(0.8);
+  }
+}
 .cc__row--done .cc__dot {
   background: var(--success);
 }
@@ -52,6 +63,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.cc__folder {
+  margin-left: 8px;
+  font-size: var(--fs-small);
+  color: var(--text-3);
 }
 .cc__when {
   font-size: var(--fs-small);
@@ -85,6 +101,15 @@
 }
 .lim__none {
   color: var(--text-3);
+}
+.lim__unit {
+  margin-left: 4px;
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  color: var(--text-2);
+}
+.lim__reached {
+  color: var(--accent);
 }
 .lim__track {
   height: 8px;

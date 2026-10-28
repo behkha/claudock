@@ -1,0 +1,73 @@
+/* The cleanup findings (Findings.tsx) on Storage. Tokens only. */
+.find {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+.find__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: var(--hair) solid var(--border);
+}
+.find__row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.find__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.find__title {
+  font-size: var(--fs-body);
+  font-weight: 500;
+}
+.find__detail {
+  font-family: var(--font-mono);
+  font-size: var(--fs-caption);
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.find__size {
+  flex: none;
+  color: var(--text-2);
+  font-size: var(--fs-small);
+  font-variant-numeric: tabular-nums;
+}
+.find__action {
+  flex: none;
+}
+.find--compact .find__row {
+  padding: 8px 0;
+}
+.find--compact .find__title {
+  font-size: var(--fs-small);
+}
+.find__status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  padding-top: 12px;
+  color: var(--text-3);
+  font-size: var(--fs-small);
+}
+.find__status:first-child {
+  margin-top: 0;
+  padding-top: 0;
+}
+.find__status--ok svg {
+  color: var(--success);
+}
+.find__error {
+  color: var(--danger);
+  font-size: var(--fs-small);
+  margin-bottom: 8px;
+}
+

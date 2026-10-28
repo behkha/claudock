@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react'
 import type { ConnectParts, ConnectPreview } from '@shared/api/connect'
 import type { LimitsState } from '@shared/api/limits'
 import type { SessionsState } from '@shared/api/sessions'
-import { formatCount } from '@shared/format'
-import { LIMITS_STALE_MS, formatTokens } from '@shared/limits'
+import { LIMITS_STALE_MS } from '@shared/limits'
 import { Button, Card, ConfirmDialog, useToast } from '@/components'
 import { ChangeDiff, ConnectSheet } from '@/components/ConnectSheet'
 import { LimitMeter, SessionRow } from '@/components/live'
@@ -12,13 +11,14 @@ import { api, useApi, useEvent } from '@/lib/api'
 const REFRESH_MS = 60_000
 
 /**
- * Claude Code right now: sessions waiting for you, working or done (from the session hooks), the 5-hour and weekly
- * limits as Claude Code reported them (from the status line step), and today's tokens from the transcripts.
- * "Connect to Claude Code" adds both parts in one write; Disconnect removes both. Re-reads when either part reports
- * and once a minute, so "as of", resets and waiting times stay true. `disconnect` (the navigation's seq) opens the
- * Disconnect dialog, for the Hooks screen's Claudock row.
+ * Claude Code right now, on Today: sessions waiting for you, working or done (from the session hooks) and the 5-hour
+ * and weekly limits as Claude Code reported them (from the status line step). "Connect to Claude Code" adds both parts
+ * in one write; Disconnect removes both. Re-reads when either part reports and once a minute, so "as of", resets and
+ * waiting times stay true. `disconnect` (the navigation's seq) opens the Disconnect dialog, for the Hooks screen's
+ * Claudock row. `onSessions` hears the running sessions, so Today lists each session once. Nothing on Windows, where
+ * neither part runs yet.
  */
-export function ClaudeCodeCard({ disconnect }: { disconnect?: number }): JSX.Element {
+export function NowCard({ disconnect, onSessions }: { disconnect?: number; onSessions?: (s: SessionsState) => void }): JSX.Element | null {
   const limits = useApi(() => api.limits.get(), [])
   const live = useApi(() => api.sessions.get(), [])
   const [limitsState, setLimits] = useState<LimitsState | undefined>()
@@ -31,8 +31,15 @@ export function ClaudeCodeCard({ disconnect }: { disconnect?: number }): JSX.Ele
 
   useEffect(() => setLimits(limits.data), [limits.data])
   useEffect(() => setSessions(live.data), [live.data])
-  useEvent('limits:changed', setLimits)
-  useEvent('sessions:changed', setSessions)
+  // a new reading moves "just now" and the waiting times along with it
+  useEvent('limits:changed', (v) => {
+    setNow(Date.now())
+    setLimits(v)
+  })
+  useEvent('sessions:changed', (v) => {
+    setNow(Date.now())
+    setSessions(v)
+  })
   const reloadLimits = limits.reload
   const reloadSessions = live.reload
   useEffect(() => {
@@ -51,7 +58,9 @@ export function ClaudeCodeCard({ disconnect }: { disconnect?: number }): JSX.Ele
   // decide which buttons to offer only once both parts have answered, so a connected card never flashes "Connect"
   const known = l !== undefined && s !== undefined
   const supported = known && l.step !== 'unsupported'
-  const today = l?.tokens.today
+  useEffect(() => {
+    if (s) onSessions?.(s)
+  }, [s, onSessions])
 
   /** Open the sheet with these parts ticked (the ones that can still be added). */
   const openSheet = (parts: ConnectParts): void => setWant(parts)
@@ -84,6 +93,7 @@ export function ClaudeCodeCard({ disconnect }: { disconnect?: number }): JSX.Ele
 
   const stale = limitsOn && l?.live ? now - l.live.at > LIMITS_STALE_MS : false
   const sessions = hooksOn ? (s?.sessions ?? []) : []
+  if (known && !supported && sessions.length === 0) return null
 
   return (
     <Card
@@ -117,20 +127,14 @@ export function ClaudeCodeCard({ disconnect }: { disconnect?: number }): JSX.Ele
         ) : null}
         {limitsOn ? (
           <div className="lim__meters">
-            <LimitMeter label="5-hour" w={l?.live?.fiveHour} at={l?.live?.at} stale={stale} waiting={!l?.live} now={now} />
-            <LimitMeter label="Weekly" w={l?.live?.sevenDay} at={l?.live?.at} stale={stale} waiting={!l?.live} now={now} />
+            <LimitMeter label="5-hour" w={l?.live?.fiveHour} at={l?.live?.at} stale={stale} hit={l?.hits.fiveHour} tokens={l?.tokens.fiveHour.tokens} span="last 5 hours" now={now} />
+            <LimitMeter label="Weekly" w={l?.live?.sevenDay} at={l?.live?.at} stale={stale} hit={l?.hits.sevenDay} tokens={l?.tokens.sevenDay.tokens} span="last 7 days" now={now} />
           </div>
         ) : known && hooksOn ? (
           <Button className="lim__show" onClick={() => openSheet({ statusLine: true, hooks: false })}>
             Show live limits
           </Button>
         ) : null}
-        <div className="lim__today">
-          <span>Today</span>
-          <span className="lim__mono">
-            {today ? `${formatTokens(today.tokens)} tokens · ${formatCount(today.sessions)} ${today.sessions === 1 ? 'session' : 'sessions'}` : '…'}
-          </span>
-        </div>
         {limits.error || live.error ? (
           <p className="find__error" role="alert">
             {limits.error ?? live.error}

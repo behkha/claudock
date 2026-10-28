@@ -12,7 +12,7 @@ export interface FindingsState {
   rescan: () => void
 }
 
-/** The cleanup findings, shared by Overview and Storage. They stream in one by one. */
+/** The cleanup findings, on Storage and counted by Today's chip. They stream in one by one. */
 export function useFindings(): FindingsState {
   const [findings, setFindings] = useState<Finding[]>([])
   const [scanning, setScanning] = useState(true)

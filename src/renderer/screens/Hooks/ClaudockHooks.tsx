@@ -14,7 +14,7 @@ export function ClaudockMark({ size = 16 }: { size?: number }): JSX.Element {
 
 /**
  * Claudock's own hooks (Connect to Claude Code), as one read-only entry. They are added and removed together, so the
- * only action is Disconnect, which opens the Overview card's Disconnect dialog.
+ * only action is Disconnect, which opens the Disconnect dialog on Today.
  */
 export function ClaudockHooks({
   entries,

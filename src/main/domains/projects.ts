@@ -281,6 +281,92 @@ export async function sessionTitle(abs: string): Promise<string> {
   return title
 }
 
+/* ------------------------------------------------------------------ a session's own name */
+
+const NAME_TAIL_BYTES = 256 * 1024
+/** Claude Code appends these again and again while a session runs: the newest one is the name it shows. */
+const NAME_LINE_RE = /"type":"(custom-title|agent-name)"/
+const NAME_RECHECK_MS = 30_000
+const nameCache = new Map<string, { checked: number; size: number; name: string | null }>()
+
+async function readTail(abs: string, bytes: number, size: number): Promise<string> {
+  const fh = await fsp.open(abs, 'r')
+  try {
+    const from = Math.max(0, size - bytes)
+    const buf = Buffer.allocUnsafe(size - from)
+    const { bytesRead } = await fh.read(buf, 0, buf.length, from)
+    return buf.subarray(0, bytesRead).toString('utf8')
+  } finally {
+    await fh.close()
+  }
+}
+
+/** The newest custom-title (else agent-name) in `text`, or null. */
+function nameIn(text: string): string | null {
+  let agent: string | null = null
+  const lines = text.split('\n')
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const m = NAME_LINE_RE.exec(lines[i])
+    if (!m) continue
+    const o = parseLine(Buffer.from(lines[i]))
+    const v = m[1] === 'custom-title' ? o?.customTitle : o?.agentName
+    if (typeof v !== 'string' || !v.trim()) continue
+    const name = v.replace(/\s+/g, ' ').trim().slice(0, 160)
+    if (m[1] === 'custom-title') return name
+    agent ??= name
+  }
+  return agent
+}
+
+/**
+ * The session's own name in Claude Code: the title it shows, or one set with /rename. Read from the end of the
+ * transcript (then its head), at most every 30 s per file while it keeps growing. Null when it has none.
+ */
+export async function ownSessionName(abs: string): Promise<string | null> {
+  const st = await stat(abs)
+  if (!st) return null
+  const c = nameCache.get(abs)
+  if (c && (c.size === st.size || Date.now() - c.checked < NAME_RECHECK_MS)) return c.name
+  let name: string | null = null
+  try {
+    await assertNotSecretReal(abs)
+    name = nameIn(await readTail(abs, NAME_TAIL_BYTES, st.size))
+    if (name === null && st.size > NAME_TAIL_BYTES) name = nameIn(await readHead(abs, NAME_TAIL_BYTES))
+  } catch {
+    /* unreadable: no name */
+  }
+  nameCache.set(abs, { checked: Date.now(), size: st.size, name })
+  return name
+}
+
+const transcriptDirs = new Map<string, string>()
+
+/**
+ * A session's transcript: `projects/<cwd with every other character as ->/<id>.jsonl`, as Claude Code names it, else
+ * the project folder that holds `<id>.jsonl`. Null when there is none (yet).
+ */
+export async function findTranscript(id: string, cwd: string | null): Promise<string | null> {
+  let sid: string
+  try {
+    sid = sessionFileId(id)
+  } catch {
+    return null
+  }
+  const known = transcriptDirs.get(sid)
+  const guesses = [known, cwd ? cwd.replace(/[^A-Za-z0-9]/g, '-') : undefined].filter((d): d is string => !!d && SAFE_NAME.test(d))
+  for (const d of guesses) {
+    const abs = path.join(projectsDir(), d, `${sid}.jsonl`)
+    if ((await stat(abs))?.isFile) return (transcriptDirs.set(sid, d), abs)
+  }
+  const dirs = await fsp.readdir(projectsDir(), { withFileTypes: true }).catch(() => [])
+  for (const d of dirs) {
+    if (!d.isDirectory()) continue
+    const abs = path.join(projectsDir(), d.name, `${sid}.jsonl`)
+    if ((await stat(abs))?.isFile) return (transcriptDirs.set(sid, d.name), abs)
+  }
+  return null
+}
+
 const CWD_RE = /"cwd":"((?:[^"\\]|\\.)*)"/
 
 async function cwdFromFile(abs: string): Promise<string | null> {

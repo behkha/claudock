@@ -1,18 +1,15 @@
 import { BrowserWindow, ClipboardItem, app, clipboard, dialog, nativeImage, shell, type IpcMain } from 'electron'
 import fsp from 'node:fs/promises'
-import fs from 'node:fs'
 import path from 'node:path'
-import type { Finding, OverviewApi, OverviewSummary } from '@shared/api/overview'
+import type { Finding, OverviewApi } from '@shared/api/overview'
 import { formatBytes, formatCount } from '@shared/format'
 import { shareText } from '@shared/wrapped'
-import { exists, readJson, stat } from '../fsx'
+import { readJson, stat } from '../fsx'
 import { defineDomain, emit } from '../ipcx'
 import { assertWritable, configDir, globalStateFile, isInside, isSecret, resolveInside, samePath } from '../paths'
 import { safeWriteText, trash } from '../safeWrite'
 import { scanLoose } from './backups'
-import { countHooks } from './settings'
 import { scanUser } from './skills'
-import { displayedStatusLine } from './limits'
 import { computeWrapped } from './overviewWrapped'
 import { sizeOf } from './storage'
 
@@ -242,117 +239,6 @@ async function computeFindings(scanId: string, force?: boolean): Promise<Finding
   return found.sort((a, b) => (b.bytes ?? -1) - (a.bytes ?? -1) || a.title.localeCompare(b.title))
 }
 
-/* ------------------------------------------------------------------ summary */
-
-async function dirs(p: string): Promise<string[]> {
-  const entries = await fsp.readdir(p, { withFileTypes: true }).catch(() => [])
-  return entries.filter((e) => !e.name.startsWith('.') && (e.isDirectory() || e.isSymbolicLink())).map((e) => e.name)
-}
-
-const isDir = (p: string): Promise<boolean> => fsp.stat(p).then((s) => s.isDirectory(), () => false)
-
-/** Skills in `dir`: folders with a SKILL.md, also one level down (synced/ groups). */
-async function countSkillsIn(dir: string): Promise<number> {
-  let n = 0
-  await Promise.all(
-    (await dirs(dir)).map(async (name) => {
-      const sub = path.join(dir, name)
-      if (!(await isDir(sub))) return
-      if (await exists(path.join(sub, 'SKILL.md'))) n++
-      else
-        for (const inner of await dirs(sub)) if (await exists(path.join(sub, inner, 'SKILL.md'))) n++
-    })
-  )
-  return n
-}
-
-async function countPluginSkills(installed: unknown): Promise<number> {
-  const plugins = (installed as { plugins?: Record<string, unknown> } | undefined)?.plugins
-  if (!plugins || typeof plugins !== 'object') return 0
-  const paths = new Set<string>()
-  for (const v of Object.values(plugins)) {
-    for (const item of Array.isArray(v) ? v : [v]) {
-      const p = (item as { installPath?: unknown } | null)?.installPath
-      if (typeof p !== 'string') continue
-      const r = path.relative(configDir(), path.resolve(p))
-      if (!r.startsWith('..') && !path.isAbsolute(r)) paths.add(path.resolve(p))
-    }
-  }
-  const counts = await Promise.all([...paths].map((p) => countSkillsIn(path.join(p, 'skills'))))
-  return counts.reduce((a, b) => a + b, 0)
-}
-
-async function countLines(file: string): Promise<number> {
-  let n = 0
-  let last = 0x0a
-  try {
-    for await (const chunk of fs.createReadStream(file) as AsyncIterable<Buffer>) {
-      for (let i = 0; i < chunk.length; i++) if (chunk[i] === 0x0a) n++
-      last = chunk[chunk.length - 1]
-    }
-  } catch {
-    return 0
-  }
-  return last === 0x0a ? n : n + 1
-}
-
-async function countRules(): Promise<number> {
-  let n = (await exists(abs('CLAUDE.md'))) ? 1 : 0
-  async function walk(dir: string, depth: number): Promise<void> {
-    const kids = await fsp.readdir(dir, { withFileTypes: true }).catch(() => [])
-    for (const k of kids) {
-      if (k.isDirectory() && depth < 3) await walk(path.join(dir, k.name), depth + 1)
-      else if (k.name.toLowerCase().endsWith('.md')) n++
-    }
-  }
-  await walk(abs('rules'), 1)
-  return n
-}
-
-const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v : null)
-
-async function summary(): Promise<OverviewSummary> {
-  const settings = (await readJson<Record<string, unknown>>(abs('settings.json'))) ?? {}
-  const installed = await readJson(abs('plugins', 'installed_plugins.json'))
-  const installedPlugins = (installed as { plugins?: Record<string, unknown> } | undefined)?.plugins
-  const pluginKeys = installedPlugins && typeof installedPlugins === 'object' ? Object.keys(installedPlugins) : []
-  const enabled = (settings.enabledPlugins ?? {}) as Record<string, unknown>
-
-  const { commands: hooks, events: hookEvents } = countHooks(settings.hooks)
-
-  const [skills, pluginSkills, rules, projects, prompts, global] = await Promise.all([
-    countSkillsIn(abs('skills')),
-    countPluginSkills(installed),
-    countRules(),
-    dirs(abs('projects')).then((d) => d.length),
-    countLines(abs('history.jsonl')),
-    readJson<Record<string, unknown>>(globalStateFile())
-  ])
-
-  const statusLine = await displayedStatusLine(settings.statusLine)
-  return {
-    configDir: configDir(),
-    counts: {
-      skills,
-      pluginSkills,
-      hooks,
-      hookEvents,
-      plugins: pluginKeys.length,
-      pluginsEnabled: pluginKeys.filter((k) => enabled[k] === true).length,
-      rules,
-      projects,
-      prompts
-    },
-    glance: {
-      model: str(settings.model),
-      // CLAUDE_CODE_EFFORT_LEVEL wins over effortLevel and is the only place max is kept
-      effort: str((settings.env as Record<string, unknown> | undefined)?.CLAUDE_CODE_EFFORT_LEVEL) ?? str(settings.effortLevel),
-      theme: str(settings.theme) ?? str(global?.theme),
-      statusLine
-    }
-  }
-}
-
 /* ------------------------------------------------------------------ share card */
 
 const PNG_MAGIC = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
@@ -385,8 +271,6 @@ async function openXCompose(text: string): Promise<void> {
 /* ------------------------------------------------------------------ api */
 
 const impl: OverviewApi = {
-  summary,
-
   findings(scanId, force) {
     return computeFindings(scanId, force)
   },

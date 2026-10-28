@@ -24,7 +24,7 @@ const GuardContext = createContext<Set<{ current: boolean }> | null>(null)
 type Target = { screen: ScreenId; selectId?: string; seq: number }
 
 export function NavProvider({ children }: { children: ReactNode }): JSX.Element {
-  const [state, setState] = useState<Target>({ screen: 'overview', seq: 0 })
+  const [state, setState] = useState<Target>({ screen: 'today', seq: 0 })
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [pending, setPending] = useState<Omit<Target, 'seq'> | null>(null)
   const seqRef = useRef(0)

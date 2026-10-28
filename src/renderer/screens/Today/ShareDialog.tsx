@@ -4,6 +4,7 @@ import type { WrappedStats } from '@shared/api/overview'
 import { Button, EmptyState, IconButton } from '@/components'
 import { api } from '@/lib/api'
 import { cardPng, drawCard } from './wrappedCard'
+import './share.css'
 
 type Action = 'copy' | 'save' | 'post'
 type Status = { kind: 'ok' | 'error'; text: string }

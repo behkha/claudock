@@ -1,8 +1,8 @@
 import type { ScreenId } from '../nav'
 
 /**
- * Overview domain contract. Owned by the maintain worker.
- * `findings()` is the one implementation of the cleanup suggestions; Overview and Storage both use it.
+ * Overview domain contract: the cleanup findings and the share card's numbers. There is no Overview screen any more:
+ * Storage lists the findings, Today counts them in its chip, and Today and the first-run reveal share the card.
  */
 
 export type FindingKind =
@@ -37,27 +37,6 @@ export interface Finding {
   action: FindingAction
 }
 
-export interface OverviewSummary {
-  configDir: string
-  counts: {
-    skills: number
-    pluginSkills: number
-    hooks: number
-    hookEvents: number
-    plugins: number
-    pluginsEnabled: number
-    rules: number
-    projects: number
-    prompts: number
-  }
-  glance: {
-    model: string | null
-    effort: string | null
-    theme: string | null
-    statusLine: string | null
-  }
-}
-
 /** Numbers behind the share card. Every field may be missing; nothing here names a project, path, session or prompt. */
 export interface WrappedStats {
   /** `YYYY-MM-DD` the numbers run up to (the cache's last computed day, else today). */
@@ -78,7 +57,6 @@ export interface WrappedStats {
 }
 
 export interface OverviewApi {
-  summary(): Promise<OverviewSummary>
   /** Computes every cleanup finding. Streams each one as it is found (`overview:finding`) and resolves with the sorted list. */
   findings(scanId: string, force?: boolean): Promise<Finding[]>
   /** Move config-relative paths to the OS Trash. Returns how many were moved. */

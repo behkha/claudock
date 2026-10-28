@@ -1,7 +1,7 @@
 import type { ComponentType } from 'react'
 import type { ScreenId } from '@shared/nav'
 import type { ScreenProps } from '@/lib/nav'
-import OverviewScreen from './Overview'
+import TodayScreen from './Today'
 import SettingsScreen from './Settings'
 import RulesScreen from './Rules'
 import HooksScreen from './Hooks'
@@ -21,7 +21,7 @@ import BackupsScreen from './Backups'
 
 /** Every screen, by id. Each lives in screens/<Folder>/index.tsx and default-exports a component taking ScreenProps. */
 export const SCREEN_COMPONENTS: Record<ScreenId, ComponentType<ScreenProps>> = {
-  overview: OverviewScreen,
+  today: TodayScreen,
   settings: SettingsScreen,
   rules: RulesScreen,
   hooks: HooksScreen,

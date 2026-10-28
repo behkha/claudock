@@ -2,11 +2,13 @@ import type { IpcMain } from 'electron'
 import fs from 'node:fs'
 import fsp from 'node:fs/promises'
 import path from 'node:path'
-import type { LimitWindow, LimitsApi, LimitsState, LiveLimits, TokenWindow, TokenWindows } from '@shared/api/limits'
+import type { LimitHits, LimitWindow, LimitsApi, LimitsState, LiveLimits, TokenWindow, TokenWindows } from '@shared/api/limits'
+import { quotaHit } from '@shared/limits'
 import { connectDir, readConnectState, writeOwn, type ConnectState } from '../connect/folder'
 import { shQuote } from '../connect/hookScript'
 import { defineDomain, emit } from '../ipcx'
 import { configDir } from '../paths'
+import type { UsageFile } from '../today/activity'
 import { isObj, readSettings } from './extendShared'
 
 /**
@@ -196,13 +198,17 @@ interface FileScan {
   /** Bytes read so far, always at a line start. */
   offset: number
   entries: Entry[]
+  /** The working folder the transcript's lines name. */
+  cwd: string | null
+  /** The newest limit Claude Code reported as reached in this file, per window. */
+  hits: LimitHits
 }
 
 const scans = new Map<string, FileScan>()
 const CHUNK = 1024 * 1024
 const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0)
 
-function entryOf(line: string, cutoff: number): Entry | null {
+function entryOf(line: string, cutoff: number, scan?: FileScan): Entry | null {
   if (!line.includes('"usage"') || !line.includes('"assistant"')) return null
   let o: unknown
   try {
@@ -211,8 +217,12 @@ function entryOf(line: string, cutoff: number): Entry | null {
     return null
   }
   if (!isObj(o) || o.type !== 'assistant' || !isObj(o.message) || !isObj(o.message.usage)) return null
-  if (o.message.model === '<synthetic>') return null
+  if (scan && scan.cwd === null && typeof o.cwd === 'string' && o.cwd) scan.cwd = o.cwd
   const t = typeof o.timestamp === 'string' ? Date.parse(o.timestamp) : NaN
+  // a refused request: Claude Code's own record of a limit reached (desktop sessions write it too)
+  const q = scan && o.quotaLimits !== undefined ? quotaHit(o.quotaLimits, t) : null
+  if (q && scan && q.hit.at >= (scan.hits[q.window]?.at ?? 0)) scan.hits[q.window] = q.hit
+  if (o.message.model === '<synthetic>') return null
   if (!Number.isFinite(t) || t < cutoff) return null
   const u = o.message.usage
   const tokens = num(u.input_tokens) + num(u.output_tokens) + num(u.cache_creation_input_tokens) + num(u.cache_read_input_tokens)
@@ -224,7 +234,8 @@ function entryOf(line: string, cutoff: number): Entry | null {
 }
 
 /** Read `abs` from `from` to `to`, push entries for complete lines, return the offset after the last one read. */
-async function readFrom(abs: string, from: number, to: number, cutoff: number, out: Entry[]): Promise<number> {
+async function readFrom(abs: string, from: number, to: number, cutoff: number, scan: FileScan): Promise<number> {
+  const out = scan.entries
   const fh = await fsp.open(abs, 'r')
   try {
     let pos = from
@@ -240,7 +251,7 @@ async function readFrom(abs: string, from: number, to: number, cutoff: number, o
       rest = lines.pop() ?? ''
       for (const line of lines) {
         offset += Buffer.byteLength(line, 'utf8') + 1
-        const e = entryOf(line, cutoff)
+        const e = entryOf(line, cutoff, scan)
         if (e) out.push(e)
       }
     }
@@ -248,7 +259,7 @@ async function readFrom(abs: string, from: number, to: number, cutoff: number, o
     if (rest.trim()) {
       try {
         JSON.parse(rest)
-        const e = entryOf(rest, cutoff)
+        const e = entryOf(rest, cutoff, scan)
         if (e) out.push(e)
         offset += Buffer.byteLength(rest, 'utf8')
       } catch {
@@ -296,9 +307,9 @@ async function scanTranscripts(now: number): Promise<void> {
     let s = scans.get(f.abs)
     if (s && s.size === f.size && s.mtimeMs === f.mtimeMs) continue
     // shrunk or rewritten in place: read it all again; grown: read only what was appended
-    if (!s || f.size < s.offset || (f.size === s.size && f.mtimeMs !== s.mtimeMs)) s = { size: 0, mtimeMs: 0, offset: 0, entries: [] }
+    if (!s || f.size < s.offset || (f.size === s.size && f.mtimeMs !== s.mtimeMs)) s = { size: 0, mtimeMs: 0, offset: 0, entries: [], cwd: null, hits: { fiveHour: null, sevenDay: null } }
     try {
-      s.offset = await readFrom(f.abs, s.offset, f.size, cutoff, s.entries)
+      s.offset = await readFrom(f.abs, s.offset, f.size, cutoff, s)
       s.size = f.size
       s.mtimeMs = f.mtimeMs
       scans.set(f.abs, s)
@@ -356,14 +367,42 @@ async function currentTokens(): Promise<TokenWindows> {
   return tokenWindows(Date.now())
 }
 
+/**
+ * The transcripts of the last 7 days as the scan keeps them, for Today (src/main/domains/today.ts): which project and
+ * session each file belongs to (a subagent's file sits in its session's folder), its folder and its token lines.
+ */
+export async function transcriptUsage(): Promise<UsageFile[]> {
+  await currentTokens()
+  const root = path.join(configDir(), 'projects')
+  const out: UsageFile[] = []
+  for (const [abs, s] of scans) {
+    const rel = path.relative(root, abs).split(path.sep)
+    if (rel.length < 2) continue
+    out.push({ project: rel[0], session: rel.length > 2 ? rel[1] : path.basename(rel[1], '.jsonl'), cwd: s.cwd, entries: s.entries })
+  }
+  return out
+}
+
 /* ------------------------------------------------------------------ state, watching, events */
+
+/** The newest reached limit per window across the scanned transcripts, while its window hasn't reset. */
+function currentHits(now: number): LimitHits {
+  const out: LimitHits = { fiveHour: null, sevenDay: null }
+  for (const s of scans.values())
+    for (const k of ['fiveHour', 'sevenDay'] as const) {
+      const h = s.hits[k]
+      if (h && h.resetsAt > now && h.at >= (out[k]?.at ?? 0)) out[k] = h
+    }
+  return out
+}
 
 /** Everything the limits card and the menu bar glance show. */
 export async function currentLimits(): Promise<LimitsState> {
   const tokens = await currentTokens()
-  if (WIN) return { step: 'unsupported', live: null, tokens }
+  const hits = currentHits(Date.now())
+  if (WIN) return { step: 'unsupported', live: null, tokens, hits }
   const on = isStepOn((await readSettings()).data.statusLine)
-  return { step: on ? 'on' : 'off', live: on ? await readLive() : null, tokens }
+  return { step: on ? 'on' : 'off', live: on ? await readLive() : null, tokens, hits }
 }
 
 /** The statusLine command to show people: their own one while the step wraps it, else what settings.json says. */

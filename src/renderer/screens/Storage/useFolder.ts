@@ -19,7 +19,7 @@ export interface FolderState {
 
 /**
  * List a folder at once, then stream the recursive size of each child (`storage:sizes`).
- * `rel` is relative to the config dir; '' is the config dir itself. Shared by Overview and Storage.
+ * `rel` is relative to the config dir; '' is the config dir itself. Used by Storage.
  */
 export function useFolder(rel: string): FolderState {
   const [entries, setEntries] = useState<StorageEntry[]>([])

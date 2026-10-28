@@ -1,0 +1,48 @@
+/* The Share stats dialog (ShareDialog.tsx), on Today and the first-run reveal. Tokens only. */
+.share {
+  width: min(880px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+}
+.share__panel {
+  gap: 16px;
+}
+.share__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.share__frame {
+  width: min(100%, calc((100vh - 240px) * 16 / 9));
+  margin-inline: auto;
+}
+.share__canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-control);
+  border: var(--hair) solid var(--border);
+}
+.share__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.share__status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-small);
+  color: var(--text-2);
+}
+.share__status svg {
+  flex: none;
+  color: var(--success);
+}
+.share__status--error {
+  color: var(--danger);
+}

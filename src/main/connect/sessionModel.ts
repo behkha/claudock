@@ -90,6 +90,8 @@ export interface SessionFold {
   cwd: string | null
   pid: number
   app: string | null
+  /** The last tool finished in this turn, by the session or one of its subagents. */
+  lastTool: { tool: string; at: number } | null
 }
 
 const WAIT_TYPES: Record<string, WaitKind> = { permission_prompt: 'permission', elicitation_dialog: 'input', elicitation_url_dialog: 'input' }
@@ -117,9 +119,12 @@ const ends = (w: Wait, tool: string | null, agent: string | null): boolean =>
  * - tool and ask never move a session out of done: late async lines from the turn that stopped.
  */
 export function applyEvent(s: SessionFold | null, id: string, ev: SessionEvent): SessionFold {
-  const cur: SessionFold = s ?? { id, status: 'working', since: ev.at, at: ev.at, waits: [], answered: null, seq: 0, cwd: null, pid: 0, app: null }
+  const cur: SessionFold = s ?? { id, status: 'working', since: ev.at, at: ev.at, waits: [], answered: null, seq: 0, cwd: null, pid: 0, app: null, lastTool: null }
   const seq = cur.seq + 1
-  const base = { ...cur, seq, at: Math.max(cur.at, ev.at), cwd: ev.cwd ?? cur.cwd, pid: ev.pid || cur.pid, app: ev.app ?? cur.app }
+  // a new turn starts with no activity; late tool lines after Stop don't count
+  const lastTool =
+    ev.e === 'prompt' ? null : ev.e === 'tool' && cur.status !== 'done' && ev.tool && ev.tool !== '?' && ev.at >= (cur.lastTool?.at ?? 0) ? { tool: ev.tool, at: ev.at } : cur.lastTool
+  const base = { ...cur, seq, at: Math.max(cur.at, ev.at), cwd: ev.cwd ?? cur.cwd, pid: ev.pid || cur.pid, app: ev.app ?? cur.app, lastTool }
   /** The state after the waits change: waiting while any is notified, `since` kept while the status holds. */
   const settle = (waits: Wait[], answered = cur.answered): SessionFold => {
     const status: SessionStatus = waits.some((w) => w.notified) ? 'waiting' : cur.status === 'waiting' ? 'working' : cur.status
@@ -205,9 +210,11 @@ export function toLiveSessions(folds: readonly SessionFold[]): LiveSession[] {
         since: f.since,
         cwd: f.cwd,
         name: sessionName(f.cwd, f.id),
+        title: null,
         kind: f.status === 'waiting' ? (shownWait(f)?.kind ?? null) : null,
         tool: f.status === 'waiting' && shownWait(f)?.tool !== '?' ? (shownWait(f)?.tool ?? null) : null,
-        message: f.status === 'waiting' ? (shownWait(f)?.message ?? null) : null
+        message: f.status === 'waiting' ? (shownWait(f)?.message ?? null) : null,
+        activity: f.status === 'working' ? f.lastTool : null
       })
     )
     .sort((a, b) => rank[a.status] - rank[b.status] || (a.status === 'waiting' ? a.since - b.since : b.since - a.since) || a.id.localeCompare(b.id))

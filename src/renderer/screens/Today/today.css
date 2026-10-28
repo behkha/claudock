@@ -1,0 +1,170 @@
+/* Today, the home screen. Tokens only. */
+/* the running-sessions card (NowCard.tsx) */
+.lim__body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.lim__meters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+.lim__show {
+  align-self: flex-start;
+}
+
+/* one reading column, capped so rows stay readable on a wide window */
+.today {
+  max-width: 920px;
+}
+.today__head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+}
+.today__lead {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.today__title {
+  font-family: var(--font-serif);
+  font-size: var(--fs-display);
+  font-weight: 400;
+  line-height: 1.1;
+}
+.today__sum {
+  font-size: var(--fs-body-lg);
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  min-height: 1.5em;
+}
+.today__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  min-height: var(--control-h);
+}
+.today__chip {
+  color: var(--text);
+}
+.today__chipdot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.today__none {
+  color: var(--text-3);
+  font-size: var(--fs-small);
+}
+
+/* this week: 7 bars to scale */
+.week {
+  flex: none;
+  width: 196px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.week__bars {
+  height: 64px;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  align-items: end;
+  border-bottom: var(--hair) solid var(--border-strong);
+}
+.week__col {
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+}
+.week__bar {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  border-radius: 3px 3px 0 0;
+  background: var(--oat);
+}
+.week__bar--today {
+  background: var(--accent);
+}
+.week__days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  font-size: var(--fs-caption);
+  color: var(--text-3);
+  text-align: center;
+}
+.week__day--today {
+  color: var(--text);
+  font-weight: 600;
+}
+@media (max-width: 720px) {
+  .today__head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* today's other sessions */
+.hist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.hist li + li {
+  border-top: var(--hair) solid var(--border);
+}
+.hist__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 56px;
+  align-items: baseline;
+  column-gap: 16px;
+  width: 100%;
+  padding: 9px 8px;
+  margin: 0 -8px;
+  box-sizing: content-box;
+  max-width: 100%;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.hist__row:hover {
+  background: var(--hover);
+}
+.hist__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hist__folder {
+  margin-left: 8px;
+  font-size: var(--fs-small);
+  color: var(--text-3);
+}
+.hist__time,
+.hist__tokens {
+  font-size: var(--fs-small);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.hist__tokens {
+  text-align: right;
+}

@@ -17,7 +17,7 @@ export function Shell(): JSX.Element {
 
   // The first-run reveal takes the window until it is left: by its buttons, or by any navigation (the palette, the menu
   // bar), which then goes where it was asked to. Worked out while rendering, and nothing else renders until main has
-  // answered, so Overview never mounts (and starts its scans) underneath it.
+  // answered, so Today never mounts (and starts its scans) underneath it.
   const first = useApi(() => api.system.firstRun(), [])
   const [left, setLeft] = useState(false)
   const [forced, setForced] = useState(false)
