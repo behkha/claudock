@@ -119,15 +119,15 @@
       <tr><th scope="row">Runs Claude Code sessions</th><td data-col="Claudock"><span>No; shows which are running or waiting for you, with an alert</span></td><td data-col="opcode"><span>Yes, start and resume</span></td></tr>
       <tr><th scope="row">Custom agents</th><td data-col="Claudock"><span>Edit the agent files in <code>~/.claude/agents</code></span></td><td data-col="opcode"><span>Its own CC Agents with per-agent file and network permissions, run in the background</span></td></tr>
       <tr><th scope="row">Session checkpoints</th><td data-col="Claudock"><span>No</span></td><td data-col="opcode"><span>Timeline, restore, fork, diff</span></td></tr>
-      <tr><th scope="row">Read past transcripts</th><td data-col="Claudock"><span>Yes</span></td><td data-col="opcode"><span>Yes</span></td></tr>
+      <tr><th scope="row">Read past transcripts</th><td data-col="Claudock"><span>Yes; search, export to Markdown, copy a resume command, kept after Claude Code's cleanup</span></td><td data-col="opcode"><span>Yes</span></td></tr>
       <tr><th scope="row">Settings (<code>settings.json</code>)</th><td data-col="Claudock"><span>Form or raw JSON, schema suggestions, history</span></td><td data-col="opcode"><span><span class="ns">Not in their README</span></span></td></tr>
       <tr><th scope="row">Hooks</th><td data-col="Claudock"><span>Add, edit, remove, grouped by event</span></td><td data-col="opcode"><span><span class="ns">Not in their README</span></span></td></tr>
       <tr><th scope="row">Permissions</th><td data-col="Claudock"><span>Allow, ask and deny rules, default mode</span></td><td data-col="opcode"><span><span class="ns">Not in their README</span></span></td></tr>
-      <tr><th scope="row">Skills</th><td data-col="Claudock"><span>Turn on or off, edit, duplicate, Trash</span></td><td data-col="opcode"><span><span class="ns">Not in their README</span></span></td></tr>
+      <tr><th scope="row">Skills</th><td data-col="Claudock"><span>Turn on or off, edit, duplicate, Trash; what each costs in context</span></td><td data-col="opcode"><span><span class="ns">Not in their README</span></span></td></tr>
       <tr><th scope="row">Slash commands, plugins</th><td data-col="Claudock"><span>Edit commands; turn plugins on or off</span></td><td data-col="opcode"><span><span class="ns">Not in their README</span></span></td></tr>
       <tr><th scope="row">CLAUDE.md</th><td data-col="Claudock"><span>Edit <code>CLAUDE.md</code> and <code>rules/</code></span></td><td data-col="opcode"><span>Editor with preview; finds CLAUDE.md files across projects</span></td></tr>
       <tr><th scope="row">MCP servers</th><td data-col="Claudock"><span>Add, edit, remove; writes only the changed key</span></td><td data-col="opcode"><span>Add, edit, test connection, import from Claude Desktop</span></td></tr>
-      <tr><th scope="row">Usage numbers</th><td data-col="Claudock"><span>5-hour and weekly limits as Claude Code reports them, token counts, activity stats</span></td><td data-col="opcode"><span>Cost and tokens by model, project and date; export</span></td></tr>
+      <tr><th scope="row">Usage numbers</th><td data-col="Claudock"><span>5-hour and weekly limits as Claude Code reports them, token counts, activity stats, a weekly cost estimate</span></td><td data-col="opcode"><span>Cost and tokens by model, project and date; export</span></td></tr>
       <tr><th scope="row">Disk use and cleanup</th><td data-col="Claudock"><span>Per folder, with cleanup suggestions</span></td><td data-col="opcode"><span><span class="ns">Not in their README</span></span></td></tr>
       <tr><th scope="row">Undo for config edits</th><td data-col="Claudock"><span>Snapshot before every write; diff and restore</span></td><td data-col="opcode"><span><span class="ns">Not in their README</span></span></td></tr>
       <tr><th scope="row">Windows</th><td data-col="Claudock"><span><code>npx claudock</code> or an <code>.exe</code></span></td><td data-col="opcode"><span>Build from source; no Windows file in the v0.2.0 release</span></td></tr>
@@ -153,7 +153,7 @@
 
 <h2>Usage and cost</h2>
 <p>opcode has a usage dashboard: cost and tokens by model, project and date, with charts and export. Its README lists usage alerts as "coming soon".</p>
-<p>Claudock shows your 5-hour and weekly limits exactly as Claude Code reports them, in the app and the menu bar, and the tokens used in each window when no percentage has been reported. It also shows activity: messages, sessions, longest session, top model and a heat map you can post as an image. It doesn't show cost. For cost reports, use opcode or ccusage.</p>
+<p>Claudock shows your 5-hour and weekly limits exactly as Claude Code reports them, in the app and the menu bar, and the tokens used in each window when no percentage has been reported. It also shows activity: messages, sessions, longest session, top model and a heat map you can post as an image. Its Share card adds one cost estimate a week, at Anthropic's API prices. For cost reports, use opcode or ccusage.</p>
 
 <h2>Install and updates</h2>
 <p>Claudock runs with <code>npx claudock</code> on macOS, Windows and Linux. npm downloads don't carry the macOS quarantine flag or the Windows Mark of the Web, so there's no security warning. There are also installers for macOS (Apple silicon and Intel), Windows and Linux. They aren't signed, so their first launch needs one extra click. There's no auto-update; the app tells you when a newer release is out.</p>
@@ -175,19 +175,12 @@
   <li>You've broken <code>settings.json</code> or <code>~/.claude.json</code> before and want undo.</li>
   <li>You're on Windows.</li>
   <li>Your <code>~/.claude</code> folder has grown to gigabytes.</li>
+  <li>You keep separate Claude Code setups, such as work and personal.</li>
 </ul>
 
 <h2>Switching from opcode</h2>
 <p>There's nothing to import. Claudock reads <code>~/.claude</code> directly, so your settings, skills, MCP servers and transcripts show up on first launch. opcode's own data, such as its CC Agents and checkpoints, stays in opcode. They do different jobs, so you can keep both: they both read <code>~/.claude/projects</code>, and Claudock writes only when you change something.</p>
 <p>To look before you trust it with your real folder, clone the repo and run <code>npm run dev</code>. It opens on a generated fake config. <code>npm run dev:real</code> opens your real <code>~/.claude</code> with every write turned off.</p>
-
-<h2>Coming to Claudock</h2>
-<p>Planned, not shipped, and not part of the comparison above.</p>
-<ul>
-  <li>Profiles: separate Claude Code setups you switch between</li>
-  <li>An archive that keeps sessions before Claude Code's cleanup deletes them, with export</li>
-  <li>What each MCP server and skill costs in context</li>
-</ul>
 
 <h2>FAQ</h2>
 <h3>Is Claudock a fork of opcode?</h3>
