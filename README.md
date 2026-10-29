@@ -6,7 +6,7 @@ See inside your `~/.claude`. Claudock is a free desktop app that lists every ski
 
 `npx claudock` · [Download](https://github.com/behkha/claudock/releases/latest) · [Website](https://behkha.github.io/claudock/)
 
-![Claudock walking through Overview, Mods, Skills, Settings, Hooks, Storage and Backups on the bundled test config](docs/demo.gif)
+![Claudock on the bundled test config: the first-run reveal, the limit in the menu bar with an alert when a session waits, and settings.json restored from a snapshot](docs/demo.gif)
 
 ![A Share stats card from the bundled test config: messages, sessions, longest session, peak hour, top model and 26 weeks of activity](docs/share-card.png)
 
@@ -102,7 +102,7 @@ Either way the app reads and writes `~/.claude`, or the folder in `CLAUDE_CONFIG
 
 ## Status
 
-Beta (v0.1.0), actively maintained. Bug reports are welcome in [Issues](https://github.com/behkha/claudock/issues).
+Beta (v0.2.0), actively maintained. Bug reports are welcome in [Issues](https://github.com/behkha/claudock/issues).
 
 ## License
 

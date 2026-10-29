@@ -1,10 +1,9 @@
-/* Claudock site: npx command with Copy, OS-aware installer link, demo video controls. No dependencies. */
+/* Claudock site: Copy for the install commands, direct installer links, launch film controls. No dependencies. */
 (function () {
   'use strict'
 
   var REPO = 'behkha/claudock'
   var FALLBACK = 'https://github.com/' + REPO + '/releases/latest'
-  var GITHUB = 'https://github.com/' + REPO
   var API = 'https://api.github.com/repos/' + REPO + '/releases/latest'
 
   // Which release file goes with which download link. Names follow electron-builder's output, e.g.
@@ -25,52 +24,11 @@
     return out
   }
 
-  function detectOS() {
-    var nav = typeof navigator === 'undefined' ? {} : navigator
-    var platform = (nav.userAgentData && nav.userAgentData.platform) || nav.platform || ''
-    var ua = nav.userAgent || ''
-    if (/android|iphone|ipad|ipod|cros/i.test(ua)) return ''
-    if (/mac/i.test(platform) || /mac os x/i.test(ua)) return nav.maxTouchPoints > 1 ? '' : 'mac' // iPadOS says "MacIntel"
-    if (/win/i.test(platform) || /windows/i.test(ua)) return 'win'
-    if (/linux|x11/i.test(platform) || /linux|x11/i.test(ua)) return 'linux'
-    return ''
-  }
-
-  // key: field of pickAssets(); primary: button text; other: label in the row of other downloads
-  var TARGETS = [
-    { key: 'mac', os: 'mac', primary: 'Download for Mac', other: 'Mac Apple silicon' },
-    { key: 'macIntel', os: '', primary: '', other: 'Mac Intel' },
-    { key: 'win', os: 'win', primary: 'Download for Windows', other: 'Windows' },
-    { key: 'linux', os: 'linux', primary: 'Download for Linux', other: 'Linux' },
-    { key: 'deb', os: '', primary: '', other: 'Linux .deb' }
-  ]
-
-  function render(os, urls) {
-    var button = document.getElementById('download')
-    var inst = document.getElementById('inst')
-    var others = document.getElementById('others')
-    var note = document.getElementById('note')
-    if (!button || !inst || !others) return
-
-    // npx claudock is the main install; this line is the installer for this OS, with the unsigned note beside it
-    var primary = TARGETS.filter(function (t) { return t.os && t.os === os })[0]
-    inst.hidden = !primary
-    button.href = (primary && urls[primary.key]) || FALLBACK
-    button.textContent = primary ? primary.primary : 'Download'
-    if (note) note.hidden = !(os === 'mac' || os === 'win')
-
-    others.textContent = ''
-    TARGETS.forEach(function (t) {
-      if (t === primary) return
-      var a = document.createElement('a')
-      a.href = urls[t.key] || FALLBACK
-      a.textContent = t.other
-      others.appendChild(a)
+  // Each installer link names its file in pickAssets() with data-asset; until the release answers, it opens the releases page
+  function render(urls) {
+    Array.prototype.forEach.call(document.querySelectorAll('[data-asset]'), function (a) {
+      a.href = urls[a.getAttribute('data-asset')] || FALLBACK
     })
-    var gh = document.createElement('a')
-    gh.href = GITHUB
-    gh.textContent = 'GitHub'
-    others.appendChild(gh)
   }
 
   function cached() {
@@ -86,18 +44,16 @@
   }
 
   function downloads() {
-    if (!document.getElementById('download')) return // only the home page has the download links
-    var os = detectOS()
-    render(os, {}) // right away: OS-specific wording, every link on the releases page
+    if (!document.querySelector('[data-asset]')) return // only the home page has the installer links
     var hit = cached()
-    if (hit) return render(os, hit)
+    if (hit) return render(hit)
     if (typeof fetch !== 'function') return
     fetch(API, { headers: { Accept: 'application/vnd.github+json' } })
       .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json() })
       .then(function (release) {
         var urls = pickAssets(release.assets)
         remember(urls)
-        render(os, urls)
+        render(urls)
       })
       .catch(function () { /* keep the releases-page links */ })
   }
@@ -105,14 +61,17 @@
   function video() {
     var v = document.getElementById('demo')
     var btn = document.getElementById('toggle')
+    var sound = document.getElementById('sound')
     if (!v || !btn) return
     var reduce = window.matchMedia('(prefers-reduced-motion: reduce)')
     var userPaused = reduce.matches
     var visible = true
 
-    function sync() { btn.dataset.playing = String(!v.paused); btn.setAttribute('aria-label', v.paused ? 'Play demo' : 'Pause demo') }
+    function sync() { btn.dataset.playing = String(!v.paused); btn.setAttribute('aria-label', v.paused ? 'Play film' : 'Pause film') }
     function play() { var p = v.play(); if (p && p.catch) p.catch(function () { /* autoplay blocked: poster stays */ }) }
 
+    // the dark film's poster; the source itself is picked by the <source media> attributes
+    if (v.dataset.posterDark && window.matchMedia('(prefers-color-scheme: dark)').matches) v.poster = v.dataset.posterDark
     v.controls = false
     btn.hidden = false
     v.addEventListener('play', sync)
@@ -121,6 +80,17 @@
       if (v.paused) { userPaused = false; play() } else { userPaused = true; v.pause() }
     })
     v.addEventListener('click', function () { btn.click() })
+
+    // The film starts muted (browsers only autoplay it that way); the score comes on from this button
+    if (sound) {
+      sound.hidden = false
+      sound.addEventListener('click', function () {
+        v.muted = !v.muted
+        sound.setAttribute('aria-pressed', String(!v.muted))
+        sound.setAttribute('aria-label', v.muted ? 'Turn sound on' : 'Turn sound off')
+        if (!v.muted && v.paused) { userPaused = false; play() }
+      })
+    }
 
     if ('IntersectionObserver' in window) {
       new IntersectionObserver(function (entries) {
@@ -133,18 +103,17 @@
     if (reduce.addEventListener) reduce.addEventListener('change', onReduce)
 
     sync()
-    if (!reduce.matches) play()
   }
 
-  // A Copy button for a block of commands. Without clipboard access the button stays hidden and the text stays selectable.
-  function copy(buttonId, codeId) {
-    var btn = document.getElementById(buttonId)
-    var code = document.getElementById(codeId)
+  // A Copy button for a block of commands, without the prompt in its <b>. Without clipboard access the button stays
+  // hidden and the text stays selectable.
+  function copy(btn, code) {
     if (!btn || !code || !navigator.clipboard) return
     btn.hidden = false
     var timer
     btn.addEventListener('click', function () {
-      var text = code.textContent.replace(/^\$ /, '').trim()
+      var prompt = code.querySelector('b')
+      var text = code.textContent.slice(prompt ? prompt.textContent.length : 0).trim()
       navigator.clipboard.writeText(text + '\n').then(function () {
         btn.textContent = 'Copied'
         clearTimeout(timer)
@@ -157,6 +126,9 @@
   if (typeof document === 'undefined') return
   downloads()
   video()
-  copy('npx-copy', 'npx-cmd')
-  copy('copy', 'cmds')
+  copy(document.getElementById('npx-copy'), document.getElementById('npx-cmd'))
+  copy(document.getElementById('copy'), document.getElementById('cmds'))
+  Array.prototype.forEach.call(document.querySelectorAll('[data-copy]'), function (b) {
+    copy(b, document.getElementById(b.getAttribute('data-copy')))
+  })
 })()

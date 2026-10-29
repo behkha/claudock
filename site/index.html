@@ -35,10 +35,10 @@
   "description": "A desktop app that opens the Claude Code config folder (~/.claude) and the MCP servers in ~/.claude.json, with one screen each for settings, CLAUDE.md and rules, hooks, permissions, skills, agents, commands, plugins, mods, MCP servers, projects, memory, plans, history, storage and backups. Every write is preceded by a snapshot.",
   "url": "https://behkha.github.io/claudock/",
   "image": "https://behkha.github.io/claudock/og.png",
-  "screenshot": "https://behkha.github.io/claudock/assets/shot-overview-light.webp",
+  "screenshot": "https://behkha.github.io/claudock/assets/shot-today-light.webp",
   "applicationCategory": "DeveloperApplication",
   "operatingSystem": "macOS, Windows, Linux",
-  "softwareVersion": "0.1.1",
+  "softwareVersion": "0.2.0",
   "installUrl": "https://www.npmjs.com/package/claudock",
   "downloadUrl": "https://github.com/behkha/claudock/releases/latest",
   "license": "https://opensource.org/license/mit",
@@ -91,48 +91,40 @@
             <code id="npx-cmd"><b aria-hidden="true">$ </b>npx claudock</code>
             <button class="npx-copy" id="npx-copy" type="button" hidden>Copy</button>
           </div>
-          <p class="inst" id="inst" hidden>
-            <a id="download" href="https://github.com/behkha/claudock/releases/latest">Download</a>
-            <a class="note" id="note" href="https://github.com/behkha/claudock#install" hidden>Not signed yet: first-launch steps</a>
-          </p>
-          <p class="others" id="others">
-            <a href="https://github.com/behkha/claudock/releases/latest">Mac</a>
-            <a href="https://github.com/behkha/claudock/releases/latest">Windows</a>
-            <a href="https://github.com/behkha/claudock/releases/latest">Linux</a>
-            <a href="https://github.com/behkha/claudock">GitHub</a>
+          <p class="inst">
+            <a href="#script">Install script <span aria-hidden="true">↓</span></a>
+            <a href="#installers">Installers <span aria-hidden="true">↓</span></a>
           </p>
         </div>
       </div>
       <div class="caps" aria-hidden="true">
-        <p class="cap">Overview</p>
-        <p class="cap">Mods</p>
+        <p class="cap">Today</p>
         <p class="cap">Skills</p>
         <p class="cap">Settings</p>
-        <p class="cap">Storage</p>
+        <p class="cap">Backups</p>
       </div>
     </div>
 
     <div class="win" id="win">
       <div class="cam" id="cam">
-        <picture class="screen">
-          <source media="(prefers-color-scheme: dark)" srcset="assets/shot-overview-dark.webp">
-          <img src="assets/shot-overview-light.webp" alt="Overview: disk use per folder, cleanup suggestions and counts of skills, hooks, plugins and rules" width="1600" height="1025">
-        </picture>
-        <picture class="screen">
-          <source media="(prefers-color-scheme: dark)" srcset="assets/shot-mods-dark.webp">
-          <img src="assets/shot-mods-light.webp" alt="Mods: installed mods, mods loaded from folders and drafts, with what the selected mod draws, hooks and reaches" width="1600" height="1025">
-        </picture>
+        <div class="screen">
+          <picture>
+            <source media="(prefers-color-scheme: dark)" srcset="assets/shot-today-dark.webp">
+            <img src="assets/shot-today-light.webp" alt="Today: running Claude Code sessions, one waiting for permission, the 5-hour and weekly limits, and today's earlier sessions" width="1600" height="900">
+          </picture>
+          <span class="demo-data">demo data</span>
+        </div>
         <picture class="screen">
           <source media="(prefers-color-scheme: dark)" srcset="assets/shot-skills-dark.webp">
-          <img src="assets/shot-skills-light.webp" alt="Skills: a list with on and off states and the selected skill's SKILL.md" width="1600" height="1025">
+          <img src="assets/shot-skills-light.webp" alt="Skills: a list with on and off states and the selected skill's SKILL.md" width="1600" height="900">
         </picture>
         <picture class="screen">
           <source media="(prefers-color-scheme: dark)" srcset="assets/shot-settings-dark.webp">
-          <img src="assets/shot-settings-light.webp" alt="Settings: settings.json as a form, with JSON and History tabs" width="1600" height="1025">
+          <img src="assets/shot-settings-light.webp" alt="Settings: settings.json as a form, with JSON and History tabs" width="1600" height="900">
         </picture>
         <picture class="screen">
-          <source media="(prefers-color-scheme: dark)" srcset="assets/shot-storage-dark.webp">
-          <img src="assets/shot-storage-light.webp" alt="Storage: what takes space in ~/.claude, with cleanup suggestions" width="1600" height="1025">
+          <source media="(prefers-color-scheme: dark)" srcset="assets/shot-backups-dark.webp">
+          <img src="assets/shot-backups-light.webp" alt="Backups: a snapshot of settings.json with its diff against the current file and Restore this file" width="1600" height="900">
         </picture>
       </div>
       <div class="term" aria-hidden="true">
@@ -149,15 +141,70 @@
   </div>
 
   <section class="film">
-    <!-- To swap in the launch film: replace assets/demo.mp4 and assets/demo-poster.jpg (1600x1024, H.264, no audio). -->
-    <video id="demo" muted loop playsinline controls preload="metadata" width="1600" height="1024"
-           poster="assets/demo-poster.jpg" aria-label="Claudock walking through Overview, Mods, Skills, Settings, Hooks, Storage and Backups">
-      <source src="assets/demo.mp4" type="video/mp4">
+    <!-- The launch film (docs/launch/video/V1-{light,dark}.mp4 from item 14), re-encoded at 1280x720 with its score. -->
+    <video id="demo" muted loop playsinline controls preload="none" width="1280" height="720"
+           poster="assets/film-poster-light.jpg" data-poster-dark="assets/film-poster-dark.jpg"
+           aria-label="Claudock's launch film: npx claudock, the first-run reveal, Connect, the limit in the menu bar, an alert when a session waits, Today, a skill turned off, and settings.json restored from a snapshot">
+      <source src="assets/film-dark.mp4" type="video/mp4" media="(prefers-color-scheme: dark)">
+      <source src="assets/film-light.mp4" type="video/mp4">
     </video>
-    <button class="toggle" id="toggle" type="button" aria-label="Pause demo" hidden>
-      <svg class="i-pause" viewBox="0 0 20 20" width="16" height="16" fill="currentColor" aria-hidden="true"><rect x="5" y="4" width="3.4" height="12" rx="1"/><rect x="11.6" y="4" width="3.4" height="12" rx="1"/></svg>
-      <svg class="i-play" viewBox="0 0 20 20" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M6 4.2v11.6a.8.8 0 0 0 1.2.7l9-5.8a.8.8 0 0 0 0-1.4l-9-5.8A.8.8 0 0 0 6 4.2Z"/></svg>
-    </button>
+    <div class="film-controls">
+      <button class="toggle" id="sound" type="button" aria-label="Turn sound on" aria-pressed="false" hidden>
+        <svg class="i-muted" viewBox="0 0 20 20" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M3 7.5h3l4-3.3v11.6l-4-3.3H3z"/><path d="m13 7.5 5 5m0-5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none"/></svg>
+        <svg class="i-sound" viewBox="0 0 20 20" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M3 7.5h3l4-3.3v11.6l-4-3.3H3z"/><path d="M13.2 7a4 4 0 0 1 0 6M15.4 5a7 7 0 0 1 0 10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none"/></svg>
+      </button>
+      <button class="toggle" id="toggle" type="button" aria-label="Pause film" hidden>
+        <svg class="i-pause" viewBox="0 0 20 20" width="16" height="16" fill="currentColor" aria-hidden="true"><rect x="5" y="4" width="3.4" height="12" rx="1"/><rect x="11.6" y="4" width="3.4" height="12" rx="1"/></svg>
+        <svg class="i-play" viewBox="0 0 20 20" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M6 4.2v11.6a.8.8 0 0 0 1.2.7l9-5.8a.8.8 0 0 0 0-1.4l-9-5.8A.8.8 0 0 0 6 4.2Z"/></svg>
+      </button>
+    </div>
+  </section>
+
+  <section class="install" id="install">
+    <h2>Install</h2>
+    <ul class="ways">
+      <li id="npx">
+        <h3>npx</h3>
+        <div class="way">
+          <div class="cmd">
+            <code id="cmd-npx"><b aria-hidden="true">$ </b>npx claudock</code>
+            <button class="npx-copy" type="button" data-copy="cmd-npx" hidden>Copy</button>
+          </div>
+          <p class="req">Node 22.12+</p>
+        </div>
+      </li>
+      <li id="script">
+        <h3>Install script</h3>
+        <div class="way">
+          <p class="os">macOS, Linux</p>
+          <div class="cmd">
+            <code id="cmd-sh"><b aria-hidden="true">$ </b>curl -fsSL https://behkha.github.io/claudock/install.sh | sh</code>
+            <button class="npx-copy" type="button" data-copy="cmd-sh" hidden>Copy</button>
+          </div>
+          <p class="os">Windows</p>
+          <div class="cmd">
+            <code id="cmd-ps"><b aria-hidden="true">&gt; </b>irm https://behkha.github.io/claudock/install.ps1 | iex</code>
+            <button class="npx-copy" type="button" data-copy="cmd-ps" hidden>Copy</button>
+          </div>
+        </div>
+      </li>
+      <li id="installers">
+        <h3>Installers</h3>
+        <div class="way">
+          <p class="dl">
+            <a data-asset="mac" href="https://github.com/behkha/claudock/releases/latest">Mac Apple silicon</a>
+            <a data-asset="macIntel" href="https://github.com/behkha/claudock/releases/latest">Mac Intel</a>
+            <a data-asset="win" href="https://github.com/behkha/claudock/releases/latest">Windows</a>
+            <a data-asset="linux" href="https://github.com/behkha/claudock/releases/latest">Linux AppImage</a>
+            <a data-asset="deb" href="https://github.com/behkha/claudock/releases/latest">Linux .deb</a>
+          </p>
+          <dl class="steps">
+            <div><dt>macOS</dt><dd>Open it once, click Done, then <strong>Open Anyway</strong> in System Settings › Privacy &amp; Security. If macOS says the app is damaged, run <code>xattr -dr com.apple.quarantine /Applications/Claudock.app</code>.</dd></div>
+            <div><dt>Windows</dt><dd>Click <strong>More info</strong>, then <strong>Run anyway</strong>.</dd></div>
+          </dl>
+        </div>
+      </li>
+    </ul>
   </section>
 
   <section class="safe">

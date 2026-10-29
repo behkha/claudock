@@ -18,17 +18,17 @@
   function $$(s) { return Array.prototype.slice.call(document.querySelectorAll(s)) }
 
   // Each file in the listing lands on the sidebar label it becomes: [file, label, label's vertical centre in the
-  // 1600x1025 screenshots]. New screenshots with a different sidebar need new numbers here.
+  // 1600x900 screenshots]. New screenshots with a different sidebar need new numbers here. Plans and History sit
+  // below the 16:9 window's edge, so their files aren't listed.
   var FILES = [
-    ['settings.json', 'Settings', 0.2049], ['CLAUDE.md', 'CLAUDE.md & rules', 0.2449], ['hooks/', 'Hooks', 0.2849],
-    ['skills/', 'Skills', 0.4107], ['agents/', 'Agents', 0.4507], ['commands/', 'Commands', 0.4907],
-    ['plugins/', 'Plugins', 0.5317], ['dev-mods/', 'Mods', 0.5717], ['projects/', 'Projects', 0.6976], ['plans/', 'Plans', 0.7776],
-    ['history.jsonl', 'History', 0.8176]
+    ['settings.json', 'Settings', 0.2323], ['CLAUDE.md', 'CLAUDE.md & rules', 0.2788], ['hooks/', 'Hooks', 0.3247],
+    ['skills/', 'Skills', 0.5135], ['agents/', 'Agents', 0.5594], ['commands/', 'Commands', 0.6052],
+    ['plugins/', 'Plugins', 0.6503], ['dev-mods/', 'Mods', 0.6969], ['projects/', 'Projects', 0.8851]
   ]
   var LABEL_X = 58 / 1600 // labels' left edge
   var LABEL_FS = 18 / 1600 // labels' font size
-  var ZOOM = 1.4 // the camera starts at 1.4x on the sidebar, showing y 0.15 to 0.86 of the screenshot
-  var ZOOM_Y = 0.15
+  var ZOOM = 1.3 // the camera starts at 1.3x on the sidebar, showing y 0.18 to 0.95 of the screenshot
+  var ZOOM_Y = 0.18
 
   // Safe by design: camera (snapshot), document (atomic write), trash, lock, all in a 100x100 box
   var ICONS = [
@@ -98,7 +98,7 @@
 
     // on load: the headline rises word by word, the command types, the listing pours in
     var words = new SplitText('.hero h1 .ln', { type: 'words', mask: 'words' }).words
-    gsap.timeline({ defaults: { ease: 'power3.out' } })
+    var intro = gsap.timeline({ defaults: { ease: 'power3.out' } })
       .from(words, { yPercent: 110, duration: 0.9, stagger: 0.06 })
       .from('.get', { y: 16, autoAlpha: 0, duration: 0.6 }, '-=0.5')
       .from(win, { y: 40, rotationX: 8, transformPerspective: 1200, autoAlpha: 0, duration: 1 }, 0.15)
@@ -108,8 +108,13 @@
 
     // on scroll: files fly onto the sidebar, the terminal gives way to the app, the camera pulls back, the screens change
     var short = innerWidth < 700
+    // A scroll that starts while the opening still pours the listing in (an Install link, say) ends the opening first, so
+    // the scroll scene takes the lines from their resting place and they don't stay over the app
     var tl = gsap.timeline({
-      scrollTrigger: { trigger: '#hero', start: short ? 'top 64px' : 'top top', end: function () { return '+=' + innerHeight * (short ? 3.8 : 5) }, pin: true, scrub: 0.8 }
+      scrollTrigger: {
+        trigger: '#hero', start: short ? 'top 64px' : 'top top', end: function () { return '+=' + innerHeight * (short ? 3.8 : 5) }, pin: true, scrub: 0.8,
+        onUpdate: function () { if (intro.progress() < 1) intro.progress(1) }
+      }
     })
     tl.to('.hero-intro', { autoAlpha: 0, y: -40, duration: 0.5 }, 0)
       .to('#prompt', { autoAlpha: 0, duration: 0.3 }, 0.1)

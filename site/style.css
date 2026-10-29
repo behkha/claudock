@@ -84,7 +84,7 @@ h1 { font-size: clamp(36px, 3.8vw, 56px); line-height: 1.08; letter-spacing: -0.
 .cap { position: absolute; left: 0; top: 50%; margin: 0; transform: translateY(-50%); font: clamp(44px, 5vw, 76px)/1 var(--font-serif); letter-spacing: -0.025em; visibility: hidden; }
 
 .get { margin-top: 36px; }
-/* npx claudock is the main install, in the place and size of a button; the installer link sits under it */
+/* npx claudock is the main install, in the place and size of a button; links to the other two ways sit under it */
 .npx {
   display: inline-flex; align-items: center; gap: 16px; max-width: 100%;
   height: 52px; padding: 0 8px 0 20px;
@@ -93,24 +93,24 @@ h1 { font-size: clamp(36px, 3.8vw, 56px); line-height: 1.08; letter-spacing: -0.
 .npx code { background: none; padding: 0; font-size: 17px; white-space: nowrap; user-select: all; -webkit-user-select: all; }
 .npx code b { color: var(--accent); font-weight: 400; user-select: none; -webkit-user-select: none; }
 .npx-copy {
-  height: 36px; padding: 0 12px; font: 13px var(--font-sans); cursor: pointer;
+  flex: none; height: 36px; padding: 0 12px; font: 13px var(--font-sans); cursor: pointer;
   color: var(--term-text); background: transparent; border: 1px solid rgba(232, 230, 220, 0.3); border-radius: 7px;
 }
 .npx-copy:hover { background: rgba(232, 230, 220, 0.1); }
 .npx-copy:focus-visible { outline-color: #6a9bcc; }
 .npx-copy[hidden] { display: none; }
-.inst { margin: 16px 0 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; font-size: 15px; }
+/* the other two ways in, as links to the Install section */
+.inst { margin: 16px 0 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 20px; font-size: 15px; }
 .inst a { padding: 4px 0; }
-.inst[hidden] { display: none; }
-.note { font-size: 14px; color: var(--text-3); }
-.others { margin: 8px 0 0; display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 14px; color: var(--text-2); }
-.others a { padding: 4px 0; }
-.note[hidden] { display: none; }
 
-.win { position: relative; aspect-ratio: 1600 / 1025; border-radius: 12px; overflow: hidden; background: var(--bg); box-shadow: var(--shadow); outline: 1px solid var(--border); outline-offset: -1px; }
+.win { position: relative; aspect-ratio: 1600 / 900; border-radius: 12px; overflow: hidden; background: var(--bg); box-shadow: var(--shadow); outline: 1px solid var(--border); outline-offset: -1px; }
 .cam { position: absolute; inset: 0; transform-origin: 0 0; }
 .screen { position: absolute; inset: 0; }
+.screen > picture { display: block; height: 100%; }
 .screen img { width: 100%; height: 100%; }
+/* The Today screenshot's limits come from the fixture: this label sits under the weekly meter, and the next screen
+   wipes over it */
+.demo-data { position: absolute; top: 70.3%; right: 9.7%; transform: translateY(-50%); padding: 1px 6px; font: 11px/1.5 var(--font-mono); color: var(--text-2); background: var(--bg); border: 1px solid var(--border); border-radius: 5px; }
 .screen + .screen { visibility: hidden; }
 .term, .lines { display: none; }
 
@@ -135,24 +135,49 @@ h1 { font-size: clamp(36px, 3.8vw, 56px); line-height: 1.08; letter-spacing: -0.
 .track { display: flex; gap: 44px; width: max-content; font: clamp(26px, 3.6vw, 52px)/1.25 var(--font-mono); color: var(--text-3); white-space: nowrap; will-change: transform; }
 .track span:nth-child(3n+1) { color: var(--text); }
 
-/* Demo film */
-.film { position: relative; max-width: 1180px; margin: 96px auto 0; border-radius: 12px; overflow: hidden; background: #1a1918; box-shadow: var(--shadow); outline: 1px solid var(--border); outline-offset: -1px; aspect-ratio: 1600 / 1024; }
+/* Launch film: sound and pause buttons in the bottom right */
+.film { position: relative; max-width: 1180px; margin: 96px auto 0; border-radius: 12px; overflow: hidden; background: #1a1918; box-shadow: var(--shadow); outline: 1px solid var(--border); outline-offset: -1px; aspect-ratio: 16 / 9; }
 .film video { width: 100%; height: 100%; object-fit: cover; }
+.film-controls { position: absolute; right: 14px; bottom: 14px; display: flex; gap: 8px; }
 .toggle {
-  position: absolute; right: 14px; bottom: 14px; width: 36px; height: 36px;
+  width: 36px; height: 36px;
   display: grid; place-items: center; padding: 0; cursor: pointer;
   color: #faf9f5; background: rgba(20, 20, 19, 0.6); border: 1px solid rgba(250, 249, 245, 0.25); border-radius: 50%;
   backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
   opacity: 0; transition: opacity 0.15s ease;
 }
 .film:hover .toggle, .toggle:focus-visible { opacity: 1; }
-.toggle[data-playing='false'] { opacity: 1; }
+.toggle[data-playing='false'], .toggle[aria-pressed='true'] { opacity: 1; }
 .toggle[hidden] { display: none; }
-.toggle .i-play { display: none; }
-.toggle[data-playing='false'] .i-pause { display: none; }
-.toggle[data-playing='false'] .i-play { display: block; }
+.toggle .i-play, .toggle .i-sound { display: none; }
+.toggle[data-playing='false'] .i-pause, .toggle[aria-pressed='true'] .i-muted { display: none; }
+.toggle[data-playing='false'] .i-play, .toggle[aria-pressed='true'] .i-sound { display: block; }
 .toggle:focus-visible { outline-color: #6a9bcc; }
 @media (hover: none) { .toggle { opacity: 1; } }
+
+/* Install: npx, the install script, the installers, in that order */
+.install { margin-top: 120px; }
+.ways { list-style: none; margin: 28px 0 0; padding: 0; border-top: 1px solid var(--border); }
+.ways > li { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 12px 32px; padding: 28px 0; border-bottom: 1px solid var(--border); align-items: baseline; scroll-margin-top: 24px; }
+.ways h3 { margin: 0; font: 22px/1.25 var(--font-serif); letter-spacing: -0.01em; font-weight: 400; display: flex; gap: 12px; align-items: baseline; }
+.ways h3::before { content: ''; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); transform: translateY(-1px); }
+.way { display: grid; gap: 10px; justify-items: start; min-width: 0; }
+.way .cmd {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; max-width: 100%;
+  min-height: 52px; padding: 8px 8px 8px 20px;
+  background: var(--term); color: var(--term-text); border-radius: 10px;
+}
+.way .cmd code { min-width: 0; background: none; padding: 0; font-size: 15px; line-height: 1.5; overflow-wrap: anywhere; }
+.way .cmd code b { color: var(--accent); font-weight: 400; user-select: none; -webkit-user-select: none; }
+.way .os { margin: 6px 0 -4px; font-size: 14px; color: var(--text-3); }
+.way .os:first-child { margin-top: 0; }
+.dl { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 20px; }
+.dl a { padding: 4px 0; }
+.steps { margin: 6px 0 0; display: grid; gap: 8px; color: var(--text-2); max-width: 68ch; }
+.steps div { display: grid; grid-template-columns: 5.5em minmax(0, 1fr); gap: 12px; }
+.steps dt { color: var(--text); font-weight: 600; }
+.steps dd { margin: 0; }
+.steps strong { color: var(--text); font-weight: 600; }
 
 /* Safe by design */
 .safe { margin-top: 120px; }
@@ -198,7 +223,7 @@ code { font-size: 0.9em; background: var(--surface-sunken); padding: 1px 6px; bo
   .film { margin-top: 72px; }
   h1 { font-size: clamp(34px, 8.6vw, 60px); }
   .get { margin-top: 28px; }
-  .safe, .try, .foot { margin-top: 88px; }
+  .install, .safe, .try, .foot { margin-top: 88px; }
   .motion .safe-body { grid-template-columns: 72px minmax(0, 1fr); gap: 16px; }
   .motion .safe-icon { height: 72px; top: calc(50vh - 36px); }
   .safe-icon svg { width: 56px; height: 56px; }
@@ -207,12 +232,16 @@ code { font-size: 0.9em; background: var(--surface-sunken); padding: 1px 6px; bo
 @media (max-width: 700px) {
   :root { --gutter: 16px; }
   .safe li { grid-template-columns: minmax(0, 1fr); gap: 4px; padding: 18px 0; }
+  .ways > li { grid-template-columns: minmax(0, 1fr); gap: 14px; padding: 22px 0; }
+  .way .cmd { width: 100%; padding-left: 16px; }
+  .way .cmd code { font-size: 13.5px; }
   .npx { display: flex; width: 100%; justify-content: space-between; }
+  .demo-data { padding: 0 4px; font-size: 9px; }
   .code pre { padding: 18px 16px; font-size: 13.5px; white-space: pre-wrap; overflow-wrap: anywhere; }
   .copy { position: static; margin: 0 16px 16px; }
   .code { display: flex; flex-direction: column; }
   .code pre { order: 0; }
-  .safe, .try { margin-top: 72px; }
+  .install, .safe, .try { margin-top: 72px; }
   .motion .safe li { padding: 28px 0; }
   .marquee { margin-top: 40px; }
   .foot { margin-top: 72px; }
