@@ -118,12 +118,12 @@ function detectInstallKind(): InstallKind {
  * ./.fixture/claude-work), or CLAUDOCK_ALLOW_REAL_WRITES=1 is set explicitly.
  * CLAUDOCK_READONLY=1 refuses every write, however it was installed.
  */
-export function writesAllowed(): boolean {
+export function writesAllowed(dir = configDir()): boolean {
   if (process.env.CLAUDOCK_READONLY === '1') return false
   if (installKind() !== 'dev') return true
   if (process.env.CLAUDOCK_ALLOW_REAL_WRITES === '1') return true
   // the folder CLAUDE_CONFIG_DIR named, or a synthetic profile beside it (never a real folder added as a profile)
-  return (envConfigDir() !== null && samePath(configDir(), launchConfigDir())) || fs.existsSync(path.join(configDir(), FIXTURE_MARK))
+  return (envConfigDir() !== null && samePath(dir, launchConfigDir())) || fs.existsSync(path.join(dir, FIXTURE_MARK))
 }
 
 /** In a folder the fixture generators (or a development build's "New folder") made: a development build may write there. */

@@ -9,7 +9,8 @@ import { defineDomain } from '../ipcx'
 import { configDir, onConfigDirChanged } from '../paths'
 import { listMemoryFiles } from './memory'
 import { listPlans } from './plans'
-import { listProjectSummaries, readHead, sessionTitle } from './projects'
+import { archiveRows, paletteHits } from './archive'
+import { listProjectSummaries, readHead } from './projects'
 
 /**
  * Global search (command palette). A small in-memory index of names / titles, built from file heads only and
@@ -23,7 +24,8 @@ import { listProjectSummaries, readHead, sessionTitle } from './projects'
  *   rules       `CLAUDE.md` or `rules/style.md`
  *   hooks       `<file>|<event>:<groupIndex>:<hookIndex>`, e.g. `settings.local.json|PreToolUse:0:1`
  *   settings    `<file>:<key path with dots>`, e.g. `settings.json:model` or `settings.local.json:permissions.defaultMode`
- *   projects    encoded folder name, or `<folder>/<sessionId>` for a session
+ *   projects    encoded folder name
+ *   archive     (the Sessions screen) `<folder>/<sessionId>`, or `<folder>/<sessionId>@<byte offset>` for a line that matched
  *   memory      config-relative path as the Memory screen lists it (`projects/<folder>/memory/<file>.md`)
  *   plans       config-relative path as the Plans screen lists it (`plans/<file>.md`)
  */
@@ -170,39 +172,9 @@ async function projectItems(): Promise<Item[]> {
   return (await listProjectSummaries()).map((p) => mk('projects', 'project', p.id, p.name, p.path ?? undefined, p.id))
 }
 
-/** Titles of the newest sessions (heads only; title cache makes refreshes cheap). */
+/** The newest sessions by title, from the session archive's index (it reads every transcript once). */
 async function sessionItems(): Promise<Item[]> {
-  const projects = (await listProjectSummaries()).sort((a, b) => b.lastActiveMs - a.lastActiveMs).slice(0, 40)
-  const files: Array<{ project: (typeof projects)[number]; sid: string; mtimeMs: number }> = []
-  await Promise.all(
-    projects.map(async (p) => {
-      const dir = path.join(configDir(), 'projects', p.id)
-      let names: string[]
-      try {
-        names = (await fsp.readdir(dir)).filter((n) => n.endsWith('.jsonl'))
-      } catch {
-        return
-      }
-      await Promise.all(
-        names.map(async (n) => {
-          const st = await fsp.stat(path.join(dir, n)).catch(() => null)
-          if (st) files.push({ project: p, sid: n.slice(0, -6), mtimeMs: st.mtimeMs })
-        })
-      )
-    })
-  )
-  files.sort((a, b) => b.mtimeMs - a.mtimeMs)
-  const top = files.slice(0, 300)
-  const out: Item[] = []
-  const queue = [...top]
-  const worker = async (): Promise<void> => {
-    for (let f = queue.shift(); f; f = queue.shift()) {
-      const title = await sessionTitle(path.join(configDir(), 'projects', f.project.id, `${f.sid}.jsonl`))
-      if (title) out.push(mk('projects', 'session', `${f.project.id}/${f.sid}`, title, f.project.name))
-    }
-  }
-  await Promise.all(Array.from({ length: 6 }, worker))
-  return out
+  return (await archiveRows(1000)).filter((r) => r.title).map((r) => mk('archive', 'session', r.key, r.title, r.project))
 }
 
 /* ------------------------------------------------------------------ index */
@@ -326,7 +298,17 @@ export function register(ipcMain: IpcMain): void {
         if (s >= 0) scored.push({ item, s })
       }
       scored.sort((a, b) => a.s - b.s || a.item.weight - b.item.weight || a.item.title.length - b.item.title.length || a.item.title.localeCompare(b.item.title))
-      return scored.slice(0, 30).map(({ item }) => ({ screen: item.screen, id: item.id, title: item.title, subtitle: item.subtitle, kind: item.kind }))
+      const out: SearchResult[] = scored.slice(0, 30).map(({ item }) => ({ screen: item.screen, id: item.id, title: item.title, subtitle: item.subtitle, kind: item.kind }))
+      // then sessions whose prompts or replies hold the words, opened at the line that matched
+      if (out.length < 30) {
+        const shown = new Set(out.filter((r) => r.screen === 'archive').map((r) => r.id))
+        for (const { session, hit } of await paletteHits(q, Math.min(8, 30 - out.length) + shown.size)) {
+          if (out.length >= 30) break
+          if (shown.has(session.key) || !session.title) continue
+          out.push({ screen: 'archive', id: hit.offset >= 0 ? `${session.key}@${hit.offset}` : session.key, title: session.title, subtitle: hit.snippet, kind: 'session' })
+        }
+      }
+      return out
     }
   })
 }

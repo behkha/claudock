@@ -17,7 +17,7 @@ Claudock opens the Claude Code config folder (`~/.claude`, or wherever `CLAUDE_C
 - **Today:** what each running Claude Code session is doing and which one waits for you, your 5-hour and weekly limits, today's sessions and this week's tokens, and **Share**: your messages, sessions, longest session, peak hour, top model and 26 weeks of activity from Claude Code's own `stats-cache.json`, as a card to copy, save or post on X. The card never shows project names or prompts.
 - **Configure:** `settings.json` and `settings.local.json` as a form or raw JSON with history, `CLAUDE.md` and `rules/`, hooks, permissions
 - **Extend:** skills (turn on or off, edit, duplicate), agents, commands, plugins, mods (what each one draws, hooks and reaches; keep the ones Claude drafts), MCP servers
-- **Your data:** projects and their session transcripts, memory, plans, prompt history
+- **Your data:** every session, kept after Claude Code's 30-day cleanup deletes it, with full-text search, resume from any folder and Markdown export; projects, memory, plans, prompt history
 - **Maintain:** disk use per folder with cleanup suggestions, plus snapshots and `.bak` files you can diff and restore
 
 **Menu bar** (the tray on Windows and Linux): the higher of your 5-hour and weekly limits, and a clay mark while a Claude Code session waits for you. Click it for the waiting sessions, both limits, today's tokens and the alert settings. On macOS, closing the window keeps Claudock running there; quit from its menu. On Windows the tray icon is off until you turn it on in View › Show in Tray.

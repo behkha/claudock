@@ -292,7 +292,11 @@ export function ProjectDetail({ project, bytes, sessionId, onOpenSession, onChan
             </>
           }
         >
-          <Transcript projectId={project.id} sessionId={session.id} totalBytes={session.bytes} />
+          <Transcript
+            source={`${project.id}/${session.id}`}
+            read={(offset, limit) => api.projects.readSession(project.id, session.id, offset, limit)}
+            totalBytes={session.bytes}
+          />
         </DetailPane>
         {dialogs}
       </>

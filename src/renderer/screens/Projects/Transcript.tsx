@@ -1,9 +1,9 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronRight, Terminal, Wrench } from 'lucide-react'
-import type { TranscriptEntry } from '@shared/api/projects'
+import type { SessionPage, TranscriptEntry } from '@shared/api/projects'
 import { formatBytes, formatCount } from '@shared/format'
 import { Button, Chip, MarkdownView, Spinner } from '@/components'
-import { api } from '@/lib/api'
+import './transcript.css'
 
 const PAGE = 200
 
@@ -76,8 +76,21 @@ const Entry = memo(function Entry({ e, showThinking }: { e: TranscriptEntry; sho
   }
 })
 
+interface TranscriptProps {
+  /** Names the transcript: a new value starts over from the top. */
+  source: string
+  /** Reads one page from a byte offset (Projects' file, or the session archive's). */
+  read: (offset: number, limit: number) => Promise<SessionPage>
+  totalBytes: number
+  /**
+   * Byte offset of a line to open at (a search hit), marked and scrolled into view. Past the first page the transcript
+   * starts at that line instead, with the start one click away, so a hit deep in a huge transcript loads one page.
+   */
+  focusOffset?: number
+}
+
 /** Streams a transcript in pages of 200 entries. Never holds more than what the user asked to see. */
-export function Transcript({ projectId, sessionId, totalBytes }: { projectId: string; sessionId: string; totalBytes: number }): JSX.Element {
+export function Transcript({ source, read, totalBytes, focusOffset }: TranscriptProps): JSX.Element {
   const [entries, setEntries] = useState<TranscriptEntry[]>([])
   const [next, setNext] = useState<number | null>(0)
   const [loading, setLoading] = useState(true)
@@ -85,13 +98,20 @@ export function Transcript({ projectId, sessionId, totalBytes }: { projectId: st
   const [skipped, setSkipped] = useState(0)
   const [showThinking, setShowThinking] = useState(false)
   const token = useRef(0)
+  const reader = useRef(read)
+  reader.current = read
+  const root = useRef<HTMLDivElement>(null)
+  /** Where what is shown starts: 0, or the line of a search hit past the first page. */
+  const [from, setFrom] = useState(0)
+  const jumpedFor = useRef<number | null>(null)
+  const scrolledTo = useRef<string | null>(null)
 
   const load = useCallback(
     (offset: number, reset: boolean) => {
       const t = ++token.current
       setLoading(true)
       setError(null)
-      api.projects.readSession(projectId, sessionId, offset, PAGE).then(
+      reader.current(offset, PAGE).then(
         (page) => {
           if (t !== token.current) return
           setEntries((prev) => (reset ? page.entries : prev.concat(page.entries)))
@@ -106,20 +126,41 @@ export function Transcript({ projectId, sessionId, totalBytes }: { projectId: st
         }
       )
     },
-    [projectId, sessionId]
+    // `source` names what `read` reads
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [source]
   )
 
   useEffect(() => {
     setEntries([])
     setNext(0)
     setSkipped(0)
+    setFrom(0)
+    jumpedFor.current = null
+    scrolledTo.current = null
     load(0, true)
   }, [load])
+
+  // a search hit that isn't in what is loaded: start at its line
+  const focusKey = focusOffset !== undefined && focusOffset >= 0 ? `${focusOffset}:` : null
+  const focusIn = focusKey !== null && entries.some((e) => e.key.startsWith(focusKey))
+  useEffect(() => {
+    if (focusKey === null || focusOffset === undefined || loading || error || focusIn || jumpedFor.current === focusOffset) return
+    if (focusOffset >= from && next !== null && next > focusOffset) return
+    jumpedFor.current = focusOffset
+    setFrom(focusOffset)
+    load(focusOffset, true)
+  }, [focusKey, focusIn, focusOffset, from, next, loading, error, load])
+  useEffect(() => {
+    if (!focusIn || focusKey === null || scrolledTo.current === focusKey) return
+    scrolledTo.current = focusKey
+    root.current?.querySelector(`[data-key^="${CSS.escape(focusKey)}"]`)?.scrollIntoView({ block: 'center' })
+  }, [focusIn, focusKey])
 
   const hasThinking = entries.some((e) => e.kind === 'thinking')
 
   return (
-    <div className="tx">
+    <div className="tx" ref={root}>
       <div className="tx__bar">
         <span>
           {formatBytes(totalBytes)} on disk. Showing {formatCount(entries.length)} entries
@@ -130,9 +171,28 @@ export function Transcript({ projectId, sessionId, totalBytes }: { projectId: st
           Show thinking
         </Chip>
       </div>
-      {entries.map((e) => (
-        <Entry key={e.key} e={e} showThinking={showThinking} />
-      ))}
+      {from > 0 && !loading ? (
+        <div className="tx__foot">
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setFrom(0)
+              load(0, true)
+            }}
+          >
+            Show from the start
+          </Button>
+        </div>
+      ) : null}
+      {entries.map((e) =>
+        focusKey !== null && e.key.startsWith(focusKey) ? (
+          <div key={e.key} data-key={e.key} className="tx__focus">
+            <Entry e={e} showThinking={showThinking} />
+          </div>
+        ) : (
+          <Entry key={e.key} e={e} showThinking={showThinking} />
+        )
+      )}
       {error ? (
         <p role="alert" style={{ color: 'var(--danger)' }}>
           {error}

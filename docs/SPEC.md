@@ -23,9 +23,9 @@ Design source of truth: the "Claudock design options" canvas, Option A (three-pa
 ## Safety rules (non-negotiable)
 
 1. **Never read, display, copy or back up `.credentials.json`** or any `*.key` file under `sessions/`. Show them only as a locked row ("Credentials — hidden").
-2. **Every write goes through `safeWrite()`** in the main process: snapshot the current file into the snapshot store, write to a temp file in the same folder, then `rename` over the target (atomic). JSON files are validated before writing and keep 2-space indentation and a trailing newline.
+2. **Every write goes through `safeWrite()`** in the main process: snapshot the current file into the snapshot store, write to a temp file in the same folder, then `rename` over the target (atomic). JSON files are validated before writing and keep 2-space indentation and a trailing newline. The one write that adds a file from Claudock's own data (a session put back from the archive, `placeNewFile`) never replaces anything, so it has nothing to snapshot.
 3. **Snapshot store**: `<app userData>/snapshots/<ISO timestamp>/<path relative to config dir>`, plus a `manifest.json` per snapshot (`{ at, reason, files: [rel paths], dir }`, `dir` being the config folder it was taken in). Backups lists only the open profile's snapshots (those without `dir`, from before profiles, belong to the launch folder Claudock had when profiles first loaded), and a restore never crosses profiles. Snapshots never go into `~/.claude` itself.
-4. **Deletes go to the OS Trash** via `shell.trashItem`, never `fs.rm`.
+4. **Deletes go to the OS Trash** via `shell.trashItem`, never `fs.rm`. The session archive removes only its own extra names for bytes that are also somewhere else (Claude Code's file, or the Trash after a delete); whatever only the archive has goes to the Trash.
 5. **`.claude.json` is written by Claude Code constantly.** Re-read it immediately before writing, change only the key being edited (e.g. `mcpServers`), and write atomically.
 6. **The renderer has no Node access.** `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`. On Linux systems that block Chromium's OS sandbox for unpackaged apps (Ubuntu 24.04), `npx claudock` and the AppImage start with `--no-sandbox`, like electron-builder's AppImage launcher; the `.deb` keeps it. Every file path coming from the renderer is resolved and checked to be inside the config dir (or the global state file) before use.
 7. **Development and tests never write to the real `~/.claude`.** Use `npm run fixture` to build `./.fixture/claude` (a synthetic config dir) and run with `CLAUDE_CONFIG_DIR=./.fixture/claude`. Reading the real folder for a look is fine; writing to it is not.
@@ -52,7 +52,10 @@ src/
       limits.ts sessions.ts connect.ts   (live limits, "needs me" sessions, Connect to Claude Code; per profile folder)
       menubar.ts       (what the popover asks of the menu bar)
       profiles.ts      (profiles: which folder the window shows, every profile's glance for the menu bar)
+      archive.ts       (the session archive behind the Sessions screen; per profile folder)
     profiles/        pure parts of profiles (names, the start command), unit-tested
+    archive/         pure parts of the session archive (search text, matching, Markdown, the resume command, link or copy), unit-tested
+    transcripts/     reading Claude Code transcripts (lines, entries), shared by Projects and the archive
     connect/         pure parts of Connect (hook script, settings merge, session model, alert rule), unit-tested
     demo/            `--demo`: the synthetic config (fixture.ts, also `npm run fixture`) built in its own data folder
     domains/index.ts registers all of them (already lists every domain)
@@ -76,10 +79,10 @@ Each domain owns: `src/main/domains/<domain>.ts`, its slice of types in `src/sha
 - **Home**: Today
 - **Configure**: Settings, CLAUDE.md & rules, Hooks, Permissions
 - **Extend**: Skills, Agents, Commands, Plugins, Mods, MCP servers
-- **Your data**: Projects, Memory, Plans, History
+- **Your data**: Sessions, Projects, Memory, Plans, History
 - **Maintain**: Storage, Backups
 
-Each item shows a count or size on the right when one is cheap to get. A search field in the title bar opens a ⌘K / Ctrl+K command palette that searches across skills, agents, rules, hooks, sessions, memory and settings keys and jumps to the result.
+Each item shows a count or size on the right when one is cheap to get. A search field in the title bar opens a ⌘K / Ctrl+K command palette that searches across skills, agents, rules, hooks, sessions, memory and settings keys and jumps to the result; sessions match by title, then by the words of their prompts and replies, opening at the line that matched.
 
 ## Screens
 
@@ -95,7 +98,8 @@ Layout for every list-type screen: sidebar (220–240px) · list pane (300–360
 - **Plugins**: installed plugins, marketplaces, enable / disable (writes `enabledPlugins`).
 - **Mods**: plugins whose `hooks/hooks.json` has `modules`. Installed ones (enable / disable via `enabledPlugins`), folders in `CLAUDE_CODE_PLUGIN_DIRS` and `mods/` (load / stop loading by editing that env var in `settings.json`), and drafts Claude wrote in `dev-mods/<session>/<name>` (Keep moves one to `mods/<name>` and loads it; Trash). Shows what the hooks module draws, hooks and calls (read from its source, never run), its `$.store` data in `plugins/store` (Clear sends it to the Trash) and its README.
 - **MCP servers**: user-scope servers from the global state file; add / edit / remove (see safety rule 5).
-- **Projects**: one row per project folder; the real path comes from the `cwd` in its transcripts, not the folder name. Detail: sessions (title = first user prompt, date, size, message count), transcript viewer, Move to Trash per session or for sessions older than N days.
+- **Sessions**: every session of the open profile, newest first, whether Claude Code still has its transcript or only the archive does (see Session archive): name (Claude Code's custom title, else the first prompt), folder, when, size, an Archived badge once Claude Code deleted it. "Search every session" matches every word in the title, prompts and replies (not tool output), each hit showing the line that matched; opening it scrolls the transcript there. Filters: All, Archived. Detail: the folder, when and how many messages, Copy resume command (`cd <folder> && claude --resume <id>`, with the profile's `CLAUDE_CONFIG_DIR`; a deleted session is put back in `projects/` first, dated now), Export… (Markdown: prompts and replies in full, each tool call one line), Move to Trash (Claude Code's files, and anything only the archive has, to the Trash), and the transcript viewer, which opens a search hit past its first page at that line, with Show from the start. The list's footer says what the archive holds and the disk it takes beyond Claude Code's folder ("Archive on · 41 archived · 120 MB") and its ⋯ menu has Show archive folder and Stop archiving this profile… (which can also move the archived sessions to the Trash).
+- **Projects**: one row per project folder; the real path comes from the `cwd` in its transcripts, not the folder name. Detail: sessions (title = first user prompt, date, size, message count), transcript viewer, Move to Trash per session or for sessions older than N days (the archive lets go of those too).
 - **Memory**: `projects/*/memory/*.md` grouped by project; view / edit / Trash; `MEMORY.md` index shown first.
 - **Plans**: `plans/*.md` with preview.
 - **History**: `history.jsonl` with search and project filter.
@@ -109,6 +113,10 @@ The first launch shows the user's own Claude Code numbers in the whole window un
 ## Profiles
 
 A profile is a Claude Code config folder (what `CLAUDE_CONFIG_DIR` names) shown under a name; Claudock never reads or swaps the logins inside one. The launch folder is always a profile. The title bar's folder is the switcher: its menu lists every profile (name, folder, its higher limit or today's tokens, a clay dot while one of its sessions waits), the command that starts Claude Code on the open one (`CLAUDE_CONFIG_DIR=~/.claude-work claude`, or `claude` for `~/.claude`) with Copy, and Add profile…; right-click a profile to rename it, show its folder or remove it (forget it, never delete the folder; not the open one or the launch folder). The profile's name shows in the title bar once there are several. Add profile lists the Claude Code folders found beside the launch folder (`~/.claude-*`), New folder (an empty `~/.claude-<name>`; Claude Code asks to log in the first time it runs there) and Choose folder… (the system picker, hidden folders shown), with a name filled in from the folder. Opening a profile reloads every screen on its folder (asking first about unsaved edits). Each profile connects to Claude Code on its own. Started with `CLAUDE_CONFIG_DIR`, Claudock opens that folder; otherwise the profile open last.
+
+## Session archive
+
+Claude Code deletes a transcript `cleanupPeriodDays` (30) days after it was last touched, at its next start. Claudock keeps every session of every profile, from the first launch on: each transcript (and its folder of sub-agent transcripts) is hard-linked into `<app userData>/archive/<folder key>/`, so the archive shares Claude Code's bytes and costs nothing until Claude Code deletes its file; on a disk without hard links it is copied (taking the same space again), and what Claude Code appends is appended. A version only the archive has is never replaced by an older file put back under its name; it is kept beside it. A sweep runs a few seconds after launch, every 10 minutes and when Sessions opens: it holds every profile's transcripts first, then reads them for search one profile at a time. Nothing is written into the config folder to keep a session. Stopping is per profile (the Sessions footer menu) and leaves what only the archive has, unless the user also sends it to the Trash. A development build keeps its own archive (`archive.dev`) and archives only the fixture.
 
 ## Menu bar
 

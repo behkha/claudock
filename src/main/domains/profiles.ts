@@ -11,6 +11,7 @@ import { FIXTURE_MARK, installKind, isInside, launchConfigDir, openConfigDir, sa
 import { cleanName, configFolderRe, nameFor, slug, startCommand } from '../profiles/model'
 import { mainWindow, showMainWindow } from '../windows'
 import { limitsIn, onLimitsChanged, watchLimitFolders } from './limits'
+import { watchArchiveFolders } from './archive'
 import { everySession, onSessionsChanged, sessionsIn, watchFolders } from './sessions'
 
 /**
@@ -111,6 +112,7 @@ async function current(): Promise<ProfilesState> {
 async function changed(): Promise<ProfilesState> {
   watchFolders(list)
   watchLimitFolders(list.map((s) => s.dir))
+  watchArchiveFolders(list.map((s) => s.dir))
   const s = await current()
   emit('profiles:changed', s)
   glanceSoon()
@@ -359,6 +361,7 @@ export function register(ipcMain: IpcMain): void {
   defineDomain(ipcMain, 'profiles', impl)
   watchFolders(list)
   watchLimitFolders(list.map((s) => s.dir))
+  watchArchiveFolders(list.map((s) => s.dir))
   onSessionsChanged(glanceSoon)
   onLimitsChanged(glanceSoon)
 }

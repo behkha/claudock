@@ -4,6 +4,7 @@ import path from 'node:path'
 import { SCREENS, type ScreenId } from '@shared/nav'
 import { app } from 'electron'
 import { connectDir } from './connect/folder'
+import { archiveRootOf, list as archiveList, markdownOf, search as archiveSearch, sweepNow } from './domains/archive'
 import { GROUP_MS } from './connect/sessionModel'
 import { postedAlerts } from './alerts'
 import { alertPrefs, setAlertPrefs } from './domains/sessions'
@@ -17,7 +18,7 @@ import { driver, sleep } from './shotDrive'
 /**
  * Screenshot mode (CLAUDOCK_SHOT=1, driven by scripts/shot.mjs): visits every screen in light then dark through the
  * normal `system:navigate` / `system:theme` events, waits until each is loaded and painted in that theme, saves
- * `<dir>/<theme>-<screen>.png` (plus `connect`, the Connect sheet, `connected`, the Today card after connecting with one played status line run and three sessions played through the real hooks, which must post exactly one alert, `connected-hooks`, the Hooks screen then, where Claudock's hooks are one row and out of the counts, and `disconnect`, the confirm dialog that row's Disconnect… opens, which must leave settings.json byte for byte as it was, `profiles-add`, `profiles-menu` and `profiles-menubar`, profiles with a second folder added and removed again, `palette`, `settings-json`, `mods-draft`, the Mods screen with the fixture's draft selected, and `share`, the Today share dialog, and `card.png`, the card itself, and `reveal`, `reveal-connect`, `reveal-connected` and `reveal-empty`, the first-run reveal), prints renderer console errors as `CONSOLE_ERROR ...` and failed shots as
+ * `<dir>/<theme>-<screen>.png` (plus `connect`, the Connect sheet, `connected`, the Today card after connecting with one played status line run and three sessions played through the real hooks, which must post exactly one alert, `connected-hooks`, the Hooks screen then, where Claudock's hooks are one row and out of the counts, and `disconnect`, the confirm dialog that row's Disconnect… opens, which must leave settings.json byte for byte as it was, `profiles-add`, `profiles-menu` and `profiles-menubar`, profiles with a second folder added and removed again, `archive-search` and `archive-resume`, the Sessions screen with a session Claude Code deleted found and put back, `palette`, `settings-json`, `mods-draft`, the Mods screen with the fixture's draft selected, and `share`, the Today share dialog, and `card.png`, the card itself, and `reveal`, `reveal-connect`, `reveal-connected` and `reveal-empty`, the first-run reveal), prints renderer console errors as `CONSOLE_ERROR ...` and failed shots as
  * `SHOT_FAILED ...`, and exits 0 (clean) or 1 (errors).
  */
 export async function runShots(win: BrowserWindow, opts: { dir: string; only: string[] }): Promise<void> {
@@ -351,6 +352,83 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
     }
   }
 
+  /**
+   * The session archive (the Sessions screen): every transcript is held as a hard link; Claude Code's cleanup is played
+   * by deleting the oldest session's transcript and folder from the copy -> it shows as Archived; a search for a word of
+   * its title opens it at the line that matched (shot `archive-search`); Copy resume command puts it back byte for byte,
+   * dated now (shot `archive-resume`); its Markdown starts with its title. Only ever on the shot's own copy.
+   */
+  async function archiveFlow(theme: 'light' | 'dark'): Promise<void> {
+    if (process.env.CLAUDOCK_READONLY === '1' || !configDir().includes(`${path.sep}.shots${path.sep}.tmp-`)) return
+    await sweepNow()
+    const rows = (await archiveList()).sessions
+    const target = rows.filter((r) => !r.archived && r.title && r.messages > 1).at(-1)
+    if (!target) throw new Error('archive: no session in the fixture to delete')
+    const live = path.join(configDir(), 'projects', target.projectId, `${target.id}.jsonl`)
+    const held = path.join(archiveRootOf(configDir()), 'projects', target.projectId, `${target.id}.jsonl`)
+    const bytes = await fsp.readFile(live)
+    if ((await fsp.stat(held)).ino !== (await fsp.stat(live)).ino) throw new Error('archive: the transcript is not hard-linked into the archive')
+    // Claude Code's cleanup
+    await fsp.rm(live)
+    await fsp.rm(path.join(configDir(), 'projects', target.projectId, target.id), { recursive: true, force: true })
+    await sweepNow()
+    if (!(await archiveList()).sessions.find((r) => r.key === target.key)?.archived) throw new Error('archive: the deleted session is not shown as archived')
+
+    const word = target.title.split(/[^A-Za-z]+/).sort((a, b) => b.length - a.length)[0]?.toLowerCase() ?? ''
+    emit('system:navigate', { screen: 'archive' })
+    await sleep(150)
+    await js(`(() => {
+      const input = document.querySelector('.ldl__list .search-field__input')
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, ${JSON.stringify(word)})
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })()`)
+    // a hit row: its title is the session's (another session's snippet may quote it)
+    const hitRow = `[...document.querySelectorAll('.list-row')].find((r) => r.querySelector('.ses-snippet') && r.querySelector('.list-row__title')?.textContent === ${JSON.stringify(target.title)})`
+    await waitFor(hitRow, 'the search hit')
+    await js(`${hitRow}.querySelector('button').click()`)
+    await waitFor(`document.querySelector('.detail-pane__title')?.textContent === ${JSON.stringify(target.title)} && document.querySelector('.tx__focus')`, 'the hit opened at its line')
+    await shoot(theme, 'archive-search')
+    await js(`(() => {
+      const input = document.querySelector('.ldl__list .search-field__input')
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, '')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })()`)
+
+    await waitFor(`[...document.querySelectorAll('.detail-pane .badge')].some((b) => b.textContent === 'Archived') && !document.querySelector('.toast')`, 'the Archived badge, no toast left')
+    await click('Copy resume command', `document.querySelector('.detail-pane')`)
+    // put back: the badge goes once the list reloads
+    await waitFor(
+      `document.querySelector('.ses-cmd')?.textContent.includes('--resume ${target.id}') && ![...document.querySelectorAll('.detail-pane .badge')].some((b) => b.textContent === 'Archived')`,
+      'the session put back and its resume command'
+    )
+    const back = await fsp.readFile(live)
+    if (!back.equals(bytes)) throw new Error('archive: the session put back is not byte for byte what Claude Code deleted')
+    if (Date.now() - (await fsp.stat(live)).mtimeMs > 60_000) throw new Error('archive: the session put back is not dated now')
+    await shoot(theme, 'archive-resume')
+
+    const md = await markdownOf(target.key)
+    if (!md.text.startsWith(`# ${target.title}\n`) || !md.text.includes('\n## You')) throw new Error('archive: the Markdown export is missing its title or prompts')
+
+    // a word of Claude's first reply, not of any title, finds it in the full text and in ⌘K
+    const titles = new Set(rows.flatMap((r) => r.title.toLowerCase().split(/[^a-z]+/)))
+    const reply = md.text.split('\n## Claude')[1]?.split('\n## ')[0] ?? ''
+    const rare = reply.split(/[^A-Za-z]+/).filter((w) => w.length >= 6 && !titles.has(w.toLowerCase())).sort((a, b) => b.length - a.length)[0]
+    if (!rare) throw new Error('archive: no word in the first reply to search for')
+    const hit = (await archiveSearch(rare)).find((h) => h.key === target.key)
+    if (!hit || hit.offset < 0 || !hit.marks.length) throw new Error(`archive: searching "${rare}" did not find the session at a line`)
+    emit('system:openPalette', null)
+    await sleep(150)
+    await js(`(() => {
+      const input = document.querySelector('.palette__input')
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, ${JSON.stringify(rare)})
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })()`)
+    await waitFor(`[...document.querySelectorAll('.palette__item')].some((i) => i.textContent.toLowerCase().includes(${JSON.stringify(rare.toLowerCase())}))`, 'a full-text session hit in ⌘K')
+    await js(`document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}))`)
+    // nothing of this flow in the shots after it
+    await waitFor(`!document.querySelector('.palette') && !document.querySelector('.toast')`, 'the palette and the toast gone')
+  }
+
   const fail = (e: unknown): void => {
     errors.push(`SHOT_FAILED ${(e as Error).message}`)
     console.log(`SHOT_FAILED ${(e as Error).message}`)
@@ -368,6 +446,8 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
       if (Date.now() > deadline) throw new Error('app not ready after 30 s')
       await sleep(100)
     }
+    // the Sessions screen shows every session read, not the first pass's "Reading…"
+    await sweepNow()
 
     for (const theme of ['light', 'dark'] as const) {
       await setTheme(theme, false)
@@ -407,6 +487,9 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
         emit('system:navigate', { screen: 'today' })
         await sleep(150)
         await revealFlow(theme).catch(fail)
+      }
+      if (opts.only.length === 0 || opts.only.includes('archive')) {
+        await archiveFlow(theme).catch(fail)
       }
       if (opts.only.length === 0 || opts.only.includes('mods') || opts.only.includes('mods-draft')) {
         emit('system:navigate', { screen: 'mods' })

@@ -13,6 +13,7 @@ import { dirSize, exists, readJson, stat } from '../fsx'
 import { defineDomain } from '../ipcx'
 import { assertNotSecretReal, configDir, globalStateFile } from '../paths'
 import { trash } from '../safeWrite'
+import { entriesFromLine, isObj, iterLines, parseLine } from '../transcripts/parse'
 import { historyProjectPaths } from './history'
 
 /**
@@ -28,12 +29,12 @@ const projectsDir = (): string => path.join(configDir(), 'projects')
 
 const SAFE_NAME = /^[^\\/\0]{1,255}$/
 
-function projectDirName(id: string): string {
+export function projectDirName(id: string): string {
   if (typeof id !== 'string' || !SAFE_NAME.test(id) || id === '.' || id === '..') throw new Error('Invalid project')
   return id
 }
 
-function sessionFileId(id: string): string {
+export function sessionFileId(id: string): string {
   if (typeof id !== 'string' || !/^[A-Za-z0-9._-]{1,200}$/.test(id) || id.startsWith('.')) throw new Error('Invalid session')
   return id
 }
@@ -41,7 +42,7 @@ function sessionFileId(id: string): string {
 const relProject = (id: string): string => path.join('projects', id)
 const relSession = (id: string, sid: string): string => path.join('projects', id, `${sid}.jsonl`)
 
-/* ------------------------------------------------------------------ reading helpers (exported for memory / search) */
+/* ------------------------------------------------------------------ reading helpers (exported for memory / search / archive) */
 
 /** First `bytes` of a file as text. A multi-byte character cut at the end becomes U+FFFD, which is fine for heads. */
 export async function readHead(abs: string, bytes: number): Promise<string> {
@@ -56,189 +57,6 @@ export async function readHead(abs: string, bytes: number): Promise<string> {
     return ''
   } finally {
     await fh?.close().catch(() => undefined)
-  }
-}
-
-interface RawLine {
-  /** Bytes of the line without the newline; null if the line was larger than `maxLine` and was skipped. */
-  line: Buffer | null
-  start: number
-  /** Offset just after the newline (or the file end). */
-  end: number
-  /** The line had no terminating newline (a transcript being written right now). */
-  open: boolean
-}
-
-const CHUNK = 256 * 1024
-const MAX_LINE = 16 * 1024 * 1024
-
-/** Lazily yield the lines of a file from a byte offset. Lines above `maxLine` are skipped, not buffered. */
-async function* iterLines(fh: FileHandle, start: number, maxLine = MAX_LINE): AsyncGenerator<RawLine> {
-  const buf = Buffer.allocUnsafe(CHUNK)
-  let pos = start
-  let lineStart = start
-  let carry: Buffer[] = []
-  let carryLen = 0
-  let overflow = false
-  for (;;) {
-    const { bytesRead } = await fh.read(buf, 0, CHUNK, pos)
-    if (bytesRead === 0) break
-    const view = buf.subarray(0, bytesRead)
-    let s = 0
-    for (;;) {
-      const nl = view.indexOf(10, s)
-      if (nl < 0) {
-        if (!overflow) {
-          carry.push(Buffer.from(view.subarray(s)))
-          carryLen += bytesRead - s
-          if (carryLen > maxLine) {
-            overflow = true
-            carry = []
-          }
-        } else {
-          carryLen += bytesRead - s
-        }
-        break
-      }
-      let line: Buffer | null = null
-      if (!overflow) {
-        carry.push(Buffer.from(view.subarray(s, nl)))
-        line = carry.length === 1 ? carry[0] : Buffer.concat(carry)
-        if (line.length > maxLine) line = null
-      }
-      const end = pos + nl + 1
-      yield { line, start: lineStart, end, open: false }
-      carry = []
-      carryLen = 0
-      overflow = false
-      lineStart = end
-      s = nl + 1
-    }
-    pos += bytesRead
-  }
-  if (carryLen > 0) {
-    const line = overflow ? null : carry.length === 1 ? carry[0] : Buffer.concat(carry)
-    yield { line, start: lineStart, end: pos, open: true }
-  }
-}
-
-/* ------------------------------------------------------------------ transcript parsing */
-
-type Json = Record<string, unknown>
-const isObj = (v: unknown): v is Json => v !== null && typeof v === 'object' && !Array.isArray(v)
-const str = (v: unknown): string => (typeof v === 'string' ? v : '')
-
-const REMINDER = /<system-reminder>[\s\S]*?<\/system-reminder>/g
-
-/** Real text of a user message, or null for system noise (reminders, command output, interrupts). Slash commands become `/name args`. */
-function userText(raw: string): { text: string; command: boolean } | null {
-  let t = raw
-  const cmd = /<command-name>\s*([^<]*?)\s*<\/command-name>/.exec(t)
-  if (cmd) {
-    const args = /<command-args>([\s\S]*?)<\/command-args>/.exec(t)?.[1]?.trim() ?? ''
-    const name = cmd[1].startsWith('/') ? cmd[1] : `/${cmd[1]}`
-    return { text: args ? `${name} ${args}` : name, command: true }
-  }
-  t = t.replace(REMINDER, '')
-  const open = t.indexOf('<system-reminder>')
-  if (open >= 0) t = t.slice(0, open)
-  t = t.trim()
-  if (!t) return null
-  if (/^<local-command-(stdout|stderr|caveat)>/.test(t) || /^<command-message>/.test(t)) return null
-  if (t.startsWith('Caveat: The messages below were generated by the user while running local commands')) return null
-  if (t.startsWith('[Request interrupted by user')) return null
-  return { text: t, command: false }
-}
-
-function summariseInput(input: unknown): string {
-  if (!isObj(input)) return typeof input === 'string' ? input.slice(0, 120) : ''
-  for (const k of ['command', 'file_path', 'path', 'pattern', 'url', 'query', 'description', 'prompt', 'skill', 'name', 'subject']) {
-    const v = input[k]
-    if (typeof v === 'string' && v.trim()) return v.trim().split('\n')[0].slice(0, 140)
-  }
-  try {
-    return JSON.stringify(input).slice(0, 140)
-  } catch {
-    return ''
-  }
-}
-
-function resultText(content: unknown): string {
-  if (typeof content === 'string') return content
-  if (Array.isArray(content)) {
-    return content
-      .map((b) => (isObj(b) ? (b.type === 'text' ? str(b.text) : b.type === 'image' ? '[image]' : '') : ''))
-      .filter(Boolean)
-      .join('\n')
-  }
-  return ''
-}
-
-const TEXT_CAP = 40_000
-const RESULT_CAP = 3_000
-const THINK_CAP = 6_000
-
-function capped(text: string, cap: number): { text: string; truncated?: boolean; chars?: number } {
-  return text.length > cap ? { text: text.slice(0, cap), truncated: true, chars: text.length } : { text }
-}
-
-function entriesFromLine(o: Json, key: string): TranscriptEntry[] {
-  const type = o.type
-  if (type !== 'user' && type !== 'assistant') return []
-  if (o.isMeta === true) return []
-  const message = isObj(o.message) ? o.message : null
-  if (!message) return []
-  const content = message.content
-  const ts = typeof o.timestamp === 'string' ? o.timestamp : undefined
-  const out: TranscriptEntry[] = []
-  const push = (e: Omit<TranscriptEntry, 'key' | 'ts'>): void => {
-    out.push({ key: `${key}:${out.length}`, ts, ...e })
-  }
-
-  if (type === 'user') {
-    if (typeof content === 'string') {
-      const u = userText(content)
-      if (u) push({ kind: u.command ? 'command' : 'user', ...capped(u.text, TEXT_CAP) })
-    } else if (Array.isArray(content)) {
-      for (const b of content) {
-        if (!isObj(b)) continue
-        if (b.type === 'text') {
-          const u = userText(str(b.text))
-          if (u) push({ kind: u.command ? 'command' : 'user', ...capped(u.text, TEXT_CAP) })
-        } else if (b.type === 'tool_result') {
-          const text = resultText(b.content)
-          push({ kind: 'tool_result', error: b.is_error === true, ...capped(text, RESULT_CAP), chars: text.length })
-        }
-      }
-    }
-    return out
-  }
-
-  if (Array.isArray(content)) {
-    for (const b of content) {
-      if (!isObj(b)) continue
-      if (b.type === 'text') {
-        const t = str(b.text).trim()
-        if (t) push({ kind: 'assistant', ...capped(t, TEXT_CAP) })
-      } else if (b.type === 'thinking') {
-        const t = str(b.thinking).trim()
-        if (t) push({ kind: 'thinking', ...capped(t, THINK_CAP) })
-      } else if (b.type === 'tool_use') {
-        push({ kind: 'tool_use', name: str(b.name) || 'tool', summary: summariseInput(b.input), text: '' })
-      }
-    }
-  } else if (typeof content === 'string' && content.trim()) {
-    push({ kind: 'assistant', ...capped(content.trim(), TEXT_CAP) })
-  }
-  return out
-}
-
-function parseLine(line: Buffer): Json | null {
-  try {
-    const v: unknown = JSON.parse(line.toString('utf8'))
-    return isObj(v) ? v : null
-  } catch {
-    return null
   }
 }
 
@@ -508,6 +326,16 @@ function invalidateProjects(): void {
   listCache = null
 }
 
+type TrashListener = (projectId: string, sessionIds: string[]) => Promise<void>
+const trashListeners = new Set<TrashListener>()
+
+/** Sessions moved to the Trash here (alone, by a cleanup or with their project folder), so the session archive drops its copies too. */
+export const onSessionsTrashed = (cb: TrashListener): void => void trashListeners.add(cb)
+
+async function trashed(projectId: string, sessionIds: string[]): Promise<void> {
+  for (const cb of trashListeners) await cb(projectId, sessionIds).catch(() => undefined)
+}
+
 /* ------------------------------------------------------------------ sessions */
 
 async function listSessions(id: string): Promise<SessionSummary[]> {
@@ -532,8 +360,8 @@ export async function sessionTitles(projectId: string, sessionIds: string[]): Pr
   return out
 }
 
-async function readSession(projectId: string, sessionId: string, offset: number, limit: number): Promise<SessionPage> {
-  const abs = path.join(projectsDir(), projectDirName(projectId), `${sessionFileId(sessionId)}.jsonl`)
+/** One page of a transcript file from byte `offset`: about `limit` entries. Also reads the session archive's copies. */
+export async function readTranscriptPage(abs: string, offset: number, limit: number): Promise<SessionPage> {
   const st = await stat(abs)
   if (!st || !st.isFile) throw new Error('This transcript no longer exists')
   const start = Math.max(0, Math.min(Math.floor(offset) || 0, st.size))
@@ -563,6 +391,9 @@ async function readSession(projectId: string, sessionId: string, offset: number,
   }
   return { entries, nextOffset: next !== null && next < st.size ? next : null, totalBytes: st.size, skipped }
 }
+
+const readSession = (projectId: string, sessionId: string, offset: number, limit: number): Promise<SessionPage> =>
+  readTranscriptPage(path.join(projectsDir(), projectDirName(projectId), `${sessionFileId(sessionId)}.jsonl`), offset, limit)
 
 /* ------------------------------------------------------------------ trash + cleanup */
 
@@ -627,6 +458,7 @@ export function register(ipcMain: IpcMain): void {
     async trashSession(projectId, sessionId) {
       await trashSessionFiles(projectDirName(projectId), sessionFileId(sessionId))
       invalidateProjects()
+      await trashed(projectId, [sessionId])
     },
 
     cleanupPreview: (projectId, days) => previewCleanup(projectId, days),
@@ -641,10 +473,15 @@ export function register(ipcMain: IpcMain): void {
         targets = targets.filter((s) => confirmed.has(s.id))
       }
       const done = await summarizeCleanup(id, targets)
+      const gone: string[] = []
       try {
-        for (const sid of done.sessionIds) await trashSessionFiles(id, sid)
+        for (const sid of done.sessionIds) {
+          await trashSessionFiles(id, sid)
+          gone.push(sid)
+        }
       } finally {
         invalidateProjects()
+        await trashed(id, gone)
       }
       return done
     },
@@ -653,9 +490,11 @@ export function register(ipcMain: IpcMain): void {
       const id = projectDirName(projectId)
       const st = await stat(path.join(projectsDir(), id))
       if (!st?.isDir) throw new Error('This project folder no longer exists')
+      const sessions = (await listSessions(id)).map((s) => s.id)
       await trash(relProject(id))
       invalidateProjects()
       cwdCache.delete(id)
+      await trashed(id, sessions)
     },
 
     async revealFolder(projectId) {

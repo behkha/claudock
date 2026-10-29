@@ -15,6 +15,7 @@ export type ScreenId =
   | 'plugins'
   | 'mods'
   | 'mcp'
+  | 'archive'
   | 'projects'
   | 'memory'
   | 'plans'
@@ -46,6 +47,7 @@ export const SCREENS: ScreenDef[] = [
   { id: 'plugins', label: 'Plugins', group: 'Extend', folder: 'Plugins' },
   { id: 'mods', label: 'Mods', group: 'Extend', folder: 'Mods' },
   { id: 'mcp', label: 'MCP servers', group: 'Extend', folder: 'Mcp' },
+  { id: 'archive', label: 'Sessions', group: 'Your data', folder: 'Sessions' },
   { id: 'projects', label: 'Projects', group: 'Your data', folder: 'Projects' },
   { id: 'memory', label: 'Memory', group: 'Your data', folder: 'Memory' },
   { id: 'plans', label: 'Plans', group: 'Your data', folder: 'Plans' },

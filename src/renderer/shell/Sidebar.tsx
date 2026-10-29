@@ -1,7 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { NAV_GROUPS, SCREENS } from '@shared/nav'
-import { api, useApi } from '@/lib/api'
-import { onRefreshCounts } from '@/lib/counts'
+import { api, useApi, useEvent } from '@/lib/api'
+import { onRefreshCounts, refreshCounts } from '@/lib/counts'
 import { useNav } from '@/lib/nav'
 import { SCREEN_ICONS } from './icons'
 import { SidebarFooter } from './SidebarFooter'
@@ -20,6 +20,13 @@ export function Sidebar(): JSX.Element {
       off()
     }
   }, [reloadCounts])
+  // the session archive found new sessions or lost some (not every progress step while it reads them)
+  const archived = useRef<number | null>(null)
+  useEvent('archive:changed', (s) => {
+    if (s.sessions === archived.current) return
+    archived.current = s.sessions
+    refreshCounts()
+  })
 
   return (
     <aside className="sidebar">

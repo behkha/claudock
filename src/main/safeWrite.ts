@@ -423,6 +423,47 @@ export function writeGlobalStateKey(key: string, value: unknown, reason = `Edit 
   }, reason)
 }
 
+/**
+ * Put a file from Claudock's own data (the session archive) into the config dir as a NEW file: hard-linked where the disk
+ * allows, else copied next to it and linked or renamed into place; never over anything already there. Its modified time
+ * becomes now, so Claude Code's cleanup counts from today. Nothing to snapshot: the file wasn't there.
+ */
+export async function placeNewFile(rel: string, src: string): Promise<void> {
+  assertWritable()
+  const abs = resolveInside(rel)
+  await assertNotSecretReal(abs)
+  if (samePath(abs, configDir()) || samePath(abs, globalStateFile())) throw new Error('Refusing to write this path')
+  const there = (): Promise<boolean> => fsp.lstat(abs).then(() => true, () => false)
+  const taken = (): Error => Object.assign(new Error(`${path.basename(abs)} is already there`), { code: 'EEXIST' })
+  return serial(abs, async () => {
+    const dir = path.dirname(abs)
+    await fsp.mkdir(dir, { recursive: true })
+    if (await there()) throw taken()
+    try {
+      await fsp.link(src, abs)
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === 'EEXIST') throw taken()
+      // no hard links between these folders: a copy beside it, then into place without replacing anything
+      const tmp = path.join(dir, `.${path.basename(abs)}.claudock-${crypto.randomBytes(4).toString('hex')}.tmp`)
+      await fsp.copyFile(src, tmp)
+      try {
+        try {
+          await fsp.link(tmp, abs)
+        } catch (le) {
+          if ((le as NodeJS.ErrnoException).code === 'EEXIST') throw taken()
+          if (await there()) throw taken()
+          await renameWithRetry(tmp, abs)
+        }
+      } finally {
+        await fsp.rm(tmp, { force: true }).catch(() => undefined)
+      }
+    }
+    const now = new Date()
+    await fsp.utimes(abs, now, now)
+    invalidateSizes(dir)
+  })
+}
+
 /** Move a file/folder inside the config dir to the OS Trash. Refuses the config root, the global state file and secrets (also behind symlinks). */
 export async function trash(rel: string): Promise<void> {
   assertWritable()
