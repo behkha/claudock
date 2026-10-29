@@ -178,6 +178,7 @@ h1 { font-size: clamp(36px, 3.8vw, 56px); line-height: 1.08; letter-spacing: -0.
 .steps dt { color: var(--text); font-weight: 600; }
 .steps dd { margin: 0; }
 .steps strong { color: var(--text); font-weight: 600; }
+.steps code { overflow-wrap: anywhere; }
 
 /* Safe by design */
 .safe { margin-top: 120px; }
@@ -211,7 +212,7 @@ code { font-size: 0.9em; background: var(--surface-sunken); padding: 1px 6px; bo
 
 /* Footer */
 .foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px 24px; margin-top: 120px; padding-block: 28px 40px; border-top: 1px solid var(--border); font-size: 14px; color: var(--text-3); }
-.foot nav { display: flex; gap: 20px; }
+.foot nav { display: flex; flex-wrap: wrap; gap: 4px 20px; }
 .foot a { color: var(--text-2); }
 .foot p { margin: 0; }
 
