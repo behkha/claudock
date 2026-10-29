@@ -60,6 +60,20 @@ npx claudock
 
 The first time, npm downloads Claudock and Electron (about 125 MB, under 2 minutes on a 10 Mbit/s connection), then opens the app. Nothing is code-signed, but files npm downloads aren't flagged by macOS Gatekeeper or Windows SmartScreen, so there's no warning to click through. To update, run `npx claudock@latest`; the app tells you in the sidebar when a newer release is out. On macOS, npx keeps a `Claudock.app` made from that Electron in Claudock's app data folder, so alerts, the Dock and the menu say Claudock and Open at login works.
 
+Or install the app with one line, also with no warning. On macOS and Linux:
+
+```sh
+curl -fsSL https://behkha.github.io/claudock/install.sh | sh
+```
+
+In PowerShell on Windows:
+
+```powershell
+irm https://behkha.github.io/claudock/install.ps1 | iex
+```
+
+On macOS the app goes into Applications, on Linux the AppImage goes into `~/.local/bin/claudock`, and on Windows the installer runs. The scripts are [`site/install.sh`](site/install.sh) and [`site/install.ps1`](site/install.ps1), so you can read them first.
+
 Or download an installer from the [latest release](https://github.com/behkha/claudock/releases/latest):
 
 | Platform | File |
