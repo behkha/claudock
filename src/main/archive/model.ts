@@ -187,9 +187,9 @@ const SAFE = /^[A-Za-z0-9._/@%+=:,-]+$/
 
 /** A folder for a POSIX shell: `~/code/app` inside the home folder when it needs no quoting, else quoted. */
 function shellFolder(dir: string, home: string): string {
-  const rel = path.relative(home, dir)
+  const rel = path.posix.relative(home, dir)
   if (rel === '') return '~'
-  const inHome = !rel.startsWith('..') && !path.isAbsolute(rel)
+  const inHome = !rel.startsWith('..') && !path.posix.isAbsolute(rel)
   if (inHome && SAFE.test(rel)) return `~/${rel}`
   if (inHome && !/["\\$`]/.test(rel)) return `"$HOME/${rel}"`
   return SAFE.test(dir) ? dir : `'${dir.replace(/'/g, `'\\''`)}'`

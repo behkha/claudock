@@ -94,11 +94,11 @@ test('toMarkdown: prompts and replies in full, tool calls and commands as list l
 })
 
 test('resumeCommand: cd into the folder, the profile start command, --resume', () => {
-  const home = path.join(path.sep, 'Users', 'me')
+  const home = '/Users/me'
   const id = '7c1e9a42-5b0d-4f7e-9a1c-2d3e4f5a6b7c'
-  assert.equal(resumeCommand(path.join(home, 'code', 'app'), id, 'claude', { home, windows: false }), `cd ~/code/app && claude --resume ${id}`)
+  assert.equal(resumeCommand(path.posix.join(home, 'code', 'app'), id, 'claude', { home, windows: false }), `cd ~/code/app && claude --resume ${id}`)
   assert.equal(
-    resumeCommand(path.join(home, 'my code'), id, 'CLAUDE_CONFIG_DIR=~/.claude-work claude', { home, windows: false }),
+    resumeCommand(path.posix.join(home, 'my code'), id, 'CLAUDE_CONFIG_DIR=~/.claude-work claude', { home, windows: false }),
     `cd "$HOME/my code" && CLAUDE_CONFIG_DIR=~/.claude-work claude --resume ${id}`
   )
   assert.equal(resumeCommand(home, id, 'claude', { home, windows: false }), `cd ~ && claude --resume ${id}`)

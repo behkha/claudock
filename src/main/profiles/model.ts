@@ -49,8 +49,8 @@ const SAFE = /^[A-Za-z0-9._/@%+=:,-]+$/
 export function startCommand(dir: string, home: string, opts: { plain: boolean; windows: boolean }): string {
   if (opts.plain) return 'claude'
   if (opts.windows) return `$env:CLAUDE_CONFIG_DIR="${dir.replace(/[`"$]/g, '`$&')}"; claude`
-  const rel = path.relative(home, dir)
-  const inHome = rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel)
+  const rel = path.posix.relative(home, dir)
+  const inHome = rel !== '' && !rel.startsWith('..') && !path.posix.isAbsolute(rel)
   let value: string
   if (inHome && SAFE.test(rel)) value = `~/${rel}`
   else if (inHome && !/["\\$`]/.test(rel)) value = `"$HOME/${rel}"`

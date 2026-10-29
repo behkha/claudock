@@ -56,11 +56,12 @@ test('"New folder" names and found folders', () => {
 
 test('the start command, for each shell', () => {
   const posix = { plain: false, windows: false }
-  assert.equal(startCommand(path.join(home, '.claude'), home, { plain: true, windows: false }), 'claude')
-  assert.equal(startCommand(path.join(home, '.claude-work'), home, posix), 'CLAUDE_CONFIG_DIR=~/.claude-work claude')
-  assert.equal(startCommand(path.join(home, 'My Configs', 'work'), home, posix), 'CLAUDE_CONFIG_DIR="$HOME/My Configs/work" claude')
-  assert.equal(startCommand('/opt/claude/work', home, posix), 'CLAUDE_CONFIG_DIR=/opt/claude/work claude')
-  assert.equal(startCommand("/opt/it's", home, posix), `CLAUDE_CONFIG_DIR='/opt/it'\\''s' claude`)
+  const me = '/Users/me'
+  assert.equal(startCommand(path.posix.join(me, '.claude'), me, { plain: true, windows: false }), 'claude')
+  assert.equal(startCommand(path.posix.join(me, '.claude-work'), me, posix), 'CLAUDE_CONFIG_DIR=~/.claude-work claude')
+  assert.equal(startCommand(path.posix.join(me, 'My Configs', 'work'), me, posix), 'CLAUDE_CONFIG_DIR="$HOME/My Configs/work" claude')
+  assert.equal(startCommand('/opt/claude/work', me, posix), 'CLAUDE_CONFIG_DIR=/opt/claude/work claude')
+  assert.equal(startCommand("/opt/it's", me, posix), `CLAUDE_CONFIG_DIR='/opt/it'\\''s' claude`)
   assert.equal(startCommand('C:\\Users\\me\\.claude-work', 'C:\\Users\\me', { plain: false, windows: true }), '$env:CLAUDE_CONFIG_DIR="C:\\Users\\me\\.claude-work"; claude')
 })
 
