@@ -1,7 +1,7 @@
 {
   "name": "claudock",
   "productName": "Claudock",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Unofficial desktop manager for the Claude Code config folder (~/.claude)",
   "homepage": "https://github.com/behkha/claudock",
   "repository": {
