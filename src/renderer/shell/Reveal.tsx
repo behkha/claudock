@@ -101,7 +101,7 @@ export function Reveal({ onDone }: { onDone: () => void }): JSX.Element {
         </div>
       </div>
       <ConnectSheet want={want} onClose={() => setWant(null)} onConnected={onDone} />
-      <ShareDialog open={sharing} stats={stats} onClose={() => setSharing(false)} />
+      <ShareDialog open={sharing} stats={stats} tab="all" onClose={() => setSharing(false)} />
     </main>
   )
 }

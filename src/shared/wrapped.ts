@@ -1,5 +1,8 @@
 import { formatCount } from './format'
-import type { WrappedStats } from './api/overview'
+import type { WeekStats, WrappedStats } from './api/overview'
+import { formatUsd, planOf, type PlanChoice } from './prices'
+
+export { friendlyModel, isClaudeModel } from './models'
 
 /** Pure helpers for the share card ("Wrapped"). Dates are plain `YYYY-MM-DD` strings; all arithmetic is in UTC so DST never shifts a day. */
 
@@ -26,20 +29,6 @@ export const weekday = (date: string): number => new Date(utc(date)).getUTCDay()
 /** First day (a Sunday) of the heat map: the week that holds `asOf`, minus 25 weeks. Also the oldest day main sends. */
 export const heatmapStart = (asOf: string): string => addDays(asOf, -weekday(asOf) - (HEATMAP_WEEKS - 1) * 7)
 
-/** "Opus 5", "Sonnet 5.5", "Haiku 4.5". Unknown ids come back as they are. */
-export function friendlyModel(id: string): string {
-  const s = id.trim().toLowerCase().replace(/^.*anthropic\./, '').replace(/\[.*\]$/, '')
-  const cap = (w: string): string => w.charAt(0).toUpperCase() + w.slice(1)
-  // claude-opus-5, claude-sonnet-5-5, claude-opus-4-20250514, claude-haiku-4-5-20251001
-  let m = /^claude-(opus|sonnet|haiku)-(\d+)(?:-(\d{1,2}))?(?=-\d{8}|-v\d|:|$)/.exec(s)
-  if (m) return `${cap(m[1])} ${m[2]}${m[3] ? `.${m[3]}` : ''}`
-  // claude-3-5-sonnet-20241022, claude-3-opus-20240229
-  m = /^claude-(\d+)(?:-(\d{1,2}))?-(opus|sonnet|haiku)/.exec(s)
-  if (m) return `${cap(m[3])} ${m[1]}${m[2] ? `.${m[2]}` : ''}`
-  return id
-}
-
-export const isClaudeModel = (id: string): boolean => /claude|opus|sonnet|haiku/i.test(id) && !id.startsWith('<')
 
 /** "48 h", "35 min", "1.5 h", "< 1 min". */
 export function formatDuration(ms: number): string {
@@ -60,11 +49,55 @@ export function formatSince(date: string): string {
   return Number.isFinite(t) ? new Date(t).toLocaleDateString('en', { month: 'short', year: 'numeric', timeZone: 'UTC' }) : ''
 }
 
-/** The text for the X post: numbers only. */
+/** "29 Oct 2026" from a `YYYY-MM-DD` date. */
+export function formatDay(date: string): string {
+  const t = utc(date)
+  return Number.isFinite(t) ? new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }) : ''
+}
+
+/** "20 – 26 Oct", "27 Oct – 2 Nov", "29 Dec 2025 – 4 Jan 2026"; `year` adds the year to a range within one year. */
+export function formatRange(start: string, end: string, year = false): string {
+  const a = utc(start)
+  const b = utc(end)
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return ''
+  const part = (t: number, o: Intl.DateTimeFormatOptions): string => new Date(t).toLocaleDateString('en', { ...o, timeZone: 'UTC' })
+  const [ya, yb] = [start.slice(0, 4), end.slice(0, 4)]
+  const [ma, mb] = [part(a, { month: 'short' }), part(b, { month: 'short' })]
+  const [da, db] = [part(a, { day: 'numeric' }), part(b, { day: 'numeric' })]
+  if (ya !== yb) return `${da} ${ma} ${ya} – ${db} ${mb} ${yb}`
+  const tail = year ? ` ${yb}` : ''
+  return ma === mb ? `${da} – ${db} ${mb}${tail}` : `${da} ${ma} – ${db} ${mb}${tail}`
+}
+
+/** The week's value as the card shows it ("≈ $1,012"); null when it shows tokens instead. */
+export const weekValue = (w: WeekStats, plan: PlanChoice): string | null => (plan === 'hide' || w.usd === null ? null : `≈ ${formatUsd(w.usd)}`)
+
+/** "Max 20x · $200/mo" beside the value; null for "Value only", "Hide value" or no value. */
+export function planLabel(w: WeekStats, plan: PlanChoice): string | null {
+  const p = planOf(plan)
+  return p && weekValue(w, plan) ? `${p.name} · $${p.usd}/mo` : null
+}
+
+const SIGN_OFF = '\n\nMade with Claudock'
+
+/** The text for the X post: numbers only. The card carries the link, so the text doesn't (social-calendar §8). */
 export function shareText(s: WrappedStats): string {
   const parts = [`My Claude Code so far: ${formatCount(s.total ?? 0)} ${s.unit}`]
   if (s.sessions) parts[0] += ` across ${formatCount(s.sessions)} ${s.sessions === 1 ? 'session' : 'sessions'}`
   parts[0] += '.'
   if (s.longestSessionMs) parts.push(`Longest session: ${formatDuration(s.longestSessionMs)}.`)
-  return `${parts.join(' ')}\n\nMade with Claudock ${REPO_LABEL}`
+  const personal = [s.peakHour === null ? '' : `Peak hour ${formatHour(s.peakHour)}`, s.topModel ? `mostly ${s.topModel}` : ''].filter(Boolean).join(', ')
+  if (personal) parts.push(`${personal.charAt(0).toUpperCase()}${personal.slice(1)}.`)
+  return parts.join(' ') + SIGN_OFF
+}
+
+/** The week card's X post: "My week with Claude Code, 20–26 Oct: ≈ $1,012 at API prices on Max 20x ($200/mo). 38 sessions, mostly Opus 5.5." */
+export function weekText(w: WeekStats, plan: PlanChoice): string {
+  const value = weekValue(w, plan)
+  const p = planOf(plan)
+  const range = formatRange(w.start, w.end).replace(' – ', '–')
+  const sessions = `${formatCount(w.sessions)} ${w.sessions === 1 ? 'session' : 'sessions'}`
+  const mostly = w.topModel ? `, mostly ${w.topModel}` : ''
+  const head = value ? `${value} at API prices${p ? ` on ${p.name} ($${p.usd}/mo)` : ''}. ${sessions}${mostly}.` : `${sessions}${mostly}.`
+  return `My week with Claude Code, ${range}: ${head}${SIGN_OFF}`
 }

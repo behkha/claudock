@@ -22,14 +22,15 @@ const time = (ms: number): string => new Date(ms).toLocaleTimeString(undefined, 
 /**
  * The home screen (checklist item 10): today's tokens with the last 7 days beside them, what is running now (waiting,
  * working, done) with both limits, then today's other sessions. Cleanup is one chip that opens Storage. `selectId`
- * 'disconnect' opens the Disconnect dialog (the Hooks screen's Claudock row).
+ * 'disconnect' opens the Disconnect dialog (the Hooks screen's Claudock row); a Monday recap opens Share on its week.
  */
 export default function TodayScreen({ selectId }: ScreenProps): JSX.Element {
   const { navigate, seq } = useNav()
   const today = useApi(() => api.today.get(), [])
   const wrapped = useApi(() => api.overview.wrapped(), [])
   const found = useFindings()
-  const [sharing, setSharing] = useState(false)
+  /** The Share dialog, on a week (null: this one). */
+  const [sharing, setSharing] = useState<{ week: string | null } | null>(null)
   const [live, setLive] = useState<Set<string>>(new Set())
 
   const reload = today.reload
@@ -47,6 +48,17 @@ export default function TodayScreen({ selectId }: ScreenProps): JSX.Element {
     return () => clearInterval(t)
   }, [reload])
   useEvent('sessions:changed', follow)
+  // a Monday recap clicked: main keeps its week until this profile's Today asks (on opening, or navigated here again)
+  useEffect(() => {
+    let stale = false
+    api.overview.takeShare().then(
+      (w) => void (w && !stale && setSharing({ week: w })),
+      () => undefined
+    )
+    return () => {
+      stale = true
+    }
+  }, [seq])
   const onSessions = useCallback((s: SessionsState) => setLive(new Set(s.hooks === 'on' ? s.sessions.map((x) => x.id) : [])), [])
 
   const t = today.data
@@ -70,7 +82,12 @@ export default function TodayScreen({ selectId }: ScreenProps): JSX.Element {
                   {look}
                 </button>
               ) : null}
-              <Button variant="ghost" icon={<Share2 size={16} strokeWidth={1.8} />} onClick={() => setSharing(true)} disabled={!wrapped.data?.total}>
+              <Button
+                variant="ghost"
+                icon={<Share2 size={16} strokeWidth={1.8} />}
+                onClick={() => setSharing({ week: null })}
+                disabled={!wrapped.data?.total && !t?.days.some((d) => d.tokens > 0)}
+              >
                 Share
               </Button>
             </div>
@@ -96,7 +113,7 @@ export default function TodayScreen({ selectId }: ScreenProps): JSX.Element {
           </Card>
         ) : null}
       </div>
-      <ShareDialog open={sharing} stats={wrapped.data} onClose={() => setSharing(false)} />
+      <ShareDialog open={sharing !== null} stats={wrapped.data} week={sharing?.week ?? null} onClose={() => setSharing(null)} />
     </div>
   )
 }

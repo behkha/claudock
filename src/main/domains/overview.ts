@@ -1,9 +1,10 @@
 import { BrowserWindow, ClipboardItem, app, clipboard, dialog, nativeImage, shell, type IpcMain } from 'electron'
 import fsp from 'node:fs/promises'
 import path from 'node:path'
-import type { Finding, OverviewApi } from '@shared/api/overview'
+import type { Finding, OverviewApi, ShareCard } from '@shared/api/overview'
 import { formatBytes, formatCount } from '@shared/format'
-import { shareText } from '@shared/wrapped'
+import { isPlanChoice } from '@shared/prices'
+import { shareText, weekText } from '@shared/wrapped'
 import { readJson, stat } from '../fsx'
 import { defineDomain, emit } from '../ipcx'
 import { assertWritable, configDir, globalStateFile, isInside, isSecret, resolveInside, samePath } from '../paths'
@@ -11,6 +12,7 @@ import { safeWriteText, trash } from '../safeWrite'
 import { scanLoose } from './backups'
 import { scanUser } from './skills'
 import { computeWrapped } from './overviewWrapped'
+import { setShareSettingsOf, shareSettingsOf, takeShareOf, weekForCard, weekShown } from './overviewShare'
 import { sizeOf } from './storage'
 
 const MB = 1024 * 1024
@@ -301,19 +303,25 @@ const impl: OverviewApi = {
     return { snapshotId: r.snapshotId }
   },
 
-  // The share card only reads stats and writes to the clipboard or to a path the user picks, so none of it asks
-  // assertWritable(): CLAUDOCK_READONLY and the dev write guard protect the config folder, which this never touches.
+  // The share cards only read stats and write to the clipboard, to a path the user picks or to Claudock's own data, so
+  // none of it asks assertWritable(): CLAUDOCK_READONLY and the dev write guard protect the config folder, which this
+  // never touches.
   wrapped: computeWrapped,
+  week: (start) => weekForCard(configDir(), start),
+  shareSettings: () => shareSettingsOf(configDir()),
+  setShareSettings: (patch) => setShareSettingsOf(configDir(), patch),
+  takeShare: async () => takeShareOf(configDir()),
 
   async copyImage(png) {
     await copyPng(pngBuffer(png))
   },
 
-  async saveImage(png) {
+  async saveImage(png, card) {
     const buf = pngBuffer(png)
+    const c = cardOf(card)
     const win = BrowserWindow.getFocusedWindow()
     const options = {
-      defaultPath: path.join(app.getPath('downloads'), 'claude-code-wrapped.png'),
+      defaultPath: path.join(app.getPath('downloads'), c.kind === 'week' ? `claude-code-week-${c.start}.png` : 'claude-code-wrapped.png'),
       filters: [{ name: 'PNG image', extensions: ['png'] }]
     }
     const { canceled, filePath } = win ? await dialog.showSaveDialog(win, options) : await dialog.showSaveDialog(options)
@@ -324,13 +332,27 @@ const impl: OverviewApi = {
     return { saved: true }
   },
 
-  async postOnX(png) {
+  async postOnX(png, card) {
     const buf = pngBuffer(png)
-    const stats = await computeWrapped()
-    if (!stats) throw new Error('There are no stats to share yet')
+    const c = cardOf(card)
+    let text: string
+    if (c.kind === 'week') text = weekText(await weekShown(configDir(), c.start), c.plan)
+    else {
+      const stats = await computeWrapped()
+      if (!stats) throw new Error('There are no stats to share yet')
+      text = shareText(stats)
+    }
     await copyPng(buf)
-    await openXCompose(shareText(stats))
+    await openXCompose(text)
   }
+}
+
+/** A card the renderer named: all time, or a week by its Monday (checked again where it is read) and what is beside its value. */
+function cardOf(card: unknown): ShareCard {
+  const c = card as Partial<{ kind: unknown; start: unknown; plan: unknown }> | null
+  if (c && c.kind === 'week' && typeof c.start === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(c.start) && isPlanChoice(c.plan)) return { kind: 'week', start: c.start, plan: c.plan }
+  if (c && c.kind === 'all') return { kind: 'all' }
+  throw new Error('Unknown card')
 }
 
 export function register(ipcMain: IpcMain): void {

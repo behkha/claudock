@@ -4,6 +4,7 @@ import type { WrappedStats } from '@shared/api/overview'
 import { friendlyModel, heatmapStart, isClaudeModel, isDate } from '@shared/wrapped'
 import { readJson, streamJsonl } from '../fsx'
 import { configDir } from '../paths'
+import { longestRun } from '../share/week'
 
 /**
  * Read-only numbers for the share card. Source of truth is `stats-cache.json`, which Claude Code writes (version 5
@@ -92,7 +93,8 @@ function fromCache(cache: Record<string, unknown>): WrappedStats | null {
     longestSessionMs: num(obj(cache.longestSession)?.duration),
     peakHour: peakOf(obj(cache.hourCounts)),
     topModel: topModelOf(modelTokens(cache)),
-    daily: withinWindow(daily, asOf)
+    daily: withinWindow(daily, asOf),
+    longestRunDays: longestRun(dates.filter((d) => daily[d] > 0))
   }
 }
 
@@ -139,7 +141,8 @@ async function fromHistory(): Promise<WrappedStats | null> {
     longestSessionMs: null,
     peakHour: peakOf(hours),
     topModel: null,
-    daily: withinWindow(daily, asOf)
+    daily: withinWindow(daily, asOf),
+    longestRunDays: longestRun(Object.keys(daily))
   }
 }
 

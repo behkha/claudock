@@ -294,7 +294,7 @@ Short sentences. No emoji in commit messages.
     const today0 = midnight.getTime()
 
     // one assistant message becomes 1-3 JSONL lines, one per content block, sharing id, requestId and usage
-    const assistantLines = (model: string, usage: Record<string, number>, blocks: Loose[]): Spec[] => {
+    const assistantLines = (model: string, usage: Record<string, unknown>, blocks: Loose[]): Spec[] => {
       const id = 'msg_' + hex(20)
       const requestId = 'req_' + hex(16)
       return blocks.map((block, i) => ({
@@ -309,6 +309,16 @@ Short sentences. No emoji in commit messages.
       cache_creation_input_tokens: i === 0 || rnd() < 0.1 ? int(6000, 12000) : int(500, 5000),
       cache_read_input_tokens: Math.min(180_000, Math.max(20_000, Math.round(crStart + (crEnd - crStart) * (n > 1 ? i / (n - 1) : 1) * (0.95 + rnd() * 0.05)))),
       output_tokens: rnd() < 0.7 ? int(80, 700) : int(700, 2500)
+    })
+    // the rest of Claude Code's usage shape, with no draws from the random stream: main sessions write the 1-hour cache,
+    // sub-agents the 5-minute one; every fourth session runs in fast mode, every third searches the web once
+    const shaped = (u: Record<string, number>, o: { oneHour: boolean; fast?: boolean; searches?: number }): Record<string, unknown> => ({
+      ...u,
+      cache_creation: { ephemeral_5m_input_tokens: o.oneHour ? 0 : u.cache_creation_input_tokens, ephemeral_1h_input_tokens: o.oneHour ? u.cache_creation_input_tokens : 0 },
+      server_tool_use: { web_search_requests: o.searches ?? 0, web_fetch_requests: 0 },
+      service_tier: 'standard',
+      speed: o.fast ? 'fast' : 'standard',
+      inference_geo: 'global'
     })
     const toolBlock = () => ({ type: 'tool_use', id: 'toolu_' + hex(24), name: pick(['Bash', 'Read', 'Edit', 'Grep']), input: { command: 'git status --short', description: 'Show working tree changes' } })
 
@@ -381,13 +391,15 @@ Short sentences. No emoji in commit messages.
     function recentSession(project: Project, endMs: number, { running = false, subagent = false, minStart }: { running?: boolean; subagent?: boolean; minStart: number }): string {
       const sessionId = uuid()
       const model = modelFor()
+      const idx = recentCount
+      const fast = model === 'claude-opus-5-5' && idx % 4 === 1
       const n = int(8, 40)
       const crStart = int(20_000, 40_000)
       const crEnd = Math.min(180_000, int(Math.max(crStart + 20_000, 90_000), 180_000))
       const specs: Spec[] = [{ type: 'user', message: { role: 'user', content: pick(recentPrompts) }, extra: {}, gap: 0 }]
       for (let i = 0; i < n; i++) {
         const last = i === n - 1
-        const usage = usageAt(i, n, crStart, crEnd)
+        const usage = shaped(usageAt(i, n, crStart, crEnd), { oneHour: true, fast, searches: i === 1 && idx % 3 === 0 ? 1 : 0 })
         const blocks: Loose[] = []
         if (rnd() < 0.34) {
           if (rnd() < 0.4) blocks.push({ type: 'thinking', thinking: 'Working out where the change belongs.', signature: hex(32) })
@@ -416,7 +428,7 @@ Short sentences. No emoji in commit messages.
         const sub: Spec[] = [{ type: 'user', message: { role: 'user', content: 'Find every caller of refreshToken and list the file and line.' }, extra: {}, gap: 0 }]
         const m = 6
         for (let i = 0; i < m; i++) {
-          const usage = { input_tokens: int(2, 12), cache_creation_input_tokens: i === 0 ? int(4000, 9000) : int(500, 3000), cache_read_input_tokens: 8000 + i * int(3000, 6500), output_tokens: int(80, 600) }
+          const usage = shaped({ input_tokens: int(2, 12), cache_creation_input_tokens: i === 0 ? int(4000, 9000) : int(500, 3000), cache_read_input_tokens: 8000 + i * int(3000, 6500), output_tokens: int(80, 600) }, { oneHour: false })
           const blocks: Loose[] = i === m - 1 ? [{ type: 'text', text: 'Found four callers, listed below.' }] : i === 2 ? [{ type: 'text', text: 'Searching the middleware first.' }, toolBlock()] : [toolBlock()]
           sub.push(...assistantLines('claude-haiku-5-5', usage, blocks))
           const tool = blocks[blocks.length - 1]

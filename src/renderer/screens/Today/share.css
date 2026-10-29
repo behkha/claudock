@@ -1,4 +1,5 @@
-/* The Share stats dialog (ShareDialog.tsx), on Today and the first-run reveal. Tokens only. */
+/* The Share stats dialog (ShareDialog.tsx), on Today and the first-run reveal: the card switch, the week stepper and
+   plan menu, the card, the prices it used, then the recap switch and the actions. Tokens only. */
 .share {
   width: min(880px, calc(100vw - 48px));
   max-height: calc(100vh - 48px);
@@ -13,7 +14,7 @@
   gap: 12px;
 }
 .share__frame {
-  width: min(100%, calc((100vh - 240px) * 16 / 9));
+  width: min(100%, calc((100vh - 300px) * 16 / 9));
   margin-inline: auto;
 }
 .share__canvas {
@@ -45,4 +46,83 @@
 }
 .share__status--error {
   color: var(--danger);
+}
+.share__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.share__step {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.share__range {
+  min-width: 128px;
+  text-align: center;
+  font-size: var(--fs-small);
+  font-variant-numeric: tabular-nums;
+}
+.share__plan {
+  margin-left: auto;
+  width: 200px;
+}
+.share__wait {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 9;
+  width: min(100%, calc((100vh - 300px) * 16 / 9));
+  margin-inline: auto;
+}
+.share__foot {
+  position: relative;
+}
+/* Prices opens over the card, above the buttons */
+.share__prices {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  max-width: 100%;
+  overflow-x: auto;
+  background: var(--surface);
+  border: var(--hair) solid var(--border-strong);
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-pop);
+  z-index: 1;
+}
+.share__prices table {
+  border-collapse: collapse;
+  font-size: var(--fs-small);
+  font-variant-numeric: tabular-nums;
+}
+.share__prices caption {
+  caption-side: top;
+  text-align: left;
+  padding: 8px 12px;
+  font-size: var(--fs-caption);
+  color: var(--text-3);
+}
+.share__prices th,
+.share__prices td {
+  padding: 6px 12px;
+  text-align: right;
+  border-top: var(--hair) solid var(--border);
+  white-space: nowrap;
+}
+.share__prices th:first-child {
+  text-align: left;
+  font-weight: 500;
+}
+.share__prices thead th {
+  font-size: var(--fs-caption);
+  font-weight: 500;
+  color: var(--text-3);
+}
+.share__unpriced td {
+  text-align: left;
+  color: var(--text-3);
+}
+.share__recap {
+  flex: none;
 }

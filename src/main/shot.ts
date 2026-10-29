@@ -2,24 +2,29 @@ import type { BrowserWindow } from 'electron'
 import fsp from 'node:fs/promises'
 import path from 'node:path'
 import { SCREENS, type ScreenId } from '@shared/nav'
+import { formatRange } from '@shared/wrapped'
 import { app } from 'electron'
-import { connectDir } from './connect/folder'
+import { connectDir, folderKey } from './connect/folder'
 import { archiveRootOf, list as archiveList, markdownOf, search as archiveSearch, sweepNow } from './domains/archive'
 import { listContext } from './domains/context'
-import { GROUP_MS } from './connect/sessionModel'
+import { GROUP_MS, isPaused } from './connect/sessionModel'
 import { postedAlerts } from './alerts'
-import { alertPrefs, setAlertPrefs } from './domains/sessions'
+import { transcriptUsage } from './domains/limits'
+import { checkRecaps, openRecap, weekIn } from './domains/overviewShare'
+import { alertPrefs, currentAlertPrefs, setAlertPrefs } from './domains/sessions'
 import { popoverForShots } from './menubar'
 import { countHooks } from './domains/settings'
 import { emit } from './ipcx'
-import { configDir } from './paths'
+import { configDir, userDataDir } from './paths'
+import { addLocalDays, midnightOf, mondayOf } from './share/week'
 import { setTheme } from './theme'
+import { sumActivity } from './today/activity'
 import { driver, sleep } from './shotDrive'
 
 /**
  * Screenshot mode (CLAUDOCK_SHOT=1, driven by scripts/shot.mjs): visits every screen in light then dark through the
  * normal `system:navigate` / `system:theme` events, waits until each is loaded and painted in that theme, saves
- * `<dir>/<theme>-<screen>.png` (plus `connect`, the Connect sheet, `connected`, the Today card after connecting with one played status line run and three sessions played through the real hooks, which must post exactly one alert, `connected-hooks`, the Hooks screen then, where Claudock's hooks are one row and out of the counts, and `disconnect`, the confirm dialog that row's Disconnect… opens, which must leave settings.json byte for byte as it was, `profiles-add`, `profiles-menu` and `profiles-menubar`, profiles with a second folder added and removed again, `archive-search` and `archive-resume`, the Sessions screen with a session Claude Code deleted found and put back, `palette`, `settings-json`, `mods-draft`, the Mods screen with the fixture's draft selected, and `share`, the Today share dialog, and `card.png`, the card itself, and `reveal`, `reveal-connect`, `reveal-connected` and `reveal-empty`, the first-run reveal, and `context-off`, the Context screen with an MCP server and a skill switched off and a row's counted text open, which must leave settings.json byte for byte as it was once they are back on), prints renderer console errors as `CONSOLE_ERROR ...` and failed shots as
+ * `<dir>/<theme>-<screen>.png` (plus `connect`, the Connect sheet, `connected`, the Today card after connecting with one played status line run and three sessions played through the real hooks, which must post exactly one alert, `connected-hooks`, the Hooks screen then, where Claudock's hooks are one row and out of the counts, and `disconnect`, the confirm dialog that row's Disconnect… opens, which must leave settings.json byte for byte as it was, `profiles-add`, `profiles-menu` and `profiles-menubar`, profiles with a second folder added and removed again, `archive-search` and `archive-resume`, the Sessions screen with a session Claude Code deleted found and put back, `palette`, `settings-json`, `mods-draft`, the Mods screen with the fixture's draft selected, and `share-week` and `share`, the Today share dialog on the week (Max 20x beside the value, the prices it used open) and on all time, with `card-week.png` and `card.png`, the cards themselves, after checking the week against the limits scan and playing the Monday recap, and `reveal`, `reveal-connect`, `reveal-connected` and `reveal-empty`, the first-run reveal, and `context-off`, the Context screen with an MCP server and a skill switched off and a row's counted text open, which must leave settings.json byte for byte as it was once they are back on), prints renderer console errors as `CONSOLE_ERROR ...` and failed shots as
  * `SHOT_FAILED ...`, and exits 0 (clean) or 1 (errors).
  */
 export async function runShots(win: BrowserWindow, opts: { dir: string; only: string[] }): Promise<void> {
@@ -129,9 +134,9 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
     })()`)
   const closeShare = (): Promise<unknown> => js(`document.querySelector('.share [aria-label="Close"]')?.click()`)
   /** The card as the dialog sends it (the same canvas), for review. It does not depend on the app theme. */
-  async function saveCard(): Promise<void> {
+  async function saveCard(name: string): Promise<void> {
     const url = await js<string>(`document.querySelector('.share__canvas').toDataURL('image/png')`)
-    const file = path.join(opts.dir, 'card.png')
+    const file = path.join(opts.dir, name)
     await fsp.writeFile(file, Buffer.from(url.replace(/^data:image\/png;base64,/, ''), 'base64'))
     console.log(`SHOT ${file} 2400x1350`)
   }
@@ -480,6 +485,93 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
     await waitFor(`!document.querySelector('.toast')`, 'the toasts gone')
   }
 
+  /**
+   * Share stats: the week's numbers against the limits scan's (each day's tokens the same as Today's), the value as the
+   * sum of its days and of its models; Today -> Share opens on the week, Max 20x goes beside the value (kept per profile
+   * in Claudock's own data), the prices it used open (`share-week`, `card-week.png`), a week back and forward again,
+   * then all time (`share`, `card.png`). The Monday recap: on, one notification for last week at 09:30 on this week's
+   * Monday (none when it had no sessions) and not a second, its click opening Share on that week. settings.json must be
+   * byte for byte as before.
+   */
+  async function shareFlow(theme: 'light' | 'dark'): Promise<void> {
+    const dir = configDir()
+    const settingsFile = path.join(dir, 'settings.json')
+    const before = await fsp.readFile(settingsFile)
+    const stored = path.join(userDataDir(), 'share.dev', `${folderKey(dir)}.json`)
+    const now = Date.now()
+    const w = await weekIn(dir, null, now)
+    if (w.sessions === 0 || !w.usd || w.prompts === 0) throw new Error(`share: this week has no numbers (${JSON.stringify({ sessions: w.sessions, usd: w.usd, prompts: w.prompts })})`)
+    for (const d of sumActivity(await transcriptUsage(), now).days) {
+      const mine = w.days.find((x) => x.date === d.date)
+      if (mine && mine.tokens !== d.tokens) throw new Error(`share: ${d.date} has ${mine.tokens} tokens, Today ${d.tokens}`)
+    }
+    const sum = (xs: number[]): number => xs.reduce((a, b) => a + b, 0)
+    if (Math.abs(sum(w.days.map((d) => d.usd)) - w.usd) > 1e-6 || Math.abs(sum(w.models.map((m) => m.usd ?? 0)) - w.usd) > 1e-6) throw new Error('share: the value is not the sum of its days and its models')
+    if (!w.models.some((m) => m.name === 'Opus 5.5') || w.prices.rows.length === 0) throw new Error(`share: the models are ${w.models.map((m) => m.name).join(', ')}`)
+    const storedIs = async (want: Record<string, unknown>): Promise<void> => {
+      for (let i = 0; i < 100; i++) {
+        const got = (await fsp.readFile(stored, 'utf8').then((t) => JSON.parse(t) as Record<string, unknown>, () => ({}))) as Record<string, unknown>
+        if (Object.entries(want).every(([k, v]) => got[k] === v)) return
+        await sleep(100)
+      }
+      throw new Error(`share: the profile's share settings never became ${JSON.stringify(want)}`)
+    }
+    const ready = `document.querySelector('.share__canvas[data-ready="true"]')`
+    const range = (a: string, b: string): string => `document.querySelector('.share__range')?.textContent === ${JSON.stringify(formatRange(a, b))}`
+
+    emit('system:navigate', { screen: 'today' })
+    await sleep(150)
+    await openShare()
+    await waitFor(range(w.start, w.end), 'Share on this week')
+    await js(`(() => {
+      const s = document.querySelector('.share select')
+      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, 'max20')
+      s.dispatchEvent(new Event('change', { bubbles: true }))
+    })()`)
+    await storedIs({ plan: 'max20' })
+    await click('Prices', `document.querySelector('.share')`)
+    await waitFor(`document.querySelector('.share__prices') && ${ready}`, 'the prices and the week card')
+    await shoot(theme, 'share-week')
+    if (theme === 'light') await saveCard('card-week.png')
+
+    await js(`document.querySelector('.share [aria-label="Previous week"]').click()`)
+    const prev = addLocalDays(w.start, -7)
+    await waitFor(`${range(prev, addLocalDays(prev, 6))} && (${ready} || document.querySelector('.share .empty'))`, 'the week before')
+    await js(`document.querySelector('.share [aria-label="Next week"]').click()`)
+    await waitFor(`${range(w.start, w.end)} && ${ready}`, 'this week again')
+
+    await js(`[...document.querySelectorAll('.share [role=radio]')].find((b) => b.textContent.trim() === 'All time').click()`)
+    await waitFor(`!document.querySelector('.share__range') && ${ready}`, 'the all-time card')
+    await shoot(theme, 'share')
+    if (theme === 'light') await saveCard('card.png')
+
+    await js(`[...document.querySelectorAll('.share [role=radio]')].find((b) => b.textContent.trim() === 'Week').click()`)
+    await waitFor(`[...document.querySelectorAll('.share [role=switch]')].some((b) => b.closest('.share__recap') && b.getAttribute('aria-checked') === 'false')`, 'the recap switch')
+    await js(`document.querySelector('.share__recap [role=switch]').click()`)
+    await storedIs({ recap: true })
+    await closeShare()
+    await sleep(200)
+
+    const monday = midnightOf(mondayOf(now)) + 9.5 * 3_600_000
+    if (isPaused(currentAlertPrefs(), monday)) throw new Error('share: alerts are paused, so no recap can be checked')
+    const last = await weekIn(dir, addLocalDays(w.start, -7), monday)
+    const n = postedAlerts().length
+    await checkRecaps(monday)
+    await checkRecaps(monday + 3_600_000)
+    const sent = postedAlerts().slice(n)
+    const want = last.sessions > 0 ? ['Your week in Claude Code'] : []
+    if (JSON.stringify(sent) !== JSON.stringify(want)) throw new Error(`share: the recap posted ${JSON.stringify(sent)}, not ${JSON.stringify(want)}`)
+    if (last.sessions > 0) {
+      openRecap({ id: folderKey(dir), dir }, last.start)
+      await waitFor(`${range(last.start, last.end)} && ${ready}`, 'Share on the recap\'s week')
+      await closeShare()
+      await sleep(200)
+    }
+    // the next pass (and the shots after it) start from no settings
+    await fsp.rm(stored, { force: true })
+    if (!(await fsp.readFile(settingsFile)).equals(before)) throw new Error('share: settings.json is not byte for byte as before')
+  }
+
   const fail = (e: unknown): void => {
     errors.push(`SHOT_FAILED ${(e as Error).message}`)
     console.log(`SHOT_FAILED ${(e as Error).message}`)
@@ -558,10 +650,7 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
         await sleep(200)
       }
       if (opts.only.length === 0 || opts.only.includes('share')) {
-        emit('system:navigate', { screen: 'today' })
-        await sleep(150)
-        await openShare().then(() => shoot(theme, 'share'), fail)
-        if (theme === 'light') await saveCard().catch(fail)
+        await shareFlow(theme).catch(fail)
         await closeShare()
         await sleep(200)
       }
