@@ -9,11 +9,12 @@ import {
   type McpServer,
   type McpServerConfig
 } from '@shared/api/mcp'
+import { deniedNames } from '../context/model'
 import { tryReadJson } from '../fsx'
 import { defineDomain } from '../ipcx'
 import { globalStateFile } from '../paths'
 import { updateGlobalState } from '../safeWrite'
-import { isObj } from './extendShared'
+import { isObj, readSettings, updateSettings } from './extendShared'
 
 /** Read the global state file; never throws. */
 async function readState(): Promise<{ state: Record<string, unknown>; exists: boolean; error?: string }> {
@@ -47,7 +48,9 @@ async function list(): Promise<McpList> {
     }
   }
   projects.sort((a, b) => a.path.localeCompare(b.path))
-  return { stateFile: globalStateFile(), stateExists: exists, user: serversOf(state.mcpServers, 'user'), projects, error }
+  const denied = deniedNames((await readSettings()).data.deniedMcpServers)
+  const user = serversOf(state.mcpServers, 'user').map((s) => ({ ...s, off: denied.has(s.name) }))
+  return { stateFile: globalStateFile(), stateExists: exists, user, projects, error }
 }
 
 /** Keep only plain JSON-friendly values and drop empty optional containers. */
@@ -98,6 +101,14 @@ const impl: McpApi = {
       }
       state.mcpServers = next
     }, input.originalName === undefined ? `Add MCP server ${name}` : `Edit MCP server ${name}`)
+    // a server turned off (deniedMcpServers) stays off under its new name
+    const old = input.originalName
+    if (old !== undefined && old !== name) {
+      await updateSettings((s) => {
+        if (!Array.isArray(s.deniedMcpServers) || !deniedNames(s.deniedMcpServers).has(old)) return false
+        s.deniedMcpServers = s.deniedMcpServers.map((e: unknown) => (isObj(e) && e.serverName === old && Object.keys(e).length === 1 ? { serverName: name } : e))
+      }, `Rename MCP server ${old} to ${name} in deniedMcpServers`)
+    }
     return { snapshotId: r.snapshotId }
   },
 

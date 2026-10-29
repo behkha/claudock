@@ -16,7 +16,8 @@ import {
   ListRow,
   Segmented,
   Spinner,
-  TextField
+  TextField,
+  Toggle
 } from '@/components'
 import { api, useApi } from '@/lib/api'
 import { useSelectId } from '@/lib/hooks'
@@ -112,7 +113,8 @@ export default function McpScreen({ selectId }: ScreenProps): JSX.Element {
                       leading={<Plug size={16} strokeWidth={1.8} />}
                       title={s.name}
                       subtitle={s.summary || 'No command or URL'}
-                      meta={s.transport}
+                      meta={s.off ? 'off' : s.transport}
+                      dimmed={s.off}
                       selected={sel === NEW_ID ? false : selUser?.name === s.name}
                       onSelect={() => guard.request(userId(s.name))}
                     />
@@ -335,6 +337,20 @@ function ServerEditor({
 
   const secrets = f.env.length + f.headers.length > 0
 
+  async function setOn(on: boolean): Promise<void> {
+    if (!server) return
+    setSaving(true)
+    try {
+      const r = await api.context.setOn(`mcp:${server.name}`, on)
+      notify.saved(r.snapshotId, 'Saved.', { changed: r.changed, message: 'Nothing needed to change.' })
+      onSaved(server.name)
+    } catch (e) {
+      notify.failed(e)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <DetailPane
       title={server ? server.name : 'New server'}
@@ -356,6 +372,12 @@ function ServerEditor({
       }
     >
       <div className="ext-body">
+        {server ? (
+          <div className="ext-toggle-row">
+            {/* reloading the server resets the form: save or discard its edits first */}
+            <Toggle checked={!server.off} disabled={saving || dirty} onChange={(v) => void setOn(v)} label="Enabled" />
+          </div>
+        ) : null}
         <div className="ext-card">
           <div className="ext-card__content ext-form">
             <TextField label="Name" mono value={f.name} disabled={saving} spellCheck={false} placeholder="my-server" error={show ? problems.name : undefined} hint="Letters, numbers, hyphens and underscores." onChange={(e) => patch({ name: e.target.value })} />

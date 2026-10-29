@@ -9,6 +9,7 @@ export type ScreenId =
   | 'rules'
   | 'hooks'
   | 'permissions'
+  | 'context'
   | 'skills'
   | 'agents'
   | 'commands'
@@ -41,6 +42,7 @@ export const SCREENS: ScreenDef[] = [
   { id: 'rules', label: 'CLAUDE.md & rules', group: 'Configure', folder: 'Rules' },
   { id: 'hooks', label: 'Hooks', group: 'Configure', folder: 'Hooks' },
   { id: 'permissions', label: 'Permissions', group: 'Configure', folder: 'Permissions' },
+  { id: 'context', label: 'Context', group: 'Extend', folder: 'Context' },
   { id: 'skills', label: 'Skills', group: 'Extend', folder: 'Skills' },
   { id: 'agents', label: 'Agents', group: 'Extend', folder: 'Agents' },
   { id: 'commands', label: 'Commands', group: 'Extend', folder: 'Commands' },

@@ -73,7 +73,7 @@ async function itemFor(rel: string): Promise<RuleItem> {
 }
 
 /** rules/*.md and rules/<folder>/*.md (Claude Code reads nested rule folders too). */
-async function ruleRels(): Promise<string[]> {
+export async function ruleRels(): Promise<string[]> {
   const out: string[] = []
   const walk = async (relDir: string, depth: number): Promise<void> => {
     for (const e of await listDir(resolveInside(relDir))) {

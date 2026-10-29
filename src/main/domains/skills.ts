@@ -65,13 +65,14 @@ async function skillsIn(root: string): Promise<Found[]> {
   return found.filter((f): f is Found => f !== null)
 }
 
-async function describe(f: Found): Promise<{ name: string; description: string; mtimeMs: number; symlink: boolean }> {
+async function describe(f: Found): Promise<{ name: string; description: string; modelHidden: boolean; mtimeMs: number; symlink: boolean }> {
   const [head, st, lst] = await Promise.all([readHead(f.file).catch(() => ''), fsp.stat(f.file).catch(() => null), stat(f.dir)])
   const fm = parseFrontmatter(head)
   const name = typeof fm.data.name === 'string' && fm.data.name.trim() ? fm.data.name.trim() : f.folder
   const d = fm.data.description
   const description = (Array.isArray(d) ? d.join(' ') : (d ?? '')).toString().trim()
-  return { name, description, mtimeMs: st?.mtimeMs ?? 0, symlink: !!lst?.isSymlink }
+  const modelHidden = fm.data['disable-model-invocation'] === 'true'
+  return { name, description, modelHidden, mtimeMs: st?.mtimeMs ?? 0, symlink: !!lst?.isSymlink }
 }
 
 /* ------------------------------------------------------------------ listing */
@@ -93,6 +94,7 @@ export async function scanUser(overrides: Record<string, unknown>): Promise<Skil
         source: 'user',
         label: 'user',
         description: d.description,
+        modelHidden: d.modelHidden,
         enabled: ov !== 'off',
         override: ov,
         rel: rel(dir),
@@ -148,6 +150,7 @@ async function scanSynced(overrides: Record<string, unknown>): Promise<SkillInfo
       source: 'synced',
       label: 'synced',
       description: d.description,
+      modelHidden: d.modelHidden,
       enabled: ov !== 'off',
       override: ov,
       rel: rel(v.f.dir),
@@ -185,6 +188,7 @@ async function scanPlugins(overrides: Record<string, unknown>, enabledPlugins: R
               plugin: p.name,
               pluginEnabled,
               description: d.description,
+              modelHidden: d.modelHidden,
               enabled: ov !== 'off' && pluginEnabled,
               override: ov,
               rel: rel(f.dir),
@@ -201,7 +205,8 @@ async function scanPlugins(overrides: Record<string, unknown>, enabledPlugins: R
   return perPlugin.flat()
 }
 
-async function list(): Promise<SkillList> {
+/** Every skill of the open profile, as the Skills screen lists it (also what the Context screen measures). */
+export async function listSkills(): Promise<SkillList> {
   const { data, error } = await readSettings()
   const overrides = isObj(data.skillOverrides) ? data.skillOverrides : {}
   const ep = enabledMap(data)
@@ -259,7 +264,7 @@ const template = (name: string, description: string): string =>
   `---\nname: ${name}\ndescription: ${description}\n---\n\n# ${name}\n\nWrite the instructions Claude should follow when this skill is used.\n`
 
 const impl: SkillsApi = {
-  list,
+  list: listSkills,
 
   async read(id) {
     const d = await skillDir(id)

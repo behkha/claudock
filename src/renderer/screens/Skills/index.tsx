@@ -43,6 +43,9 @@ function findSkill(skills: SkillInfo[], sel: string): SkillInfo | undefined {
 function stateText(s: SkillInfo): string {
   if (s.source === 'override') return `${s.enabled ? 'On' : 'Off'} · override only`
   if (s.source === 'plugin' && s.pluginEnabled === false) return `Off · ${s.label} (plugin off)`
+  // the two values between on and off: Claude sees only the name, or nothing while /name still runs it (Context's switch)
+  if (s.override === 'name-only') return `Name only · ${s.label}`
+  if (s.override === 'user-invocable-only') return `/${s.key} only · ${s.label}`
   return `${s.enabled ? 'On' : 'Off'} · ${s.label}`
 }
 

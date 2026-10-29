@@ -1,0 +1,229 @@
+/* Context: one ranked table of what the setup adds to every session. Clay marks only the biggest item. */
+
+.ctx__total {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0;
+}
+.ctx__total b {
+  font-family: var(--font-serif);
+  font-size: var(--fs-title);
+  font-weight: 500;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.ctx__total span {
+  font-size: var(--fs-caption);
+  color: var(--text-3);
+}
+
+.ctx__toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.ctx__stack {
+  display: flex;
+  gap: 1px;
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--surface-sunken);
+}
+.ctx__seg {
+  flex-basis: 0;
+  min-width: 2px;
+  background: color-mix(in srgb, var(--text-3) 55%, transparent);
+}
+.ctx__seg:nth-child(even) {
+  background: color-mix(in srgb, var(--text-3) 35%, transparent);
+}
+.ctx__seg--top,
+.ctx__seg--top:nth-child(even) {
+  background: var(--accent);
+}
+.ctx__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ctx__card {
+  transition: opacity 120ms;
+}
+.ctx__card--loading {
+  opacity: 0.7;
+}
+.ctx__table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: var(--fs-body);
+}
+.ctx__c-switch {
+  width: 64px;
+}
+.ctx__c-used {
+  width: 130px;
+}
+.ctx__c-tokens {
+  width: 220px;
+}
+.ctx__c-chev {
+  width: 44px;
+}
+.ctx__table th {
+  padding: 8px;
+  text-align: left;
+  font-size: var(--fs-caption);
+  font-weight: 400;
+  color: var(--text-3);
+  border-bottom: var(--hair) solid var(--border);
+}
+.ctx__table td {
+  padding: 4px 8px;
+  border-bottom: var(--hair) solid var(--border);
+  vertical-align: middle;
+}
+.ctx__table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.ctx__table th:first-child,
+.ctx__table td:first-child {
+  padding-left: 20px;
+}
+.ctx__row:hover td {
+  background: var(--hover);
+}
+.ctx__row--open td,
+.ctx__detail td {
+  background: var(--selected);
+}
+.ctx__row--open td {
+  border-bottom-color: transparent;
+}
+
+.ctx__switch {
+  height: 52px;
+}
+.ctx__name {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  width: 100%;
+  min-height: 44px;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  min-width: 0;
+}
+.ctx__label,
+.ctx__kind {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ctx__label {
+  font-weight: 500;
+}
+.ctx__kind {
+  font-size: var(--fs-small);
+  color: var(--text-3);
+}
+.ctx__row--off .ctx__label {
+  color: var(--text-3);
+  font-weight: 400;
+}
+.ctx__used {
+  font-size: var(--fs-small);
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.ctx__tokens {
+  text-align: right !important;
+}
+.ctx__cost {
+  display: grid;
+  grid-template-columns: 1fr 64px;
+  align-items: center;
+  gap: 10px;
+}
+.ctx__track {
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+.ctx__fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--text-3) 55%, transparent);
+}
+.ctx__fill--top {
+  background: var(--accent);
+}
+.ctx__num {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.ctx__muted {
+  color: var(--text-3);
+  font-size: var(--fs-small);
+}
+.ctx__chev {
+  color: var(--text-3);
+  text-align: center;
+}
+
+.ctx__group td {
+  padding-top: 14px;
+  padding-bottom: 6px;
+  font-size: var(--fs-caption);
+  color: var(--text-3);
+  background: transparent !important;
+}
+
+.ctx__detail td {
+  padding-top: 0;
+  padding-bottom: 14px;
+}
+.ctx__text {
+  margin: 0;
+  max-height: 260px;
+  overflow: auto;
+  padding: 10px 12px;
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  border: var(--hair) solid var(--border);
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  line-height: 1.55;
+  color: var(--text-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ctx__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.ctx__error {
+  color: var(--danger);
+  font-size: var(--fs-small);
+}
+
+.ctx__from {
+  font-family: var(--font-mono);
+  font-size: var(--fs-caption);
+  color: var(--text-3);
+}

@@ -5,6 +5,7 @@ import { SCREENS, type ScreenId } from '@shared/nav'
 import { app } from 'electron'
 import { connectDir } from './connect/folder'
 import { archiveRootOf, list as archiveList, markdownOf, search as archiveSearch, sweepNow } from './domains/archive'
+import { listContext } from './domains/context'
 import { GROUP_MS } from './connect/sessionModel'
 import { postedAlerts } from './alerts'
 import { alertPrefs, setAlertPrefs } from './domains/sessions'
@@ -18,7 +19,7 @@ import { driver, sleep } from './shotDrive'
 /**
  * Screenshot mode (CLAUDOCK_SHOT=1, driven by scripts/shot.mjs): visits every screen in light then dark through the
  * normal `system:navigate` / `system:theme` events, waits until each is loaded and painted in that theme, saves
- * `<dir>/<theme>-<screen>.png` (plus `connect`, the Connect sheet, `connected`, the Today card after connecting with one played status line run and three sessions played through the real hooks, which must post exactly one alert, `connected-hooks`, the Hooks screen then, where Claudock's hooks are one row and out of the counts, and `disconnect`, the confirm dialog that row's Disconnect… opens, which must leave settings.json byte for byte as it was, `profiles-add`, `profiles-menu` and `profiles-menubar`, profiles with a second folder added and removed again, `archive-search` and `archive-resume`, the Sessions screen with a session Claude Code deleted found and put back, `palette`, `settings-json`, `mods-draft`, the Mods screen with the fixture's draft selected, and `share`, the Today share dialog, and `card.png`, the card itself, and `reveal`, `reveal-connect`, `reveal-connected` and `reveal-empty`, the first-run reveal), prints renderer console errors as `CONSOLE_ERROR ...` and failed shots as
+ * `<dir>/<theme>-<screen>.png` (plus `connect`, the Connect sheet, `connected`, the Today card after connecting with one played status line run and three sessions played through the real hooks, which must post exactly one alert, `connected-hooks`, the Hooks screen then, where Claudock's hooks are one row and out of the counts, and `disconnect`, the confirm dialog that row's Disconnect… opens, which must leave settings.json byte for byte as it was, `profiles-add`, `profiles-menu` and `profiles-menubar`, profiles with a second folder added and removed again, `archive-search` and `archive-resume`, the Sessions screen with a session Claude Code deleted found and put back, `palette`, `settings-json`, `mods-draft`, the Mods screen with the fixture's draft selected, and `share`, the Today share dialog, and `card.png`, the card itself, and `reveal`, `reveal-connect`, `reveal-connected` and `reveal-empty`, the first-run reveal, and `context-off`, the Context screen with an MCP server and a skill switched off and a row's counted text open, which must leave settings.json byte for byte as it was once they are back on), prints renderer console errors as `CONSOLE_ERROR ...` and failed shots as
  * `SHOT_FAILED ...`, and exits 0 (clean) or 1 (errors).
  */
 export async function runShots(win: BrowserWindow, opts: { dir: string; only: string[] }): Promise<void> {
@@ -429,6 +430,56 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
     await waitFor(`!document.querySelector('.palette') && !document.querySelector('.toast')`, 'the palette and the toast gone')
   }
 
+  /**
+   * Context: the numbers come from the fixture's newest session; turn the github server and two skills off from their
+   * switches (deniedMcpServers, skillOverrides user-invocable-only; release-notes had "on", which must come back),
+   * open a row's counted text, shoot, turn them back on, and fail unless settings.json is byte for byte as before.
+   */
+  async function contextFlow(theme: 'light' | 'dark'): Promise<void> {
+    if (process.env.CLAUDOCK_READONLY === '1' || !configDir().includes(`${path.sep}.shots${path.sep}.tmp-`)) return
+    const settingsFile = path.join(configDir(), 'settings.json')
+    const before = await fsp.readFile(settingsFile)
+    const l = await listContext(true)
+    const item = (id: string): (typeof l.items)[number] => {
+      const i = l.items.find((x) => x.id === id)
+      if (!i) throw new Error(`context: no ${id} row`)
+      return i
+    }
+    const gh = item('mcp:github')
+    if (gh.tools !== 28 || gh.measured !== 'session' || !gh.tokens) throw new Error(`context: github is not measured from the session (${JSON.stringify(gh)})`)
+    if (item('mcp:docs-search').uses !== 2 || item('mcp:github').uses !== 0) throw new Error('context: MCP tool calls are not counted')
+    if (item('mcp:claude.ai Linear').missing !== 'needs-auth') throw new Error('context: the connector that needs a login has a number')
+    if (item('skill:release-notes').measured !== 'session' || item('skill:release-notes').uses !== 12) throw new Error('context: release-notes is not measured from the listing')
+    if (item('skill:big-assets').on) throw new Error('context: a skill that is off counts')
+    const memory = l.items.filter((i) => i.kind === 'memory').map((i) => i.name).sort()
+    if (memory.join() !== 'CLAUDE.md,rules/git.md,rules/security.md') throw new Error(`context: the instruction files are ${memory.join()}`)
+    if (l.tokens !== l.items.reduce((n, i) => n + (i.on && i.tokens ? i.tokens : 0), 0)) throw new Error('context: the total is not the sum of its rows')
+
+    emit('system:navigate', { screen: 'context' })
+    await sleep(150)
+    const flip = async (name: string, on: boolean): Promise<void> => {
+      const sw = `document.querySelector('[role=switch][aria-label=${JSON.stringify(`${name} in context`)}]')`
+      await waitFor(`${sw} && !${sw}.disabled && ${sw}.getAttribute('aria-checked') === ${JSON.stringify(String(!on))}`, `the ${name} switch`)
+      await js(`${sw}.click()`)
+      await waitFor(`${sw}?.getAttribute('aria-checked') === ${JSON.stringify(String(on))} && !${sw}.disabled`, `${name} switched ${on ? 'on' : 'off'}`)
+    }
+    await flip('github', false)
+    await flip('db-migrations', false)
+    await flip('release-notes', false)
+    const off = JSON.parse(await fsp.readFile(settingsFile, 'utf8')) as { deniedMcpServers?: unknown; skillOverrides?: Record<string, unknown> }
+    if (JSON.stringify(off.deniedMcpServers) !== JSON.stringify([{ serverName: 'github' }])) throw new Error(`context: deniedMcpServers is ${JSON.stringify(off.deniedMcpServers)}`)
+    for (const k of ['db-migrations', 'release-notes']) if (off.skillOverrides?.[k] !== 'user-invocable-only') throw new Error(`context: ${k} was not hidden from Claude with /name kept`)
+    await js(`[...document.querySelectorAll('.ctx__name')].find((b) => b.querySelector('.ctx__label')?.textContent === 'docs-search')?.click()`)
+    await waitFor(`document.querySelector('.ctx__text')?.textContent.includes('mcp__docs-search__search') && !document.querySelector('.toast')`, 'the counted text, no toast left')
+    await shoot(theme, 'context-off')
+    await js(`document.querySelector('.ctx__row--open .ctx__name')?.click()`)
+    await flip('github', true)
+    await flip('db-migrations', true)
+    await flip('release-notes', true)
+    if (!(await fsp.readFile(settingsFile)).equals(before)) throw new Error('context: settings.json is not byte for byte as before after switching back on')
+    await waitFor(`!document.querySelector('.toast')`, 'the toasts gone')
+  }
+
   const fail = (e: unknown): void => {
     errors.push(`SHOT_FAILED ${(e as Error).message}`)
     console.log(`SHOT_FAILED ${(e as Error).message}`)
@@ -490,6 +541,9 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
       }
       if (opts.only.length === 0 || opts.only.includes('archive')) {
         await archiveFlow(theme).catch(fail)
+      }
+      if (opts.only.length === 0 || opts.only.includes('context')) {
+        await contextFlow(theme).catch(fail)
       }
       if (opts.only.length === 0 || opts.only.includes('mods') || opts.only.includes('mods-draft')) {
         emit('system:navigate', { screen: 'mods' })

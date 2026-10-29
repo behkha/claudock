@@ -47,14 +47,16 @@ src/
     safeWrite.ts     snapshot + atomic write + JSON validation
     domains/         ONE file per domain; each exports `register(ipcMain)`
       today.ts overview.ts storage.ts backups.ts settings.ts rules.ts hooks.ts
-      permissions.ts skills.ts agents.ts commands.ts plugins.ts mods.ts mcp.ts
+      permissions.ts context.ts skills.ts agents.ts commands.ts plugins.ts mods.ts mcp.ts
       projects.ts memory.ts plans.ts history.ts search.ts system.ts
       limits.ts sessions.ts connect.ts   (live limits, "needs me" sessions, Connect to Claude Code; per profile folder)
       menubar.ts       (what the popover asks of the menu bar)
       profiles.ts      (profiles: which folder the window shows, every profile's glance for the menu bar)
       archive.ts       (the session archive behind the Sessions screen; per profile folder)
+      context.ts       (what each skill, MCP server and CLAUDE.md file adds to every session; per profile folder)
     profiles/        pure parts of profiles (names, the start command), unit-tested
     archive/         pure parts of the session archive (search text, matching, Markdown, the resume command, link or copy), unit-tested
+    context/         pure parts of Context (Claude Code's session-start records, the rows, the switch values), unit-tested
     transcripts/     reading Claude Code transcripts (lines, entries), shared by Projects and the archive
     connect/         pure parts of Connect (hook script, settings merge, session model, alert rule), unit-tested
     demo/            `--demo`: the synthetic config (fixture.ts, also `npm run fixture`) built in its own data folder
@@ -78,7 +80,7 @@ Each domain owns: `src/main/domains/<domain>.ts`, its slice of types in `src/sha
 
 - **Home**: Today
 - **Configure**: Settings, CLAUDE.md & rules, Hooks, Permissions
-- **Extend**: Skills, Agents, Commands, Plugins, Mods, MCP servers
+- **Extend**: Context, Skills, Agents, Commands, Plugins, Mods, MCP servers
 - **Your data**: Sessions, Projects, Memory, Plans, History
 - **Maintain**: Storage, Backups
 
@@ -93,11 +95,12 @@ Layout for every list-type screen: sidebar (220–240px) · list pane (300–360
 - **CLAUDE.md & rules**: `CLAUDE.md` plus every `rules/*.md`. Markdown editor with preview, new rule, rename, move to Trash.
 - **Hooks**: grouped by event; each hook shows matcher + command; add / edit / remove; writes `hooks` in `settings.json`. Claudock's own hooks (Connect to Claude Code) are one read-only "Connect to Claude Code" row whose Disconnect… opens the Disconnect dialog on Today; they are left out of every hook count (sidebar badge, Settings form).
 - **Permissions**: `defaultMode`, and allow / ask / deny rule lists with add / remove.
-- **Skills**: user skills (`skills/*/SKILL.md`), synced skills, and plugin skills (read-only). On/off toggle writes `skillOverrides`. Detail: frontmatter, SKILL.md (editable for user skills), file list, size, Reveal, Open in editor, Duplicate, Move to Trash.
+- **Context**: full width. What every session of the open profile starts with, from the newest transcript that recorded it: the total (`≈ 3.4k tokens per session`), a bar of it (the biggest item in clay), filters (All, Skills, MCP servers, CLAUDE.md & rules, Unused: nothing in 30 days), then one table, most tokens first and the ones turned off under "Off": a switch, the name and its kind (`MCP · 28 tools`, `skill · user`), Used (skills: Claude Code's own count and last use; servers: tool calls in the last 30 days, `0 in 30 d`), and Tokens with a bar. Every token number is an estimate (characters ÷ 3.5) and carries `≈`; an item turned off is an exact `0`; a server with nothing to measure says why (`needs login`, `failed`, `connecting`, `not seen`). Opening a row shows the exact text counted and, where one edits it, Open in Skills / MCP servers / CLAUDE.md & rules. A skill's switch writes `skillOverrides` `user-invocable-only` (Claude no longer sees it, `/name` still runs it) and on removes it; a user server's switch adds or removes `{ "serverName": … }` in settings.json `deniedMcpServers`, leaving its settings in the global state file untouched. Skills only the session listed (Claude Code's own, a project's, a plugin's installed elsewhere) switch the same way; synced skills (switched on the Skills screen), servers from plugins, claude.ai or the app running Claude Code, and CLAUDE.md & rules have no switch. Skills that won't load (plugin off, `disable-model-invocation`) are left out. The footer names the session measured. The sidebar shows the total.
+- **Skills**: user skills (`skills/*/SKILL.md`), synced skills, and plugin skills (read-only). On/off toggle writes `skillOverrides` (`off`); a row set elsewhere to `name-only` or `user-invocable-only` reads "Name only" or "/name only". Detail: frontmatter, SKILL.md (editable for user skills), file list, size, Reveal, Open in editor, Duplicate, Move to Trash.
 - **Agents** / **Commands**: `agents/*.md` and `commands/**/*.md`; list, edit with frontmatter form + body, new from template, Trash.
 - **Plugins**: installed plugins, marketplaces, enable / disable (writes `enabledPlugins`).
 - **Mods**: plugins whose `hooks/hooks.json` has `modules`. Installed ones (enable / disable via `enabledPlugins`), folders in `CLAUDE_CODE_PLUGIN_DIRS` and `mods/` (load / stop loading by editing that env var in `settings.json`), and drafts Claude wrote in `dev-mods/<session>/<name>` (Keep moves one to `mods/<name>` and loads it; Trash). Shows what the hooks module draws, hooks and calls (read from its source, never run), its `$.store` data in `plugins/store` (Clear sends it to the Trash) and its README.
-- **MCP servers**: user-scope servers from the global state file; add / edit / remove (see safety rule 5).
+- **MCP servers**: user-scope servers from the global state file; add / edit / remove (see safety rule 5), and an Enabled switch (settings.json `deniedMcpServers`, the same as Context's); a server turned off reads "off" in the list.
 - **Sessions**: every session of the open profile, newest first, whether Claude Code still has its transcript or only the archive does (see Session archive): name (Claude Code's custom title, else the first prompt), folder, when, size, an Archived badge once Claude Code deleted it. "Search every session" matches every word in the title, prompts and replies (not tool output), each hit showing the line that matched; opening it scrolls the transcript there. Filters: All, Archived. Detail: the folder, when and how many messages, Copy resume command (`cd <folder> && claude --resume <id>`, with the profile's `CLAUDE_CONFIG_DIR`; a deleted session is put back in `projects/` first, dated now), Export… (Markdown: prompts and replies in full, each tool call one line), Move to Trash (Claude Code's files, and anything only the archive has, to the Trash), and the transcript viewer, which opens a search hit past its first page at that line, with Show from the start. The list's footer says what the archive holds and the disk it takes beyond Claude Code's folder ("Archive on · 41 archived · 120 MB") and its ⋯ menu has Show archive folder and Stop archiving this profile… (which can also move the archived sessions to the Trash).
 - **Projects**: one row per project folder; the real path comes from the `cwd` in its transcripts, not the folder name. Detail: sessions (title = first user prompt, date, size, message count), transcript viewer, Move to Trash per session or for sessions older than N days (the archive lets go of those too).
 - **Memory**: `projects/*/memory/*.md` grouped by project; view / edit / Trash; `MEMORY.md` index shown first.

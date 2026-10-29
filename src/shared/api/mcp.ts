@@ -25,6 +25,8 @@ export interface McpServer {
   config: McpServerConfig
   /** One line for the list: the command line or the URL. */
   summary: string
+  /** User servers: turned off with `deniedMcpServers` in settings.json (the Context screen's switch, or the one here). */
+  off?: boolean
 }
 
 export interface McpProject {

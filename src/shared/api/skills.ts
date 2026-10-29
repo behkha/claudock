@@ -20,6 +20,8 @@ export interface SkillInfo {
   /** For plugin skills: false when the plugin itself is turned off (its skills do not load). */
   pluginEnabled?: boolean
   description: string
+  /** `disable-model-invocation: true`: Claude Code never lists it for Claude, only /name runs it. */
+  modelHidden?: boolean
   /** Not "off" in skillOverrides (and, for plugin skills, the plugin is on). */
   enabled: boolean
   /** Raw value in skillOverrides, if any. */
