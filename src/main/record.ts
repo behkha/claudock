@@ -1,12 +1,13 @@
 import type { BrowserWindow, WebContents } from 'electron'
 import fsp from 'node:fs/promises'
 import path from 'node:path'
-import { app } from 'electron'
+import { app, clipboard } from 'electron'
 import { postedAlertTexts } from './alerts'
 import { GROUP_MS } from './connect/sessionModel'
+import { list as archiveList, sweepNow } from './domains/archive'
 import { setAlertPrefs } from './domains/sessions'
 import { emit } from './ipcx'
-import { glanceForShots, popoverForShots } from './menubar'
+import { glanceForShots, popoverForShots, resetLimitAlertsForShots } from './menubar'
 import { configDir, snapshotsDir } from './paths'
 import { setTheme } from './theme'
 import { driver, sleep } from './shotDrive'
@@ -18,6 +19,9 @@ const FPS = 60
 const SIZE = { width: 1280, height: 720 }
 /** The weekly % fed to the status line: under the 5-hour one, so the menu bar (which shows the higher) reads 42%. */
 const WEEK = 28
+/** The first prompt of the old session the Sessions take finds: no other transcript on the fixture has its words. */
+const OLD_PROMPT = 'Why did the nightly invoice job charge twice in July?'
+const OLD_ID = '7e1f0c52-3a94-4d6b-8f21-c0de5e551011'
 
 type Box = { x: number; y: number; w: number; h: number }
 type Mark = { t: number; kind: 'click' | 'cue'; label: string; box?: Box }
@@ -85,9 +89,13 @@ class SlowMo {
  * frame's time and the clicks and cues in it, in CSS px of a 1280×720 window), the six screenshots as
  * `<dir>/stills/<theme>-<name>.png`, and what the film draws around the app (the status line's output, the menu bar
  * title, the alerts) in `<dir>/strings.json`. Takes: `reveal` (the reveal fills in, Connect), `today` (one status line
- * run, three sessions, one starts waiting), `popover` (the menu bar popover and its settings), `limit` (the 80% limit
- * alert), `skills` (a skill off, settings.json, on again), `restore` (settings.json broken, yesterday's snapshot
- * restored). Exits 0 (clean) or 1.
+ * run, three sessions, one starts waiting), `popover` (the menu bar popover, then its settings: Limit reaches goes from
+ * Off to 80%), `limit` (the 5-hour limit crosses 80%, then the weekly one, one alert each), `profiles` (the title bar
+ * menu with both profiles, a switch to Work), `profiles-pop` (the popover with both profiles), `skills` (a skill off,
+ * settings.json, on again), `context` (the skills ranked, one off and the total drops, on again), `restore`
+ * (settings.json broken, yesterday's snapshot restored), `sessions` (a session Claude Code deleted found by a word of
+ * its first prompt, opened at that line, its resume command copied), `share` (the week's card, a week back, the cursor
+ * on Post on X). Exits 0 (clean) or 1.
  */
 export async function runRecord(win: BrowserWindow, opts: { dir: string; only: string[] }): Promise<void> {
   const errors: string[] = []
@@ -102,8 +110,11 @@ export async function runRecord(win: BrowserWindow, opts: { dir: string; only: s
 
   const { js, jsOn, settle, click, waitFor, playStatusLine, hookSteps, startSessions, advanceSessions } = driver(win)
   const slow = new SlowMo()
-  const strings: Record<string, unknown> = {}
+  // the menu bar clock the film draws: the sessions on screen are dated from now
+  const strings: Record<string, unknown> = { clock: new Date().toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' }).replace(',', ' ') }
   const settingsFile = path.join(configDir(), 'settings.json')
+  // the Sessions take copies a resume command: the clipboard goes back to what it held
+  const clipboardBefore = await clipboard.readText()
 
   win.setContentSize(SIZE.width, SIZE.height)
   await slow.add(win.webContents)
@@ -163,6 +174,7 @@ export async function runRecord(win: BrowserWindow, opts: { dir: string; only: s
       })()`
       )
     const ctx: TakeCtx = {
+      box: (el, label) => boxOf(el, label, w),
       hold: (ms) => slow.hold(ms),
       cue: (label, box) => void marks.push({ t: at(), kind: 'cue', label, ...(box ? { box } : {}) }),
       clickEl: async (el, label, on = w) => {
@@ -190,10 +202,51 @@ export async function runRecord(win: BrowserWindow, opts: { dir: string; only: s
   }
 
   const closeToasts = (): Promise<unknown> => js(`document.querySelectorAll('.toast__close').forEach((b) => b.click())`)
-  const go = async (screen: 'today' | 'skills' | 'settings' | 'backups', theme: 'light' | 'dark'): Promise<void> => {
+  const go = async (screen: 'today' | 'skills' | 'settings' | 'backups' | 'context' | 'archive', theme: 'light' | 'dark'): Promise<void> => {
     emit('system:navigate', { screen })
     await sleep(150)
     await settle(theme, screen)
+  }
+
+  /** Connect the open profile from the Today card, off camera. */
+  async function connect(): Promise<void> {
+    await click('Connect to Claude Code')
+    await waitFor(`document.querySelector('dialog[open] .diff')`, 'the Connect sheet')
+    await click('Connect', `document.querySelector('dialog[open]')`)
+    await waitFor(`!document.querySelector('dialog[open]') && [...document.querySelectorAll('.lim button')].some((b) => b.textContent.trim() === 'Disconnect')`, 'the connection')
+    await closeToasts()
+  }
+
+  const openProfile = async (name: string): Promise<void> => {
+    await js(`document.querySelector('.titlebar__profile').click()`)
+    await waitFor(`document.querySelectorAll('.profile-row').length === 2`, 'the profile menu')
+    await js(`[...document.querySelectorAll('.profile-row')].find((r) => r.textContent.includes(${JSON.stringify(name)})).click()`)
+    await waitFor(`document.querySelector('.titlebar__profile-name')?.textContent === ${JSON.stringify(name)} && document.querySelector('.today')`, `${name} open on Today`)
+  }
+
+  /**
+   * Off camera, an old session for the Sessions take, which Claude Code has since deleted: the fixture's oldest
+   * transcript under a new id and a first prompt no other transcript has, archived by the sweep, then its live copy gone.
+   */
+  async function seedDeletedSession(): Promise<string> {
+    if (process.env.CLAUDOCK_READONLY === '1') throw new Error('record: never on a real config')
+    await sweepNow()
+    const rows = (await archiveList()).sessions.filter((r) => r.title && r.messages > 1 && r.id !== OLD_ID)
+    const from = rows.at(-1)
+    if (!from) throw new Error('record: no session on the fixture to copy')
+    const dir = path.join(configDir(), 'projects', from.projectId)
+    const text = await fsp.readFile(path.join(dir, `${from.id}.jsonl`), 'utf8')
+    const live = path.join(dir, `${OLD_ID}.jsonl`)
+    await fsp.writeFile(live, text.replaceAll(from.id, OLD_ID).replaceAll(from.title, OLD_PROMPT))
+    const when = new Date(Date.now() - 110 * 86_400_000)
+    await fsp.utimes(live, when, when)
+    await sweepNow()
+    await fsp.rm(live)
+    await fsp.rm(path.join(dir, OLD_ID), { recursive: true, force: true })
+    await sweepNow()
+    const row = (await archiveList()).sessions.find((r) => r.id === OLD_ID)
+    if (!row?.archived || row.title !== OLD_PROMPT) throw new Error(`record: the old session is ${JSON.stringify(row)}`)
+    return live
   }
 
   /** Disconnect from the Today card, then put settings.json back as it was before the takes, for the next theme. */
@@ -219,6 +272,8 @@ export async function runRecord(win: BrowserWindow, opts: { dir: string; only: s
     for (const theme of themes) {
       // each theme starts with no snapshots, so the second one's Backups list doesn't hold the first one's changes
       await fsp.rm(snapshotsDir(), { recursive: true, force: true })
+      await setAlertPrefs({ limitPercent: null })
+      resetLimitAlertsForShots()
       await setTheme(theme, false)
       await go('today', theme)
       const pristine = await fsp.readFile(settingsFile)
@@ -272,8 +327,8 @@ export async function runRecord(win: BrowserWindow, opts: { dir: string; only: s
         await c.still('today')
       })
 
-      // 3. popover: the menu bar popover with the waiting session first, then its settings view (the limit alert at 80%) and back
-      await setAlertPrefs({ limitPercent: 80 })
+      // 3. popover: the menu bar popover with the waiting session first, then its settings view, where the limit alert
+      // goes from Off to 80% (a native menu is not in a capture: the film draws it), and back
       const pop = await popoverForShots()
       emit('menubar:opened', null)
       await settle(theme, 'popover', pop)
@@ -282,18 +337,29 @@ export async function runRecord(win: BrowserWindow, opts: { dir: string; only: s
         await c.still('menubar')
         await c.clickEl(`document.querySelector('[aria-label="Alert settings"]')`, 'Alert settings')
         await waitFor(`document.querySelector('.pop__back')`, 'the settings view', pop)
-        await c.hold(2000)
+        await c.hold(1400)
+        const limitChoice = `[...document.querySelectorAll('.pop__row')].find((r) => r.textContent.startsWith('Limit reaches')).querySelector('select')`
+        await c.clickEl(limitChoice, 'Limit reaches')
+        await c.hold(900)
+        await jsOn(pop, `(() => {
+          const s = ${limitChoice}
+          Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, '80')
+          s.dispatchEvent(new Event('change', { bubbles: true }))
+        })()`)
+        await waitFor(`${limitChoice}.value === '80'`, 'Limit reaches at 80%', pop)
+        c.cue('80')
+        await c.hold(1600)
         await c.clickEl(`document.querySelector('.pop__back')`, 'Back')
         await c.hold(1200)
       })
 
-      // 4. limit: the 5-hour limit passes 80% and the one limit alert goes out
+      // 4. limit: the 5-hour limit passes 80% and its alert goes out, then the weekly one and its own
       await take(theme, 'limit', pop, async (c) => {
         await c.hold(1000)
         const alerts = postedAlertTexts().length
-        await playStatusLine(85, '/Users/me/code/app', WEEK)
-        await waitFor(`[...document.querySelectorAll('.lim__top b')][0]?.textContent === '85%'`, 'the 85% reading', pop)
-        c.cue('85')
+        await playStatusLine(80, '/Users/me/code/app', WEEK)
+        await waitFor(`[...document.querySelectorAll('.lim__top b')][0]?.textContent === '80%'`, 'the 80% reading', pop)
+        c.cue('80')
         await sleep(1000)
         const posted = postedAlertTexts().slice(alerts)
         if (posted.length !== 1) throw new Error(`record: expected one limit alert, got ${JSON.stringify(posted)}`)
@@ -301,10 +367,77 @@ export async function runRecord(win: BrowserWindow, opts: { dir: string; only: s
         strings.trayLimit = glanceForShots()?.title
         c.cue('alert')
         await c.hold(2500)
+        const before = postedAlertTexts().length
+        await playStatusLine(80, '/Users/me/code/app', 80)
+        await waitFor(`[...document.querySelectorAll('.lim__top b')][1]?.textContent === '80%'`, 'the 80% weekly reading', pop)
+        c.cue('week')
+        await sleep(1000)
+        const weekly = postedAlertTexts().slice(before)
+        if (weekly.length !== 1) throw new Error(`record: expected one weekly limit alert, got ${JSON.stringify(weekly)}`)
+        strings.weeklyAlert = weekly[0]
+        c.cue('alert week')
+        await c.hold(2500)
       })
+      // the reading V2 starts from, then back to where the film rests
+      await playStatusLine(38, '/Users/me/code/app', WEEK)
+      await waitFor(`[...document.querySelectorAll('.lim__top b')].map((b) => b.textContent).join(' ') === '38% 28%'`, 'the limits at 38% and 28%')
+      await sleep(300)
+      strings.trayBefore = glanceForShots()?.title
       await playStatusLine(42, '/Users/me/code/app', WEEK)
+      await waitFor(`[...document.querySelectorAll('.lim__top b')].map((b) => b.textContent).join(' ') === '42% 28%'`, 'the limits back at 42% and 28%')
 
-      // 5. skills: one skill off, settings.json's skillOverrides, then on again
+      // 5. profiles: Work added and connected off camera, then the title bar menu with both, a switch to Work, the popover
+      await js(`document.querySelector('.titlebar__profile').click()`)
+      await click('Add profile…', `document.querySelector('.profile-menu')`)
+      await waitFor(`document.querySelector('dialog[open] .add-profile__opt input:checked') && [...document.querySelectorAll('dialog[open] .add-profile__dir')].some((d) => d.textContent.endsWith('.claude-work'))`, 'the Add profile sheet with the work folder')
+      await click('Add', `document.querySelector('dialog[open]')`)
+      await waitFor(`!document.querySelector('dialog[open]') && document.querySelector('.titlebar__profile-name')?.textContent === 'Work' && document.querySelector('.today')`, 'Work open on Today')
+      await closeToasts()
+      const workFile = path.join(configDir(), 'settings.json')
+      const workBefore = await fsp.readFile(workFile)
+      await connect()
+      await playStatusLine(18, '/Users/me/work/billing', 33)
+      await waitFor(`[...document.querySelectorAll('.lim__top b')].map((b) => b.textContent).join(' ') === '18% 33%'`, "Work's limits")
+      await openProfile('Default')
+      await settle(theme, 'today')
+      await take(theme, 'profiles', win, async (c) => {
+        await c.hold(900)
+        await c.clickEl(`document.querySelector('.titlebar__profile')`, 'folder')
+        await waitFor(`document.querySelector('.profile-row__dot') && [...document.querySelectorAll('.profile-row__end')].map((e) => e.textContent).join(' ').includes('42%') && [...document.querySelectorAll('.profile-row__end')].map((e) => e.textContent).join(' ').includes('33%')`, 'both profiles, with their limits and the waiting dot')
+        c.cue('menu')
+        await c.hold(2000)
+        await c.still('profiles')
+        await c.clickEl(`[...document.querySelectorAll('.profile-row')].find((r) => r.textContent.includes('Work'))`, 'Work')
+        await waitFor(`document.querySelector('.titlebar__profile-name')?.textContent === 'Work' && document.querySelector('.today') && document.querySelectorAll('.lim__top b').length === 2`, 'Work open on Today')
+        c.cue('work')
+        await c.hold(2800)
+      })
+      emit('menubar:opened', null)
+      await settle(theme, 'popover', pop)
+      await take(theme, 'profiles-pop', pop, async (c) => {
+        await c.hold(600)
+        await waitFor(`document.querySelector('.cc__row--waiting')?.textContent.includes('Default') && document.querySelector('.pop__other')`, 'the popover with both profiles', pop)
+        c.cue('both')
+        strings.trayWork = glanceForShots()?.title
+        await c.hold(3000)
+      })
+      // Work disconnected and removed, off camera, leaving its settings.json as it was
+      await click('Disconnect')
+      await waitFor(`document.querySelector('dialog[open] .diff')`, 'the Disconnect dialog')
+      await click('Disconnect', `document.querySelector('dialog[open]')`)
+      await waitFor(`!document.querySelector('dialog[open]') && [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Connect to Claude Code')`, 'Work disconnected')
+      await closeToasts()
+      await fsp.writeFile(workFile, workBefore)
+      await openProfile('Default')
+      await js(`document.querySelector('.titlebar__profile').click()`)
+      await waitFor(`document.querySelectorAll('.profile-row').length === 2`, 'the profile menu')
+      await js(`[...document.querySelectorAll('.profile-row')].find((r) => r.textContent.includes('Work'))?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))`)
+      await click('Remove from Claudock', `document.querySelector('.profile-menu')`)
+      await waitFor(`!document.querySelector('.titlebar__profile-name')`, 'Work removed')
+      await js(`document.querySelector('.titlebar__profile').click()`)
+      await closeToasts()
+
+      // 6. skills: one skill off, settings.json's skillOverrides, then on again
       await go('skills', theme)
       const row = `[...document.querySelectorAll('.list-row button')].find((b) => b.textContent.includes('release-notes'))`
       await jsOn(win, `(${row}).click()`)
@@ -349,11 +482,35 @@ export async function runRecord(win: BrowserWindow, opts: { dir: string; only: s
       })
       await closeToasts()
 
-      // 6. settings: the form, for the screenshot
+      // 7. context: the skills ranked, one off and the total drops, on again
+      const beforeContext = await fsp.readFile(settingsFile)
+      await go('context', theme)
+      await still(theme, 'context')
+      const total = `document.querySelector('.ctx__total b')?.textContent`
+      const contextSwitch = `document.querySelector('[role=switch][aria-label="release-notes in context"]')`
+      const totalOn = await js<string>(total)
+      await take(theme, 'context', win, async (c) => {
+        await c.hold(1000)
+        await c.clickEl(`[...document.querySelectorAll('.chip--button')].find((b) => b.textContent.startsWith('Skills'))`, 'Skills')
+        await c.hold(1500)
+        c.cue('total', await c.box(`document.querySelector('.ctx__total')`, 'the total'))
+        await c.clickEl(contextSwitch, 'Turn off')
+        await waitFor(`${contextSwitch}?.getAttribute('aria-checked') === 'false' && !${contextSwitch}.disabled && ${total} !== ${JSON.stringify(totalOn)}`, 'release-notes off and the total down')
+        c.cue('off')
+        await c.hold(2600)
+        await c.clickEl(contextSwitch, 'Turn on')
+        await waitFor(`${contextSwitch}?.getAttribute('aria-checked') === 'true' && !${contextSwitch}.disabled && ${total} === ${JSON.stringify(totalOn)}`, 'release-notes on and the total back')
+        c.cue('on')
+        await c.hold(1500)
+      })
+      await closeToasts()
+      if (!beforeContext.equals(await fsp.readFile(settingsFile))) throw new Error('record: the Context take did not leave settings.json byte for byte')
+
+      // 8. settings: the form, for the screenshot
       await go('settings', theme)
       await still(theme, 'settings')
 
-      // 7. restore: settings.json breaks (a bad hand edit), yesterday's snapshot puts it back
+      // 9. restore: settings.json breaks (a bad hand edit), yesterday's snapshot puts it back
       const good = await fsp.readFile(settingsFile)
       const yesterday = new Date(Date.now() - 86_400_000)
       yesterday.setHours(18, 42, 7, 0)
@@ -387,18 +544,88 @@ export async function runRecord(win: BrowserWindow, opts: { dir: string; only: s
       await closeToasts()
       await fsp.rm(path.join(snapshotsDir(), id), { recursive: true, force: true })
 
+      // 10. sessions: a session Claude Code deleted, found by a word of its first prompt, its resume command copied
+      const oldSession = await seedDeletedSession()
+      await go('archive', theme)
+      const hit = `[...document.querySelectorAll('.list-row')].find((r) => r.querySelector('.ses-snippet') && r.querySelector('.list-row__title')?.textContent === ${JSON.stringify(OLD_PROMPT)})`
+      await take(theme, 'sessions', win, async (c) => {
+        await c.hold(900)
+        c.cue('search', await c.box(`document.querySelector('.ldl__list .search-field__input')`, 'the search field'))
+        for (const n of [1, 2, 3, 4, 5, 6, 7]) {
+          await js(`(() => {
+            const input = document.querySelector('.ldl__list .search-field__input')
+            Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, ${JSON.stringify('invoice'.slice(0, n))})
+            input.dispatchEvent(new Event('input', { bubbles: true }))
+          })()`)
+          await c.hold(90)
+        }
+        await waitFor(`document.querySelectorAll('.ses-snippet').length === 1 && ${hit}`, 'the one search hit')
+        c.cue('hit')
+        await c.hold(1100)
+        await c.clickEl(`${hit}.querySelector('button')`, 'hit')
+        await waitFor(`document.querySelector('.detail-pane__title')?.textContent === ${JSON.stringify(OLD_PROMPT)} && document.querySelector('.tx__focus')`, 'the hit opened at its line')
+        c.cue('open')
+        await c.hold(2400)
+        await c.still('sessions')
+        await c.clickButton('Copy resume command', `document.querySelector('.detail-pane')`)
+        await waitFor(`document.querySelector('.ses-cmd')?.textContent.includes('--resume ${OLD_ID}')`, 'the resume command')
+        c.cue('resume', await c.box(`document.querySelector('.ses-cmd')`, 'the resume command'))
+        await c.hold(2600)
+      })
+      await closeToasts()
+      // put back and dated now, it would be the next theme's newest session
+      await fsp.rm(oldSession)
+
+      // 11. share: the week's card beside a plan (set off camera), a week back, the cursor on Post on X, which isn't clicked
+      await go('today', theme)
+      const shareOpen = `[...document.querySelectorAll('.today__actions button')].find((b) => b.textContent.trim() === 'Share' && !b.disabled)`
+      const cardReady = `document.querySelector('.share__canvas[data-ready="true"]')`
+      await js(`${shareOpen}.click()`)
+      await waitFor(cardReady, 'the week card')
+      await js(`(() => {
+        const s = document.querySelector('.share select')
+        Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, 'max20')
+        s.dispatchEvent(new Event('change', { bubbles: true }))
+      })()`)
+      await sleep(400)
+      await js(`document.querySelector('.share [aria-label="Close"]').click()`)
+      await waitFor(`!document.querySelector('dialog[open]')`, 'Share closed')
+      await settle(theme, 'today')
+      await take(theme, 'share', win, async (c) => {
+        await c.hold(900)
+        await c.clickEl(shareOpen, 'Share')
+        await waitFor(cardReady, 'the week card')
+        c.cue('week')
+        await c.hold(2600)
+        await c.still('share')
+        const range = await js<string>(`document.querySelector('.share__range').textContent`)
+        await c.clickEl(`document.querySelector('.share [aria-label="Previous week"]')`, 'back')
+        await waitFor(`document.querySelector('.share__range').textContent !== ${JSON.stringify(range)} && ${cardReady}`, 'the week before')
+        c.cue('before')
+        await c.hold(2200)
+        c.cue('post', await c.box(`[...document.querySelectorAll('.share button')].find((b) => b.textContent.trim() === 'Post on X')`, 'Post on X'))
+        await c.hold(1600)
+      })
+      await js(`document.querySelector('.share [aria-label="Close"]').click()`)
+      await waitFor(`!document.querySelector('dialog[open]')`, 'Share closed')
+
       await disconnect(pristine)
     }
   } catch (e) {
     fail(e)
+    // what the window showed when the take failed
+    await fsp.writeFile(path.join(opts.dir, 'failed.png'), (await win.webContents.capturePage()).toPNG()).catch(() => undefined)
   }
 
+  await clipboard.writeText(clipboardBefore)
   await fsp.writeFile(path.join(opts.dir, 'strings.json'), JSON.stringify(strings, null, 2) + '\n')
   console.log(errors.length ? `RECORD_DONE with ${errors.length} error(s)` : 'RECORD_DONE ok')
   app.exit(errors.length ? 1 : 0)
 }
 
 type TakeCtx = {
+  /** The box of the element `el` (a JS expression) evaluates to, waiting for it. */
+  box: (el: string, label: string) => Promise<Box>
   /** Wait this long in the take's (slowed) time. */
   hold: (ms: number) => Promise<void>
   /** Name this moment, for the film's timing, with the box it is about if any. */

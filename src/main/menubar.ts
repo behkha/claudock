@@ -270,6 +270,8 @@ export async function popoverForShots(): Promise<BrowserWindow> {
 
 /** What the menu bar item shows now (its title and icon), for recording mode, where no item is added. */
 export const glanceForShots = (): Glance | null => last
+/** A recording plays the same weekly window in each theme: forget what each window has alerted. */
+export const resetLimitAlertsForShots = (): void => rules.clear()
 
 export { openedAtLogin }
 

@@ -112,8 +112,12 @@ export function driver(win: BrowserWindow) {
     if (!command) throw new Error('limits: no statusLine command after turning on')
     const input = statusInput(fiveHour, dir, week)
     const out = await run(command, input, 'limits: status line')
-    const own = await run(`bash ${JSON.stringify(path.join(configDir(), 'statusline.sh'))}`, input, "limits: the fixture's status line")
-    if (out !== own) throw new Error(`limits: status line printed ${JSON.stringify(out)}, not the fixture's own ${JSON.stringify(own)}`)
+    // the second profile has no status line of its own, so there's nothing to compare
+    const script = path.join(configDir(), 'statusline.sh')
+    if (await fsp.access(script).then(() => true, () => false)) {
+      const own = await run(`bash ${JSON.stringify(script)}`, input, "limits: the fixture's status line")
+      if (out !== own) throw new Error(`limits: status line printed ${JSON.stringify(out)}, not the fixture's own ${JSON.stringify(own)}`)
+    }
     return out.trim()
   }
 

@@ -36,6 +36,12 @@ const fixture = path.join(root, '.fixture', 'claude')
 const tmp = path.join(root, '.shots', `.tmp-${process.pid}`)
 const buildDir = path.join(tmp, 'build')
 
+// a recording happens at about 2 PM, whenever it runs, so Today has a full day behind it and the film's clock reads well
+if (record) {
+  const east = 14 - new Date().getUTCHours()
+  process.env.TZ = `UTC${east > 0 ? '-' : '+'}${Math.abs(east)}`
+}
+
 // a recording needs today's sessions to be from today: always a fresh fixture
 if (!real && (record || !fs.existsSync(fixture))) {
   console.log(record ? 'making a fresh fixture' : 'fixture missing, creating it')
@@ -60,7 +66,8 @@ if (shared) {
   fs.mkdirSync(shared, { recursive: true })
   fs.writeFileSync(path.join(shared, '.claudock-record'), '')
 }
-const userData = shared ?? path.join(tmp, 'userData')
+// Beside the temp HOME, never around it: Add profile refuses a folder inside Claudock's own data.
+const userData = path.join(shared ?? tmp, 'userData')
 
 // Fixture shots: a copy of the fixture as HOME/.claude, so the app shows "~/.claude" (USERPROFILE is home on Windows).
 // A copy, not a link, so the plugin records below can point at it without touching the fixture. File times and the
