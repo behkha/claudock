@@ -113,7 +113,7 @@
 
 <div class="tbl stack">
   <table>
-    <caption>As of 28 October 2026</caption>
+    <caption>As of 7 November 2026</caption>
     <thead><tr><th scope="col"><span class="visually-hidden">Topic</span></th><th scope="col">Claudock</th><th scope="col">CC Switch</th></tr></thead>
     <tbody>
       <tr><th scope="row">Built for</th><td data-col="Claudock"><span>Every part of <code>~/.claude</code></span></td><td data-col="CC Switch"><span>Providers and shared config across 12 CLIs</span></td></tr>
@@ -124,24 +124,24 @@
       <tr><th scope="row">Settings (<code>settings.json</code>)</th><td data-col="Claudock"><span>Form or raw JSON, schema suggestions, history</span></td><td data-col="CC Switch"><span>Changes the provider keys when you switch</span></td></tr>
       <tr><th scope="row">Hooks</th><td data-col="Claudock"><span>Add, edit, remove, grouped by event</span></td><td data-col="CC Switch"><span>Left as they are</span></td></tr>
       <tr><th scope="row">Permissions</th><td data-col="Claudock"><span>Allow, ask and deny rules, default mode</span></td><td data-col="CC Switch"><span>Left as they are</span></td></tr>
-      <tr><th scope="row">Agents and slash commands</th><td data-col="Claudock"><span>Create, edit, duplicate, Trash</span></td><td data-col="CC Switch"><span><span class="ns">Not in their README</span></span></td></tr>
+      <tr><th scope="row">Agents and slash commands</th><td data-col="Claudock"><span>Create, edit, Trash; duplicate agents</span></td><td data-col="CC Switch"><span><span class="ns">Not in their README</span></span></td></tr>
       <tr><th scope="row">Plugins</th><td data-col="Claudock"><span>Turn on or off</span></td><td data-col="CC Switch"><span><span class="ns">Not in their README</span></span></td></tr>
       <tr><th scope="row">Skills</th><td data-col="Claudock"><span>Turn on or off, edit, duplicate, Trash</span></td><td data-col="CC Switch"><span>Install from skills.sh, GitHub or a ZIP; update checks; sync across tools</span></td></tr>
       <tr><th scope="row">MCP servers</th><td data-col="Claudock"><span>Add, edit, remove; writes only the changed key</span></td><td data-col="CC Switch"><span>One panel for all tools, import, deep links</span></td></tr>
-      <tr><th scope="row">Context cost of skills and MCP servers</th><td data-col="Claudock"><span>≈ tokens each adds to every session, with a switch per row</span></td><td data-col="CC Switch"><span><span class="ns">Not in their README</span></span></td></tr>
+      <tr><th scope="row">Context cost of skills and MCP servers</th><td data-col="Claudock"><span>≈ tokens each adds to every session, with a switch on skills and user MCP servers</span></td><td data-col="CC Switch"><span><span class="ns">Not in their README</span></span></td></tr>
       <tr><th scope="row">CLAUDE.md</th><td data-col="Claudock"><span>Edit <code>CLAUDE.md</code> and <code>rules/</code></span></td><td data-col="CC Switch"><span>Prompt library that writes <code>CLAUDE.md</code></span></td></tr>
       <tr><th scope="row">Memory, plans, prompt history</th><td data-col="Claudock"><span>A screen each</span></td><td data-col="CC Switch"><span><span class="ns">Not in their README</span></span></td></tr>
-      <tr><th scope="row">Sessions</th><td data-col="Claudock"><span>Running and waiting sessions live; search, read, export to Markdown, copy a resume command, Trash</span></td><td data-col="CC Switch"><span>List, search, read, export to Markdown, resume</span></td></tr>
+      <tr><th scope="row">Sessions</th><td data-col="Claudock"><span>Running and waiting sessions live (macOS, Linux); search, read, export to Markdown, copy a resume command, Trash</span></td><td data-col="CC Switch"><span>List, search, read, export to Markdown, resume</span></td></tr>
       <tr><th scope="row">Sessions after Claude Code's 30-day cleanup</th><td data-col="Claudock"><span>Kept in an archive, on by default</span></td><td data-col="CC Switch"><span><span class="ns">Not in their README</span></span></td></tr>
       <tr><th scope="row">Alert when a session waits for you</th><td data-col="Claudock"><span>Yes (macOS, Linux)</span></td><td data-col="CC Switch"><span><span class="ns">Not in their README</span></span></td></tr>
-      <tr><th scope="row">5-hour and weekly limits</th><td data-col="Claudock"><span>As Claude Code reports them, in the menu bar; token counts otherwise</span></td><td data-col="CC Switch"><span>Subscription quota with a reset countdown, in the tray</span></td></tr>
+      <tr><th scope="row">5-hour and weekly limits</th><td data-col="Claudock"><span>As Claude Code reports them, in the menu bar (macOS, Linux); token counts otherwise</span></td><td data-col="CC Switch"><span>Subscription quota with a reset countdown, in the tray</span></td></tr>
       <tr><th scope="row">Cost</th><td data-col="Claudock"><span>Each week's value at API prices, estimated, beside your plan</span></td><td data-col="CC Switch"><span>Tokens, cache hit rate, spend, heat map</span></td></tr>
       <tr><th scope="row">Disk use of <code>~/.claude</code></th><td data-col="Claudock"><span>Per folder, with cleanup suggestions</span></td><td data-col="CC Switch"><span><span class="ns">Not in their README</span></span></td></tr>
       <tr><th scope="row">Backups</th><td data-col="Claudock"><span>Snapshot before every write; diff and restore</span></td><td data-col="CC Switch"><span>Backup on the first rewrite of each file; full backup every 24 hours; WebDAV or S3 sync</span></td></tr>
       <tr><th scope="row">Menu bar or tray</th><td data-col="Claudock"><span>Yes</span></td><td data-col="CC Switch"><span>Yes</span></td></tr>
       <tr><th scope="row">Install</th><td data-col="Claudock"><span><code>npx claudock</code>, a one-line script, or an installer (not signed)</span></td><td data-col="CC Switch"><span>Homebrew, <code>.dmg</code> (signed and notarized), <code>.msi</code>, <code>.deb</code>, <code>.rpm</code>, AppImage, AUR</span></td></tr>
       <tr><th scope="row">Updates</th><td data-col="Claudock"><span>Tells you when a new version is out</span></td><td data-col="CC Switch"><span>Updates itself</span></td></tr>
-      <tr><th scope="row">Latest release</th><td data-col="Claudock"><span>v0.2.0</span></td><td data-col="CC Switch"><span>v4.0.21, 26 Oct 2026</span></td></tr>
+      <tr><th scope="row">Latest release</th><td data-col="Claudock"><span>v0.2.0</span></td><td data-col="CC Switch"><span>v4.0.26, 5 Nov 2026</span></td></tr>
       <tr><th scope="row">License</th><td data-col="Claudock"><span>MIT</span></td><td data-col="CC Switch"><span>MIT</span></td></tr>
       <tr><th scope="row">Stack</th><td data-col="Claudock"><span>Electron</span></td><td data-col="CC Switch"><span>Tauri</span></td></tr>
       <tr><th scope="row">Price</th><td data-col="Claudock"><span>Free</span></td><td data-col="CC Switch"><span>Free</span></td></tr>
@@ -160,7 +160,7 @@
 <h2>Skills and MCP servers</h2>
 <p>CC Switch finds and installs skills from skills.sh, GitHub or a ZIP, checks them for updates and syncs them to several tools. Its MCP panel shares servers across tools and imports the ones you have.</p>
 <p>Claudock doesn't install skills. It shows the ones you have, turns each on or off through Claude Code's <code>skillOverrides</code> setting, and lets you edit, duplicate or Trash them. For MCP it edits the servers in <code>~/.claude.json</code>. Claude Code rewrites that file while it runs, so Claudock re-reads it just before writing and changes only the server you edited.</p>
-<p>Claudock's Context screen shows roughly how many tokens each skill and MCP server adds to every session, from what Claude Code recorded at the start of your latest one, with a switch on each row. A skill switched off drops out of Claude's list but still runs when you type its <code>/name</code>. CC Switch's README doesn't mention context cost.</p>
+<p>Claudock's Context screen shows roughly how many tokens each skill and MCP server adds to every session, from what Claude Code recorded at the start of your latest one, with a switch on each skill and user MCP server. A skill switched off drops out of Claude's list but still runs when you type its <code>/name</code>. CC Switch's README doesn't mention context cost.</p>
 
 <h2>Limits and usage</h2>
 <p>Both put your limits in the menu bar or tray. CC Switch shows how much subscription quota is left, with a reset countdown. Claudock shows the 5-hour and weekly percentages exactly as Claude Code reports them, after one Connect step, and never estimates one. Without it, or on Windows, it shows the tokens used in each window, counted from your transcripts.</p>
@@ -169,7 +169,7 @@
 <h2>Sessions</h2>
 <p>Both search past sessions, show them for reading, export them to Markdown and copy a resume command. CC Switch's reading view goes further: each turn folds into a one-line summary, failed steps are marked, and an outline sits beside it.</p>
 <p>Claudock keeps the sessions Claude Code would delete. By default Claude Code removes a transcript 30 days after it was last touched. Claudock archives every transcript, with hard links where the disk allows, so the archive takes almost no extra space and old sessions stay searchable, readable and resumable.</p>
-<p>It also watches the sessions running now. Once connected, it shows which ones are working, done, or waiting for you, and sends one alert when a session starts waiting for a permission or an answer.</p>
+<p>On macOS and Linux it also watches the sessions running now. Once connected, it shows which ones are working, done, or waiting for you, and sends one alert when a session starts waiting for a permission or an answer.</p>
 
 <h2>Safety and undo</h2>
 <p>CC Switch backs up each config file the first time it rewrites it, makes a full backup every 24 hours, and can sync to WebDAV or S3.</p>
@@ -191,7 +191,7 @@
 <ul>
   <li>You use Claude Code only and have customised it: hooks, permission rules, agents, commands, plugins.</li>
   <li>You want to read and edit <code>settings.json</code> as a form, with undo for every change.</li>
-  <li>You run several sessions and want to know when one is waiting for you.</li>
+  <li>You run several sessions on macOS or Linux and want to know when one is waiting for you.</li>
   <li>Your <code>~/.claude</code> has grown and you want to see what's taking the space.</li>
   <li>You keep separate Claude Code setups, such as work and personal.</li>
   <li>You want sessions kept after Claude Code's cleanup deletes them.</li>
@@ -202,7 +202,7 @@
 
 <h2>Switching from CC Switch</h2>
 <p>There's nothing to move. Claudock reads <code>~/.claude</code> and <code>~/.claude.json</code> directly, so whatever CC Switch has written there shows up in Claudock. CC Switch's own data, such as its provider list, prompt library and backups, stays in CC Switch's folder.</p>
-<p>To look before you trust it with your real folder, clone the repo and run <code>npm run dev</code>. It opens on a generated fake config. <code>npm run dev:real</code> opens your real <code>~/.claude</code> with every write turned off.</p>
+<p>To look before you trust it with your real folder, run <code>npx claudock --demo</code>. It opens on a generated fake config. From a clone of the repo, <code>npm run dev:real</code> opens your real <code>~/.claude</code> with every write turned off.</p>
 
 <h2>FAQ</h2>
 <h3>Does Claudock switch API providers?</h3>
@@ -229,7 +229,7 @@
 </div>
 
 
-<p class="fine">Facts about CC Switch come from <a href="https://github.com/farion1231/cc-switch">github.com/farion1231/cc-switch</a> (README, releases, SECURITY.md and the code that writes <code>settings.json</code>), checked 28 October 2026. If something here is wrong or out of date, <a href="https://github.com/behkha/claudock/issues">open an issue</a> and it will be fixed.</p>
+<p class="fine">Facts about CC Switch come from <a href="https://github.com/farion1231/cc-switch">github.com/farion1231/cc-switch</a> (README, releases, SECURITY.md and the code that writes <code>settings.json</code>), checked 7 November 2026. If something here is wrong or out of date, <a href="https://github.com/behkha/claudock/issues">open an issue</a> and it will be fixed.</p>
 </main>
 
 <footer class="foot">

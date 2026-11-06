@@ -40,7 +40,7 @@
       "name": "Which GUI shows my Claude Code 5-hour limit?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "CC Switch shows subscription quota with a reset countdown in its tray. Claudock shows the 5-hour and weekly percentages Claude Code reports, in the menu bar. Claude Code Usage Monitor shows them in the terminal."
+        "text": "CC Switch shows subscription quota with a reset countdown in its tray. Claudock shows the 5-hour and weekly percentages Claude Code reports, in the menu bar on macOS and Linux. Claude Code Usage Monitor shows them in the terminal."
       }
     },
     {
@@ -109,7 +109,7 @@
     <thead><tr><th scope="col">You want</th><th scope="col">Use</th></tr></thead>
     <tbody>
       <tr><th scope="row">Tokens, cost and quota in a desktop app and tray</th><td data-col="Use"><span>CC Switch</span></td></tr>
-      <tr><th scope="row">Your 5-hour and weekly limits as Claude Code reports them, in the menu bar</th><td data-col="Use"><span>Claudock</span></td></tr>
+      <tr><th scope="row">Your 5-hour and weekly limits as Claude Code reports them, in the menu bar</th><td data-col="Use"><span>Claudock (macOS, Linux)</span></td></tr>
       <tr><th scope="row">The same official limits, live, in a terminal</th><td data-col="Use"><span>Claude Code Usage Monitor</span></td></tr>
       <tr><th scope="row">A cost dashboard inside a session GUI</th><td data-col="Use"><span>opcode, though its last release was August 2025</span></td></tr>
       <tr><th scope="row">Exact cost reports and scripting</th><td data-col="Use"><span>Keep ccusage</span></td></tr>
@@ -119,19 +119,19 @@
 
 <div class="tbl stack wide">
   <table>
-    <caption>As of 28 October 2026</caption>
+    <caption>As of 7 November 2026</caption>
     <thead><tr><th scope="col"><span class="visually-hidden">Topic</span></th><th scope="col">ccusage</th><th scope="col">CC Switch</th><th scope="col">Claudock</th><th scope="col">Usage Monitor</th><th scope="col">opcode</th></tr></thead>
     <tbody>
       <tr><th scope="row">Interface</th><td data-col="ccusage"><span>CLI, status line</span></td><td data-col="CC Switch"><span>Desktop app, tray</span></td><td data-col="Claudock"><span>Desktop app, menu bar</span></td><td data-col="Usage Monitor"><span>Terminal UI, status line</span></td><td data-col="opcode"><span>Desktop app</span></td></tr>
       <tr><th scope="row">Tokens</th><td data-col="ccusage"><span>By day, month, session, 5-hour block</span></td><td data-col="CC Switch"><span>Yes, with cache hit rate</span></td><td data-col="Claudock"><span>Per 5-hour and weekly window</span></td><td data-col="Usage Monitor"><span>Yes</span></td><td data-col="opcode"><span>By model, project, date</span></td></tr>
       <tr><th scope="row">Cost</th><td data-col="ccusage"><span>Yes, per model</span></td><td data-col="CC Switch"><span>Yes</span></td><td data-col="Claudock"><span>A weekly estimate at API prices</span></td><td data-col="Usage Monitor"><span>Yes</span></td><td data-col="opcode"><span>Yes</span></td></tr>
-      <tr><th scope="row">Official 5-hour %</th><td data-col="ccusage"><span><span class="ns">Not in their docs</span></span></td><td data-col="CC Switch"><span>Yes, with reset countdown</span></td><td data-col="Claudock"><span>Yes, with reset time</span></td><td data-col="Usage Monitor"><span>Yes, via its status line step</span></td><td data-col="opcode"><span><span class="ns">Not in their README</span></span></td></tr>
-      <tr><th scope="row">Official weekly %</th><td data-col="ccusage"><span><span class="ns">Not in their docs</span></span></td><td data-col="CC Switch"><span><span class="ns">Not in their README</span></span></td><td data-col="Claudock"><span>Yes, with reset time</span></td><td data-col="Usage Monitor"><span>Yes, via its status line step</span></td><td data-col="opcode"><span><span class="ns">Not in their README</span></span></td></tr>
+      <tr><th scope="row">Official 5-hour %</th><td data-col="ccusage"><span><span class="ns">Not in their docs</span></span></td><td data-col="CC Switch"><span>Yes, with reset countdown</span></td><td data-col="Claudock"><span>Yes, with reset time (macOS, Linux)</span></td><td data-col="Usage Monitor"><span>Yes, via its status line step</span></td><td data-col="opcode"><span><span class="ns">Not in their README</span></span></td></tr>
+      <tr><th scope="row">Official weekly %</th><td data-col="ccusage"><span><span class="ns">Not in their docs</span></span></td><td data-col="CC Switch"><span><span class="ns">Not in their README</span></span></td><td data-col="Claudock"><span>Yes, with reset time (macOS, Linux)</span></td><td data-col="Usage Monitor"><span>Yes, via its status line step</span></td><td data-col="opcode"><span><span class="ns">Not in their README</span></span></td></tr>
       <tr><th scope="row">Activity heat map</th><td data-col="ccusage"><span><span class="ns">Not in their docs</span></span></td><td data-col="CC Switch"><span>Yes</span></td><td data-col="Claudock"><span>Yes, 26 weeks</span></td><td data-col="Usage Monitor"><span><span class="ns">Not in their README</span></span></td><td data-col="opcode"><span><span class="ns">Not in their README</span></span></td></tr>
       <tr><th scope="row">Export</th><td data-col="ccusage"><span>JSON</span></td><td data-col="CC Switch"><span><span class="ns">Not in their README</span></span></td><td data-col="Claudock"><span>Stats as an image</span></td><td data-col="Usage Monitor"><span>JSON, CSV</span></td><td data-col="opcode"><span>Yes</span></td></tr>
       <tr><th scope="row">Other CLIs</th><td data-col="ccusage"><span>17 more</span></td><td data-col="CC Switch"><span>11 more</span></td><td data-col="Claudock"><span>No</span></td><td data-col="Usage Monitor"><span>No</span></td><td data-col="opcode"><span>No</span></td></tr>
       <tr><th scope="row">Also edits Claude Code config</th><td data-col="ccusage"><span>No</span></td><td data-col="CC Switch"><span>Providers, MCP, skills, prompts</span></td><td data-col="Claudock"><span>All of <code>~/.claude</code></span></td><td data-col="Usage Monitor"><span>No</span></td><td data-col="opcode"><span>MCP, CLAUDE.md</span></td></tr>
-      <tr><th scope="row">Latest release</th><td data-col="ccusage"><span>26 Oct 2026</span></td><td data-col="CC Switch"><span>26 Oct 2026</span></td><td data-col="Claudock"><span>v0.2.0</span></td><td data-col="Usage Monitor"><span>27 Jun 2026</span></td><td data-col="opcode"><span>31 Aug 2025</span></td></tr>
+      <tr><th scope="row">Latest release</th><td data-col="ccusage"><span>2 Nov 2026</span></td><td data-col="CC Switch"><span>5 Nov 2026</span></td><td data-col="Claudock"><span>v0.2.0</span></td><td data-col="Usage Monitor"><span>27 Jun 2026</span></td><td data-col="opcode"><span>31 Aug 2025</span></td></tr>
       <tr><th scope="row">License</th><td data-col="ccusage"><span>MIT</span></td><td data-col="CC Switch"><span>MIT</span></td><td data-col="Claudock"><span>MIT</span></td><td data-col="Usage Monitor"><span>MIT</span></td><td data-col="opcode"><span>AGPL-3.0</span></td></tr>
     </tbody>
   </table>
@@ -143,7 +143,7 @@
 
 <h2>Claudock</h2>
 <p>A desktop app for Claude Code's <code>~/.claude</code> folder, with your limits in the menu bar. After one Connect step, it shows the 5-hour and weekly percentages exactly as Claude Code reports them, with their reset times, and never estimates one. Until a terminal session reports them, or on Windows, it shows the tokens used in each window, counted from your transcripts. Its Share card puts one cost estimate on each week: what it would have cost at Anthropic's API prices, beside the plan you pick.</p>
-<p>It also shows which sessions are running or waiting for you, alerts you when one starts waiting, and has a screen for every part of your setup: settings, hooks, permissions, skills, agents, commands, plugins and MCP servers.</p>
+<p>On macOS and Linux it also shows which sessions are running or waiting for you and alerts you when one starts waiting. It has a screen for every part of your setup: settings, hooks, permissions, skills, agents, commands, plugins and MCP servers.</p>
 <p><strong>Good fit if</strong> you want your real limits at a glance and your setup in one window. Keep ccusage alongside it for cost reports.</p>
 
 <h2>Claude Code Usage Monitor</h2>
@@ -161,7 +161,7 @@
 <h3>Does ccusage have a GUI?</h3>
 <p>Not from the project. It's a CLI with a status line mode. Its docs list menu bar apps and dashboards made by other people.</p>
 <h3>Which GUI shows my Claude Code 5-hour limit?</h3>
-<p>CC Switch shows subscription quota with a reset countdown in its tray. Claudock shows the 5-hour and weekly percentages Claude Code reports, in the menu bar. Claude Code Usage Monitor shows them in the terminal.</p>
+<p>CC Switch shows subscription quota with a reset countdown in its tray. Claudock shows the 5-hour and weekly percentages Claude Code reports, in the menu bar on macOS and Linux. Claude Code Usage Monitor shows them in the terminal.</p>
 <h3>Are these numbers exact?</h3>
 <p>Cost is estimated from local logs in every tool here. Limit percentages are exact only when they come from Claude Code itself, through its status line.</p>
 
@@ -180,7 +180,7 @@
 </div>
 
 
-<p class="fine">Facts come from each project's GitHub repo and docs, checked 28 October 2026. Claudock is one of the tools compared here; the others are described as their own READMEs and docs describe them. If something here is wrong or out of date, <a href="https://github.com/behkha/claudock/issues">open an issue</a> and it will be fixed.</p>
+<p class="fine">Facts come from each project's GitHub repo and docs, checked 7 November 2026. Claudock is one of the tools compared here; the others are described as their own READMEs and docs describe them. If something here is wrong or out of date, <a href="https://github.com/behkha/claudock/issues">open an issue</a> and it will be fixed.</p>
 </main>
 
 <footer class="foot">
