@@ -1,0 +1,23 @@
+title: "[Setup] "
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What's in your setup
+      description: Skills, hooks, MCP servers, status line, rules. Leave out API keys, tokens, private paths and company names from your CLAUDE.md.
+      placeholder: |
+        Skills: …
+        Hooks: …
+        Status line: …
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: The one part worth copying, and why
+    validations:
+      required: true
+  - type: input
+    id: link
+    attributes:
+      label: Repo, gist or dotfiles link
