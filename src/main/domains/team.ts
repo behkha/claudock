@@ -19,6 +19,7 @@ import {
   type TeamItem,
   type TeamItemState,
   type TeamKind,
+  type TeamProject,
   type TeamRemote,
   type TeamSetup,
   type TeamState,
@@ -39,11 +40,14 @@ import {
   hookScriptToken,
   isChange,
   isObj,
+  isPointed,
   isOpen,
   joinCommands,
   maskSecrets,
   planToken,
   pluginDir,
+  pointerText,
+  unpointerText,
   repoHook,
   sendCommand,
   sha256,
@@ -60,10 +64,11 @@ import {
   type Source
 } from '../team/model'
 import { existingNames, gitDirOf, readRemote, readRepo, readRepoFile } from '../team/repo'
-import { devAllowed, writeFiles, type WriteGuard } from '../team/write'
+import { devAllowed, readText, writeFiles, writeOne, type WriteGuard } from '../team/write'
 import { listContext } from './context'
 import { collectMd, readSettings, toPosix } from './extendShared'
 import { ourHookCommands } from './sessions'
+import { listProjectSummaries } from './projects'
 import { scanUser } from './skills'
 
 /**
@@ -95,6 +100,8 @@ interface Store {
   sentAt?: number
   /** The send line of the last write, for Copy. */
   send?: string
+  /** Connected projects whose settings.json Claudock made: Disconnect takes it away again when nothing else is in it. */
+  created?: string[]
 }
 
 const storeDir = (): string => path.join(userDataDir(), installKind() === 'dev' ? 'team.dev' : 'team')
@@ -115,7 +122,8 @@ function parseStore(v: unknown): Store | null {
     fixes,
     projects: strings(v.projects),
     ...(typeof v.sentAt === 'number' ? { sentAt: v.sentAt } : {}),
-    ...(typeof v.send === 'string' ? { send: v.send } : {})
+    ...(typeof v.send === 'string' ? { send: v.send } : {}),
+    created: strings(v.created)
   }
 }
 
@@ -314,6 +322,7 @@ interface Built {
   stays: StaysRow[]
   context: ContextItem[]
   home: string
+  projects: TeamProject[]
 }
 
 const KIND_ORDER: TeamKind[] = ['mcp', 'skill', 'agent', 'command', 'hook']
@@ -452,7 +461,8 @@ async function build(opts: { context: boolean }): Promise<Built> {
   if (has(settings.model) || has(settings.effortLevel)) stays.push({ name: 'Model and effort', reason: "A plugin's settings cannot set them", tokens: null })
   if (has(settings.env)) stays.push({ name: 'Environment variables', reason: "A plugin's settings cannot set them", tokens: null })
 
-  return { store, setup, remote, view, rows, items, findings, outs, plan, states, stays, context, home }
+  const projects = store && opts.context ? await projectsOf(store) : []
+  return { store, setup, remote, view, rows, items, findings, outs, plan, states, stays, context, home, projects }
 }
 
 /** The skills, agents and commands the plugin folder holds, by the names their files give them. */
@@ -512,13 +522,83 @@ function toState(b: Built): TeamState {
     tokens: tickedItems.reduce((n, i) => n + (i.tokens ?? 0), 0),
     changes,
     join: b.store && b.remote ? joinCommands(b.store, b.remote, asks) : null,
-    projects: [],
+    projects: b.projects,
     joined: null,
     writable: b.store ? guard.allowed(b.store.dir) : true
   }
 }
 
 const get = (): Promise<TeamState> => build({ context: true }).then(toState)
+
+/* ------------------------------------------------------------------ connected projects */
+
+const SETTINGS_REL = '.claude/settings.json'
+
+/** The git projects Claude Code knows (its project folders, most recent first), each with whether it points at the team. */
+async function projectsOf(store: Store): Promise<TeamProject[]> {
+  const out: (TeamProject & { at: number })[] = []
+  for (const p of await listProjectSummaries().catch(() => [])) {
+    if (!p.path || p.missing || samePath(p.path, store.dir) || samePath(p.path, os.homedir())) continue
+    if (!(await gitDirOf(p.path))) continue
+    const text = await readText(p.path, SETTINGS_REL).catch(() => null)
+    out.push({ id: p.id, name: p.name, path: p.path, connected: isPointed(text, store), at: p.lastActiveMs })
+  }
+  return out.sort((a, b) => b.at - a.at).map(({ at: _at, ...p }) => p)
+}
+
+/** A project offered in the list: the renderer names it by its id, never by a path. */
+async function projectFor(projectId: string): Promise<{ store: Store; remote: TeamRemote; project: TeamProject }> {
+  if (typeof projectId !== 'string') throw new Error('Unknown project')
+  const store = await mustStore()
+  const remote = await readRemote(store.dir)
+  if (!remote) throw new Error('The team folder has no remote yet: add one with git first')
+  const project = (await projectsOf(store)).find((p) => p.id === projectId)
+  if (!project) throw new Error('That project is not one Claude Code knows as a git repo')
+  return { store, remote, project }
+}
+
+async function connectPlan(projectId: string): Promise<TeamDiff> {
+  const { store, remote, project } = await projectFor(projectId)
+  const before = await readText(project.path, SETTINGS_REL)
+  const next = project.connected ? unpointerText(before, store) : pointerText(before, store, remote)
+  if (next.problem) throw new Error(next.problem)
+  return { before: before ?? '', after: next.text, binary: false }
+}
+
+function connect(projectId: string): Promise<TeamState> {
+  const cfg = configDir()
+  return serial(cfg, async () => {
+    const { store, remote, project } = await projectFor(projectId)
+    const before = await readText(project.path, SETTINGS_REL)
+    const next = pointerText(before, store, remote)
+    if (next.problem) throw new Error(next.problem)
+    await writeOne(project.path, SETTINGS_REL, next.text, guard)
+    store.projects = [...new Set([...store.projects, project.path])]
+    if (before === null) store.created = [...new Set([...(store.created ?? []), project.path])]
+    await saveStore(cfg, store)
+    return get()
+  })
+}
+
+function disconnect(projectId: string): Promise<TeamState> {
+  const cfg = configDir()
+  return serial(cfg, async () => {
+    const { store, project } = await projectFor(projectId)
+    const before = await readText(project.path, SETTINGS_REL)
+    const next = unpointerText(before, store)
+    if (next.problem) throw new Error(next.problem)
+    const made = (store.created ?? []).some((p) => samePath(p, project.path))
+    if (made && next.text === '{}\n') {
+      // the file Connect made, with nothing else in it: back to no file at all
+      if (!guard.allowed(project.path)) throw new Error('Writes to this folder are turned off in development (it has no .claudock-fixture file).')
+      await guard.trash(path.join(project.path, '.claude', 'settings.json'))
+    } else await writeOne(project.path, SETTINGS_REL, next.text, guard)
+    store.projects = store.projects.filter((p) => !samePath(p, project.path))
+    store.created = (store.created ?? []).filter((p) => !samePath(p, project.path))
+    await saveStore(cfg, store)
+    return get()
+  })
+}
 
 /* ------------------------------------------------------------------ the folder */
 
@@ -806,7 +886,6 @@ function takeRepoVersion(id: string): Promise<{ snapshotId: string | null }> {
   })
 }
 
-const notYet = (): Promise<never> => Promise.reject(new Error('Not available yet'))
 
 /** The domain's calls, for screenshot mode's checks (src/main/shot.ts). */
 export const impl: TeamApi = {
@@ -820,9 +899,9 @@ export const impl: TeamApi = {
   itemDiff,
   write,
   takeRepoVersion,
-  connectPlan: notYet,
-  connect: notYet,
-  disconnect: notYet,
+  connectPlan,
+  connect,
+  disconnect,
   copy,
   reveal,
   forget

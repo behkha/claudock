@@ -109,9 +109,10 @@ if (!real) {
   ]
   for (const rel of fs.readdirSync(copy, { recursive: true })) {
     const f = path.join(copy, String(rel))
-    if (!/\.(json|md)$/.test(f) || !fs.statSync(f).isFile()) continue
-    for (const [a, b] of pairs) {
-      const [from, to] = f.endsWith('.json') ? [a, b].map((p) => JSON.stringify(p).slice(1, -1)) : [a, b]
+    if (!/\.(json|jsonl|md)$/.test(f) || !fs.statSync(f).isFile()) continue
+    // transcripts: only the team project's folder, so the other sessions read exactly as before
+    for (const [a, b] of f.endsWith('.jsonl') ? pairs.slice(1) : pairs) {
+      const [from, to] = /\.jsonl?$/.test(f) ? [a, b].map((p) => JSON.stringify(p).slice(1, -1)) : [a, b]
       const text = fs.readFileSync(f, 'utf8')
       if (!text.includes(from)) continue
       const { atime, mtime } = fs.statSync(f)

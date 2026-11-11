@@ -10,7 +10,7 @@ const MARK = '.claudock-fixture'
  * `.claude/settings.json` to connect. Both carry the fixture mark, so a development build may write there. Plain Node,
  * like buildFixture. `base` is the folder holding the fixture (./.fixture, or --demo's data folder).
  */
-export function buildTeamFixture(base: string): { team: string; project: string } {
+export function buildTeamFixture(base: string, configDir = path.join(base, 'claude')): { team: string; project: string } {
   const team = path.join(base, 'team-repo')
   const project = path.join(base, 'acme-web')
   const w = (abs: string, text: string): void => {
@@ -27,5 +27,12 @@ export function buildTeamFixture(base: string): { team: string; project: string 
   git(project, 'git@github.com:acme/web.git')
   w(path.join(project, 'README.md'), '# acme web\n\nThe storefront.\n')
   w(path.join(project, '.claude', 'settings.json'), JSON.stringify({ permissions: { allow: ['Bash(npm test)', 'Bash(npm run lint)'] } }, null, 2) + '\n')
+  // one session in the project, five days ago, so Claude Code knows it (and the Connect sheet lists it)
+  const at = Date.now() - 5 * 86_400_000
+  const sessionId = '7e1a2b3c-0000-4000-8000-00000000ac3e'
+  const line = { parentUuid: null, isSidechain: false, type: 'user', message: { role: 'user', content: 'Add the checkout page' }, uuid: '7e1a2b3c-0000-4000-8000-0000000000u1', timestamp: new Date(at).toISOString(), cwd: project, sessionId, version: '2.1.318', gitBranch: 'main', userType: 'external' }
+  const file = path.join(configDir, 'projects', project.replace(/[^A-Za-z0-9]/g, '-'), `${sessionId}.jsonl`)
+  w(file, JSON.stringify(line) + '\n')
+  fs.utimesSync(file, new Date(at), new Date(at))
   return { team, project }
 }

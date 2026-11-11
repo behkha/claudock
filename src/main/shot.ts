@@ -495,7 +495,7 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
    * Team mode on the fixture's team folder (HOME/team-repo, where Team's folder dialog lands in screenshots): New team
    * setup (`team-new`), Choose with the github server and the fmt.sh hook ticked (`team-choose`), Review with their two
    * blockers (`team-review`), both fixed (`team-review-clear`), Written (`team-written`), and Team with a new and a
-   * changed item (`team-states`), then a teammate's edits in the repo (`team-both`: changed in the repo with its diff open, changed in both, only in the repo, removed) and the repo's release-notes taken back. Fails unless the written tree is what the review showed, no file holds the fixture's
+   * changed item (`team-states`), then a teammate's edits in the repo (`team-both`: changed in the repo with its diff open, changed in both, only in the repo, removed) the repo's release-notes taken back, Connect a project (`team-connect`) and Invite (`team-invite`). Fails unless the written tree is what the review showed, no file holds the fixture's
    * fake tokens, a second write writes nothing, and settings.json and the global state file are byte for byte as
    * before; `claude plugin validate` checks the plugin and the marketplace when `claude` is on the path.
    */
@@ -610,6 +610,30 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
       const mineNow = await fsp.readFile(path.join(configDir(), 'skills', 'release-notes', 'SKILL.md'))
       if (!mineNow.equals(await fsp.readFile(path.join(plugin, 'skills', 'release-notes', 'SKILL.md')))) throw new Error("team: release-notes is not the repo's after taking it")
       await waitFor(`!document.querySelector('.toast')`, 'the toast gone')
+
+      // Connect a project: the fixture's acme-web gains exactly the two keys, and Disconnect puts its file back byte for byte
+      const projectFile = path.join(os.homedir(), 'acme-web', '.claude', 'settings.json')
+      const projectBefore = await fsp.readFile(projectFile)
+      await click('Connect a project')
+      await waitFor(`${dialog}?.querySelector('.diff') && [...${dialog}.querySelectorAll('.add-profile__dir')].some((d) => d.textContent === 'acme-web')`, 'the Connect sheet with its diff')
+      await shoot(theme, 'team-connect')
+      await click('Connect', dialog)
+      await waitFor(`!${dialog} && [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Connected · 1')`, 'one project connected')
+      const pointed = JSON.parse(await fsp.readFile(projectFile, 'utf8')) as Record<string, unknown>
+      const was = JSON.parse(projectBefore.toString('utf8')) as Record<string, unknown>
+      const added = Object.keys(pointed).filter((k) => !(k in was))
+      if (added.sort().join() !== 'enabledPlugins,extraKnownMarketplaces') throw new Error(`team: the project gained ${added.join(', ')}`)
+      if (JSON.stringify(pointed.permissions) !== JSON.stringify(was.permissions)) throw new Error("team: the project's other keys changed")
+      if (JSON.stringify(pointed.extraKnownMarketplaces) !== JSON.stringify({ 'claude-setup': { source: { source: 'github', repo: 'acme/claude-setup' }, autoUpdate: true } })) throw new Error(`team: the pointer is ${JSON.stringify(pointed.extraKnownMarketplaces)}`)
+      if (JSON.stringify(pointed.enabledPlugins) !== JSON.stringify({ 'team@claude-setup': true })) throw new Error(`team: enabledPlugins is ${JSON.stringify(pointed.enabledPlugins)}`)
+      await click('Invite')
+      await waitFor(`${dialog}?.querySelectorAll('.tm-cmd').length >= 2`, 'the Invite sheet')
+      await shoot(theme, 'team-invite')
+      await click('Done', dialog)
+      const project = (await team.get()).projects.find((x) => x.connected)
+      if (!project) throw new Error('team: the connected project is not listed as connected')
+      await team.disconnect(project.id)
+      if (!(await fsp.readFile(projectFile)).equals(projectBefore)) throw new Error("team: the project's settings.json is not byte for byte as before after Disconnect")
 
       if (theme === 'light') {
         // the plugin and the marketplace as Claude Code itself reads them, when it is installed here

@@ -8,6 +8,8 @@ import { cx } from '@/lib/cx'
 import { useNav, type ScreenProps } from '@/lib/nav'
 import { useNotify } from '../_ext/ui'
 import { ChooseView } from './ChooseView'
+import { ConnectSheet } from './ConnectSheet'
+import { InviteSheet } from './InviteSheet'
 import { NewTeamSheet } from './NewTeamSheet'
 import { ReviewSheet } from './ReviewSheet'
 import { WrittenSheet } from './WrittenSheet'
@@ -34,7 +36,7 @@ export default function TeamScreen(_props: ScreenProps): JSX.Element {
   }, [])
   useEffect(reload, [reload])
   const [view, setView] = useState<'team' | 'choose'>('team')
-  const [sheet, setSheet] = useState<'new' | 'review' | null>(null)
+  const [sheet, setSheet] = useState<'new' | 'review' | 'connect' | 'invite' | null>(null)
   const [written, setWritten] = useState<Written | null>(null)
 
   const update = (s: TeamState): void => {
@@ -75,6 +77,16 @@ export default function TeamScreen(_props: ScreenProps): JSX.Element {
         }}
       />
       <WrittenSheet written={written} onClose={() => setWritten(null)} />
+      <ConnectSheet
+        open={sheet === 'connect'}
+        projects={data.projects}
+        onClose={() => setSheet(null)}
+        onDone={(s) => {
+          setSheet(null)
+          update(s)
+        }}
+      />
+      <InviteSheet join={data.join} open={sheet === 'invite'} onClose={() => setSheet(null)} />
     </>
   )
 
@@ -105,7 +117,7 @@ export default function TeamScreen(_props: ScreenProps): JSX.Element {
 
   return (
     <>
-      <TeamView state={data} onChoose={() => setView('choose')} onReview={() => setSheet('review')} onForget={() => api.team.forget().then(reload)} onReload={reload} />
+      <TeamView state={data} onChoose={() => setView('choose')} onReview={() => setSheet('review')} onForget={() => api.team.forget().then(reload)} onReload={reload} onSheet={setSheet} />
       {sheets}
     </>
   )
@@ -123,7 +135,7 @@ function repoLine(s: TeamState): string {
   return setup.remote ? `${where} · ${sent}` : `${where} · No remote yet · ${sent}`
 }
 
-function TeamView({ state, onChoose, onReview, onForget, onReload }: { state: TeamState; onChoose: () => void; onReview: () => void; onForget: () => void; onReload: () => void }): JSX.Element {
+function TeamView({ state, onChoose, onReview, onForget, onReload, onSheet }: { state: TeamState; onChoose: () => void; onReview: () => void; onForget: () => void; onReload: () => void; onSheet: (s: 'connect' | 'invite') => void }): JSX.Element {
   const [open, setOpen] = useState<string | null>(null)
   const [taking, setTaking] = useState<string | null>(null)
   const notify = useNotify()
@@ -142,6 +154,7 @@ function TeamView({ state, onChoose, onReview, onForget, onReload }: { state: Te
   const { navigate } = useNav()
   const rows = state.items.filter((i) => i.ticked || i.state === 'removed' || i.state === 'repo-only')
   const setup = state.setup
+  const connected = state.projects.filter((p) => p.connected).length
   if (!setup) return <></>
 
   const row = (i: TeamItem): JSX.Element[] => {
@@ -196,6 +209,12 @@ function TeamView({ state, onChoose, onReview, onForget, onReload }: { state: Te
             {repoLine(state)}
           </span>
           <div className="tm__buttons">
+            <Button disabled={!state.join} onClick={() => onSheet('invite')}>
+              Invite
+            </Button>
+            <Button disabled={!setup.remote || setup.missing} onClick={() => onSheet('connect')}>
+              {connected ? `Connected · ${connected}` : 'Connect a project'}
+            </Button>
             <Button onClick={onChoose}>Choose</Button>
             <Button variant="primary" disabled={state.changes === 0 || setup.missing} onClick={onReview}>
               {state.changes === 1 ? 'Review 1 change' : `Review ${state.changes} changes`}
