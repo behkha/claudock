@@ -7,8 +7,6 @@ import { FetchedDiff } from './parts'
 
 const MARK = { add: '+', change: '~', remove: '−' } as const
 
-/** Plugin files are shown inside the plugin folder; the marketplace file and the README as they are. */
-const shown = (rel: string): string => rel.replace(/^plugins\/[^/]+\//, '')
 
 /**
  * Review (decision 3 A): what must be fixed first, each with its fix buttons, then every file the write adds, changes
@@ -134,7 +132,7 @@ export function ReviewSheet({ open, onClose, onTicked, onWritten }: { open: bool
                     <span className="tm-file__mark" aria-label={f.change}>
                       {MARK[f.change]}
                     </span>
-                    <span className="tm-file__rel">{shown(f.rel)}</span>
+                    <span className="tm-file__rel">{f.rel}</span>
                   </button>
                   {file === f.rel ? (
                     <div className="tm-sheet__diff">

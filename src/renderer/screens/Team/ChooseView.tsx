@@ -67,30 +67,30 @@ export function ChooseView({ state, onChange, onDone }: { state: TeamState; onCh
   return (
     <PageLayout
       title="Choose"
-      actions={
-        <>
-          <Total tokens={state.tokens} />
-          <Button variant="primary" onClick={onDone}>
-            Done
-          </Button>
-        </>
-      }
+      actions={<Total tokens={state.tokens} />}
       toolbar={
-        <div className="ctx__filters">
-          <Chip selected={filter === 'all'} onClick={() => setFilter('all')} count={counts.all}>
-            All
-          </Chip>
-          {KINDS.filter((k) => counts[k.id] > 0).map((k) => (
-            <Chip key={k.id} selected={filter === k.id} onClick={() => setFilter(k.id)} count={counts[k.id]}>
-              {k.label}
+        <div className="tm__bar">
+          <div className="ctx__filters">
+            <Chip selected={filter === 'all'} onClick={() => setFilter('all')} count={counts.all}>
+              All
             </Chip>
-          ))}
-          <Chip selected={filter === 'fix'} onClick={() => setFilter('fix')} count={counts.fix}>
-            To fix
-          </Chip>
-          <Chip selected={filter === 'stays'} onClick={() => setFilter('stays')} count={counts.stays}>
-            Stays yours
-          </Chip>
+            {KINDS.filter((k) => counts[k.id] > 0).map((k) => (
+              <Chip key={k.id} selected={filter === k.id} onClick={() => setFilter(k.id)} count={counts[k.id]}>
+                {k.label}
+              </Chip>
+            ))}
+            <Chip selected={filter === 'fix'} onClick={() => setFilter('fix')} count={counts.fix}>
+              To fix
+            </Chip>
+            <Chip selected={filter === 'stays'} onClick={() => setFilter('stays')} count={counts.stays}>
+              Stays yours
+            </Chip>
+          </div>
+          <div className="tm__buttons">
+            <Button variant="primary" onClick={onDone}>
+              Done
+            </Button>
+          </div>
         </div>
       }
     >
