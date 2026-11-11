@@ -89,7 +89,8 @@ test('read, plan, write, read again: published, and a second write writes nothin
     const r1 = await writeFiles(dir, plan.writes, plan.removes, guard)
     assert.equal(r1.written.length, plan.writes.size)
     // the script keeps its run bit, nothing holds the token
-    assert.ok(fs.statSync(path.join(dir, 'plugins/team/bin/fmt.sh')).mode & 0o100)
+    // Windows has no run bit
+    if (process.platform !== 'win32') assert.ok(fs.statSync(path.join(dir, 'plugins/team/bin/fmt.sh')).mode & 0o100)
     for (const rel of fs.readdirSync(dir, { recursive: true })) {
       const f = path.join(dir, String(rel))
       if (fs.statSync(f).isFile()) assert.ok(!fs.readFileSync(f, 'utf8').includes(FAKE), `${rel} holds the token`)
