@@ -1,0 +1,235 @@
+/* Team: the Context screen's table (../Context/context.css) with a state column or a tick, and the sheets around it. */
+
+.tm__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.tm__repo {
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  color: var(--text-2);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tm__buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.tm__c-dot {
+  width: 40px;
+}
+.tm__c-state {
+  width: 170px;
+}
+.tm__c-tokens {
+  width: 110px;
+}
+.tm__dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-3);
+}
+.tm__dot--new {
+  background: var(--accent);
+}
+.tm__dot--published {
+  background: var(--success);
+}
+.tm__dot--changed {
+  background: var(--warning);
+}
+.tm__dot--removed,
+.tm__dot--repo-only {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--text-3);
+}
+.tm__state {
+  font-size: var(--fs-small);
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.tm__kind--danger {
+  color: var(--danger) !important;
+}
+.tm__kind--warning {
+  color: var(--warning) !important;
+}
+.tm__tick {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+.tm__diff {
+  padding-bottom: 6px;
+}
+.tm__error {
+  color: var(--danger);
+  font-size: var(--fs-small);
+}
+
+/* sheets */
+.tm-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  color: var(--text);
+}
+.tm-sheet__sub {
+  margin: 0;
+  font-size: var(--fs-caption);
+  color: var(--text-3);
+}
+.tm-sheet__list {
+  display: flex;
+  flex-direction: column;
+  border: var(--hair) solid var(--border);
+  border-radius: var(--radius-control);
+  max-height: 260px;
+  overflow: auto;
+}
+.tm-find {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: var(--hair) solid var(--border);
+}
+.tm-find:last-child {
+  border-bottom: 0;
+}
+.tm-find__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger);
+}
+.tm-find__dot--warning {
+  background: var(--warning);
+}
+.tm-find__dot--done {
+  background: var(--success);
+}
+.tm-find__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.tm-find__text b {
+  font-weight: 500;
+}
+.tm-find__text span {
+  font-size: var(--fs-small);
+  color: var(--text-2);
+}
+.tm-find__fixes {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.tm-file {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 12px;
+  border: 0;
+  border-bottom: var(--hair) solid var(--border);
+  background: transparent;
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  text-align: left;
+}
+.tm-file:hover {
+  background: var(--hover);
+}
+.tm-file[aria-expanded='true'] {
+  background: var(--selected);
+}
+.tm-file__mark {
+  width: 1ch;
+  flex: none;
+}
+.tm-file--add .tm-file__mark {
+  color: var(--success);
+}
+.tm-file--change .tm-file__mark {
+  color: var(--warning);
+}
+.tm-file--remove .tm-file__mark {
+  color: var(--danger);
+}
+.tm-file__rel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tm-sheet__diff {
+  padding: 8px 12px;
+  border-bottom: var(--hair) solid var(--border);
+}
+.tm-sheet__muted {
+  margin: 0;
+  font-size: var(--fs-small);
+  color: var(--text-3);
+}
+.tm-cmd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 8px 8px 12px;
+  border-radius: var(--radius-control);
+  background: var(--surface-sunken);
+}
+.tm-cmd code {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.tm-ok {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-body);
+  font-weight: 500;
+}
+.tm-ok svg {
+  color: var(--success);
+}
+.tm-folder {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: var(--hair) solid var(--border);
+  border-radius: var(--radius-control);
+}
+.tm-folder__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.tm-folder__text span:last-child {
+  font-size: var(--fs-small);
+  color: var(--text-3);
+}
+.tm-sheet__error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--fs-small);
+}

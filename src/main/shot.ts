@@ -1,5 +1,7 @@
 import type { BrowserWindow } from 'electron'
+import { spawnSync } from 'node:child_process'
 import fsp from 'node:fs/promises'
+import os from 'node:os'
 import path from 'node:path'
 import { SCREENS, type ScreenId } from '@shared/nav'
 import { formatRange } from '@shared/wrapped'
@@ -7,6 +9,7 @@ import { app } from 'electron'
 import { connectDir, folderKey } from './connect/folder'
 import { archiveRootOf, list as archiveList, markdownOf, search as archiveSearch, sweepNow } from './domains/archive'
 import { listContext } from './domains/context'
+import { impl as team } from './domains/team'
 import { GROUP_MS, isPaused } from './connect/sessionModel'
 import { postedAlerts } from './alerts'
 import { transcriptUsage } from './domains/limits'
@@ -15,7 +18,7 @@ import { alertPrefs, currentAlertPrefs, setAlertPrefs } from './domains/sessions
 import { popoverForShots } from './menubar'
 import { countHooks } from './domains/settings'
 import { emit } from './ipcx'
-import { configDir, userDataDir } from './paths'
+import { configDir, globalStateFile, userDataDir } from './paths'
 import { addLocalDays, midnightOf, mondayOf } from './share/week'
 import { setTheme } from './theme'
 import { sumActivity } from './today/activity'
@@ -489,6 +492,119 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
   }
 
   /**
+   * Team mode on the fixture's team folder (HOME/team-repo, where Team's folder dialog lands in screenshots): New team
+   * setup (`team-new`), Choose with the github server and the fmt.sh hook ticked (`team-choose`), Review with their two
+   * blockers (`team-review`), both fixed (`team-review-clear`), Written (`team-written`), and Team with a new and a
+   * changed item (`team-states`). Fails unless the written tree is what the review showed, no file holds the fixture's
+   * fake tokens, a second write writes nothing, and settings.json and the global state file are byte for byte as
+   * before; `claude plugin validate` checks the plugin and the marketplace when `claude` is on the path.
+   */
+  async function teamFlow(theme: 'light' | 'dark'): Promise<void> {
+    if (process.env.CLAUDOCK_READONLY === '1' || !configDir().includes(`${path.sep}.shots${path.sep}.tmp-`)) return
+    const repo = path.join(os.homedir(), 'team-repo')
+    const settingsFile = path.join(configDir(), 'settings.json')
+    const before = { settings: await fsp.readFile(settingsFile), state: await fsp.readFile(globalStateFile()) }
+    const skillFile = path.join(configDir(), 'skills', 'db-migrations', 'SKILL.md')
+    const skillBefore = await fsp.readFile(skillFile)
+    // each pass starts with no setup and an empty repo
+    const reset = async (): Promise<void> => {
+      await team.forget()
+      for (const n of await fsp.readdir(repo)) if (n !== '.git' && n !== '.claudock-fixture') await fsp.rm(path.join(repo, n), { recursive: true, force: true })
+    }
+    await reset()
+    const dialog = `document.querySelector('dialog[open]')`
+    const tick = (name: string): Promise<void> =>
+      js(`(() => {
+        const row = [...document.querySelectorAll('tr')].find((r) => r.querySelector('.ctx__label')?.textContent === ${JSON.stringify(name)})
+        const box = row?.querySelector('input[type=checkbox]')
+        if (!box) throw new Error('team: no tick for ${name}')
+        if (!box.checked) box.click()
+      })()`)
+    const ticked = (name: string): string => `[...document.querySelectorAll('tr')].some((r) => r.querySelector('.ctx__label')?.textContent === ${JSON.stringify(name)} && r.querySelector('input[type=checkbox]')?.checked && !r.querySelector('input[type=checkbox]').disabled)`
+    const clickStarting = (prefix: string, scope = 'document'): Promise<void> =>
+      waitFor(`[...((${scope})?.querySelectorAll('button') ?? [])].some((b) => b.textContent.trim().startsWith(${JSON.stringify(prefix)}) && !b.disabled)`, `a button "${prefix}…"`).then(() =>
+        js(`[...(${scope}).querySelectorAll('button')].find((b) => b.textContent.trim().startsWith(${JSON.stringify(prefix)}) && !b.disabled).click()`)
+      )
+    try {
+      emit('system:navigate', { screen: 'team' })
+      await sleep(150)
+      await click('New team setup')
+      await waitFor(`${dialog}?.querySelector('input')?.value === 'claude-setup'`, 'the names filled in from the remote')
+      await shoot(theme, 'team-new')
+      await click('Create', dialog)
+      await waitFor(`!${dialog} && document.querySelector('.tm__repo')?.textContent.startsWith('acme/claude-setup')`, 'the Team view')
+      await click('Choose')
+      await waitFor(`document.querySelector('.tm__tick')`, 'the Choose list')
+      await tick('github')
+      await waitFor(ticked('github'), 'github ticked')
+      await tick('fmt.sh')
+      await waitFor(ticked('fmt.sh'), 'fmt.sh ticked')
+      await shoot(theme, 'team-choose')
+      await click('Done')
+      await clickStarting('Review ')
+      await waitFor(`${dialog}?.querySelectorAll('.tm-find').length >= 2 && ${dialog}.querySelector('.tm-sheet[aria-busy="false"]')`, 'the review')
+      const r1 = await team.review()
+      const blockers = r1.findings.filter((f) => f.blocks && !f.fix).map((f) => `${f.itemName}:${f.code}`)
+      if (blockers.sort().join() !== 'fmt.sh:script,github:secret') throw new Error(`team: the blockers are ${blockers.join(', ')}`)
+      if (r1.canWrite) throw new Error('team: Write is on with blockers left')
+      await shoot(theme, 'team-review')
+      await click('Ask each teammate', dialog)
+      await waitFor(`${dialog}.querySelectorAll('.tm-find__dot--done').length === 1`, 'the token fixed')
+      await click('Copy it in', dialog)
+      await waitFor(`${dialog}.querySelectorAll('.tm-find__dot--done').length === 2 && [...${dialog}.querySelectorAll('button')].some((b) => b.textContent.startsWith('Write ') && !b.disabled)`, 'Write on')
+      await shoot(theme, 'team-review-clear')
+      const r2 = await team.review()
+      await clickStarting('Write ', dialog)
+      await waitFor(`${dialog}?.querySelector('.dialog__title')?.textContent.endsWith('written')`, 'the Written sheet')
+      await shoot(theme, 'team-written')
+
+      // the tree is what the review showed: nothing is left to write, and every file it listed is there
+      const r3 = await team.review()
+      if (r3.files.length) throw new Error(`team: after the write, the review still lists ${r3.files.map((f) => f.rel).join(', ')}`)
+      for (const f of r2.files) if (f.change !== 'remove' && !(await fsp.stat(path.join(repo, f.rel)).catch(() => null))) throw new Error(`team: ${f.rel} was not written`)
+      for (const rel of await fsp.readdir(repo, { recursive: true })) {
+        const abs = path.join(repo, String(rel))
+        if (String(rel).startsWith('.git') || !(await fsp.stat(abs)).isFile()) continue
+        const text = await fsp.readFile(abs, 'utf8')
+        if (/ghp_FAKEDONOTUSE|fake-key-do-not-use/.test(text)) throw new Error(`team: ${rel} holds a fixture token`)
+      }
+      const again = await team.write(r3.token)
+      if (again.files !== 0 || again.removed !== 0) throw new Error(`team: a second write with nothing changed wrote ${again.files} and removed ${again.removed}`)
+      await click('Done', dialog)
+
+      // a new item and one changed here
+      await team.setTicked(['skill:team-notes'], true)
+      await fsp.appendFile(skillFile, '\n- Check the lock timeout first.\n')
+      emit('system:navigate', { screen: 'today' })
+      await sleep(150)
+      emit('system:navigate', { screen: 'team' })
+      await waitFor(`[...document.querySelectorAll('.tm__state')].some((t) => t.textContent === 'New') && [...document.querySelectorAll('.tm__state')].some((t) => t.textContent === 'Changed here')`, 'New and Changed here on Team')
+      await shoot(theme, 'team-states')
+
+      if (theme === 'light') {
+        // the plugin and the marketplace as Claude Code itself reads them, when it is installed here
+        for (const target of [path.join(repo, 'plugins', 'team'), repo]) {
+          // its own empty home and config folder: validating must not touch the fixture copy
+          const own = await fsp.mkdtemp(path.join(os.tmpdir(), 'claudock-validate-'))
+          const v = spawnSync('claude', ['plugin', 'validate', target], { encoding: 'utf8', timeout: 60_000, env: { ...process.env, HOME: own, USERPROFILE: own, CLAUDE_CONFIG_DIR: path.join(own, '.claude') } })
+          await fsp.rm(own, { recursive: true, force: true })
+          if (v.error && (v.error as NodeJS.ErrnoException).code === 'ENOENT') break
+          if (v.status !== 0) throw new Error(`team: claude plugin validate ${path.relative(repo, target) || '.'} failed: ${(v.stdout + v.stderr).trim().slice(0, 400)}`)
+          console.log(`TEAM validate ${path.relative(repo, target) || '.'}: ok`)
+        }
+      }
+    } finally {
+      await fsp.writeFile(skillFile, skillBefore)
+      await reset()
+      // leave Team, so the next visit shows it from the start
+      emit('system:navigate', { screen: 'today' })
+      await sleep(150)
+    }
+    if (!(await fsp.readFile(settingsFile)).equals(before.settings)) throw new Error('team: settings.json is not byte for byte as before')
+    if (!(await fsp.readFile(globalStateFile())).equals(before.state)) throw new Error('team: the global state file is not byte for byte as before')
+  }
+
+  /**
    * Share stats: the week's numbers against the limits scan's (each day's tokens the same as Today's), the value as the
    * sum of its days and of its models; Today -> Share opens on the week, Max 20x goes beside the value (kept per profile
    * in Claudock's own data), the prices it used open (`share-week`, `card-week.png`), a week back and forward again,
@@ -644,6 +760,9 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
       }
       if (opts.only.length === 0 || opts.only.includes('context')) {
         await contextFlow(theme).catch(fail)
+      }
+      if (opts.only.length === 0 || opts.only.includes('team')) {
+        await teamFlow(theme).catch(fail)
       }
       if (opts.only.length === 0 || opts.only.includes('mods') || opts.only.includes('mods-draft')) {
         emit('system:navigate', { screen: 'mods' })

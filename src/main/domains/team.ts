@@ -47,6 +47,7 @@ import {
   sendCommand,
   sha256,
   stateOf,
+  suggestKey,
   textOf,
   type ItemOut,
   type JsonObj,
@@ -139,7 +140,8 @@ function serial<T>(dir: string, fn: () => Promise<T>): Promise<T> {
 
 const guard: WriteGuard = {
   allowed: (dir) => devAllowed(dir, { readonly: process.env.CLAUDOCK_READONLY === '1', dev: installKind() === 'dev', allowReal: process.env.CLAUDOCK_ALLOW_REAL_WRITES === '1' }),
-  trash: (abs) => shell.trashItem(abs)
+  // screenshots write into a temp copy: what they take away is not worth a place in this Mac's Trash
+  trash: (abs) => (SHOT ? fsp.rm(abs) : shell.trashItem(abs))
 }
 
 /* ------------------------------------------------------------------ what can travel */
@@ -320,6 +322,16 @@ function firstTicks(items: TeamItem[], now: number): string[] {
   return items.filter((i) => i.kind === 'agent' || i.kind === 'command' || (i.kind !== 'hook' && !!i.uses && !!i.lastUsedAt && now - i.lastUsedAt <= 30 * DAY)).map((i) => i.id)
 }
 
+/** What each fix button fills in: a `userConfig` key, a variable's name, the script's name in `bin/`. */
+function withValues(src: Source, f: Finding): Finding {
+  const key = suggestKey(src.name, f.where)
+  const script = src.kind === 'hook' && src.script ? path.basename(src.script.abs).replace(/[^A-Za-z0-9._-]/g, '-') : ''
+  return {
+    ...f,
+    choices: f.choices.map((c) => (c.kind === 'ask' ? { ...c, value: key } : c.kind === 'env' ? { ...c, value: key.toUpperCase() } : c.kind === 'copy-script' ? { ...c, value: script || 'script' } : c))
+  }
+}
+
 function bothFinding(src: Source, fixes: Fix[]): Finding {
   const theirs = src.kind === 'skill' || src.kind === 'agent' || src.kind === 'command'
   const fix = fixes.find((f) => f.kind === 'mine' && f.where === 'item')
@@ -374,7 +386,7 @@ async function build(opts: { context: boolean }): Promise<Built> {
     const on = ticked.has(src.id)
     const state = store ? stateOf(on, out, rec, view) : null
     states.set(src.id, state)
-    const f = findingsFor(src, fixes, home)
+    const f = findingsFor(src, fixes, home).map((x) => withValues(src, x))
     if (state === 'changed-both') f.push(bothFinding(src, fixes))
     if (on) {
       findings.push(...f)
@@ -712,7 +724,8 @@ function forget(): Promise<void> {
 
 const notYet = (): Promise<never> => Promise.reject(new Error('Not available yet'))
 
-const impl: TeamApi = {
+/** The domain's calls, for screenshot mode's checks (src/main/shot.ts). */
+export const impl: TeamApi = {
   get,
   pickFolder,
   create,

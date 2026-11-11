@@ -49,6 +49,8 @@ export type FixChoiceKind = Fix['kind'] | 'untick' | 'theirs'
 export interface FixChoice {
   kind: FixChoiceKind
   label: string
+  /** What the fix is filled with: the `userConfig` key, the variable's name, the script's name in `bin/`. */
+  value?: string
 }
 
 export interface Finding {

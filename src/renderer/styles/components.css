@@ -810,6 +810,9 @@ textarea.field__control {
   box-shadow: var(--shadow-pop);
   width: min(440px, calc(100vw - 48px));
 }
+.dialog--wide {
+  width: min(720px, calc(100vw - 48px));
+}
 .dialog::backdrop {
   background: var(--scrim);
 }
