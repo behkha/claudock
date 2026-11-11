@@ -16,7 +16,7 @@ Claudock opens the Claude Code config folder (`~/.claude`, or wherever `CLAUDE_C
 
 - **Today:** what each running Claude Code session is doing and which one waits for you, your limits as Claude Code reports them (5-hour and weekly today, and any window it adds), today's sessions and this week's tokens, and **Share**: your messages, sessions, longest session, peak hour, top model and 26 weeks of activity from Claude Code's own `stats-cache.json`, as a card to copy, save or post on X. The card never shows project names or prompts.
 - **Configure:** `settings.json` and `settings.local.json` as a form or raw JSON with history, `CLAUDE.md` and `rules/`, hooks, permissions
-- **Extend:** skills (turn on or off, edit, duplicate), agents, commands, plugins, mods (what each one draws, hooks and reaches; keep the ones Claude drafts), MCP servers
+- **Extend:** skills (turn on or off, edit, duplicate), agents, commands, plugins, mods (what each one draws, hooks and reaches; keep the ones Claude drafts), MCP servers, and **Team**: tick the skills, agents, commands, hooks and MCP servers your team should have and Claudock writes them as a Claude Code plugin and marketplace into a git repo you choose, after checking that no token, home-folder path or script only you have goes with them. You commit and push; teammates install it with one `claude plugin` command (or get it in a project you connect) and Claude Code keeps it up to date. Their Claudock shows what each update changed.
 - **Your data:** every session, kept after Claude Code's 30-day cleanup deletes it, with full-text search, resume from any folder and Markdown export; projects, memory, plans, prompt history
 - **Maintain:** disk use per folder with cleanup suggestions, plus snapshots and `.bak` files you can diff and restore
 
@@ -32,8 +32,9 @@ Claude Code keeps its config in dozens of JSON, JSONL and Markdown files, and re
 - For `~/.claude.json` it re-reads the file right before writing and changes only the key you edited, so it doesn't overwrite what Claude Code wrote in the meantime.
 - Deletes go to the OS Trash.
 - It never reads `.credentials.json` or `sessions/*.key`. They show up as locked rows.
+- Team mode writes only into the git repo you picked and, when you connect a project, two keys of its `.claude/settings.json`. It changes or removes only files it wrote there itself (removals go to the Trash), never writes a token, and never runs git or Claude Code.
 
-What it doesn't do: it doesn't run, update or sign in to Claude Code, and it doesn't sync settings between machines. It only works on the config folder and `~/.claude.json`, not on the `.claude/` folders inside your repositories. If you only change a setting now and then, Claude Code's own `/config` and `/permissions` commands are enough.
+What it doesn't do: it doesn't run, update or sign in to Claude Code, and it doesn't sync settings between machines. It works on the config folder and `~/.claude.json`; the only files it writes elsewhere are Team mode's, in the places you pick. If you only change a setting now and then, Claude Code's own `/config` and `/permissions` commands are enough.
 
 At launch Claudock downloads Anthropic's public settings docs (code.claude.com) and the Claude Code JSON schema to power the JSON editor's suggestions. It asks json.schemastore.org and the schema's GitHub mirror (raw.githubusercontent.com) at the same time and uses whichever answers first. It downloads Anthropic's public pricing page (platform.claude.com) and Claude Code's model configuration page for the model list in Settings and the prices on the share card. It also asks api.github.com for the latest Claudock release, to tell you when there's a newer one. It sends nothing about your config. `CLAUDOCK_OFFLINE=1` turns all of this off.
 
