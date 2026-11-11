@@ -51,6 +51,21 @@ async function ensureParents(dir: string, rel: string): Promise<string> {
   return path.join(dir, ...parts)
 }
 
+/**
+ * False when a folder between `dir` and the file is a link (or not a folder). The list of files to remove comes from
+ * `.claudock.json` in the repo, which anyone with the repo can edit, so a link there must never lead out of the folder.
+ */
+export async function plainParents(dir: string, rel: string): Promise<boolean> {
+  let at = dir
+  for (const p of rel.split('/').slice(0, -1)) {
+    at = path.join(at, p)
+    const st = await fsp.lstat(at).catch(() => null)
+    if (!st) return true
+    if (st.isSymbolicLink() || !st.isDirectory()) return false
+  }
+  return true
+}
+
 /** The file's bytes, or null when it is missing. A link or a folder in its place is refused. */
 async function current(abs: string, rel: string): Promise<Buffer | null> {
   const st = await fsp.lstat(abs).catch(() => null)
@@ -106,6 +121,7 @@ export async function writeFiles(dir: string, writes: Map<string, Uint8Array>, r
   }
   for (const rel of [...removes].sort()) {
     const abs = path.join(root, ...rel.split('/'))
+    if (!(await plainParents(root, rel))) throw new Error(`${rel} sits behind a link, so Claudock will not remove it`)
     const now = await fsp.lstat(abs).catch(() => null)
     if (!now) continue
     if (!now.isFile()) throw new Error(`${rel} is not a plain file, so Claudock will not remove it`)
@@ -131,6 +147,7 @@ export async function writeOne(dir: string, rel: string, text: string, guard: Wr
 export async function readText(dir: string, rel: string, max = 2_000_000): Promise<string | null> {
   checkRel(rel)
   const abs = path.join(path.resolve(dir), ...rel.split('/'))
+  if (!(await plainParents(path.resolve(dir), rel))) throw new Error(`${rel} sits behind a link`)
   const st = await fsp.lstat(abs).catch(() => null)
   if (!st) return null
   if (!st.isFile()) throw new Error(`${rel} is not a plain file`)

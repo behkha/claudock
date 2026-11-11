@@ -129,6 +129,20 @@ test('never through a link, never over a link', async () => {
     fs.symlinkSync(path.join(outside, 'secret'), path.join(dir, 'plugins', 'team', 'x.md'))
     await assert.rejects(writeFiles(dir, new Map([['plugins/team/x.md', bytes('x')]]), [], guardFor([])), /not a plain file/)
     assert.equal(fs.readFileSync(path.join(outside, 'secret'), 'utf8'), 'mine')
+    // a removal never follows a link out of the folder (the list of removals comes from a file in the repo)
+    fs.unlinkSync(path.join(dir, 'plugins', 'team', 'x.md'))
+    fs.symlinkSync(outside, path.join(dir, 'plugins', 'team', 'skills'))
+    const trashed: string[] = []
+    await assert.rejects(writeFiles(dir, new Map(), ['plugins/team/skills/secret'], guardFor(trashed)), /behind a link/)
+    assert.deepEqual(trashed, [])
+    assert.equal(fs.readFileSync(path.join(outside, 'secret'), 'utf8'), 'mine')
+    await assert.rejects(readText(dir, 'plugins/team/skills/secret'), /behind a link/)
+    fs.unlinkSync(path.join(dir, 'plugins', 'team', 'skills'))
+    // a plugin folder that is itself a link is not read
+    fs.rmdirSync(path.join(dir, 'plugins', 'team'))
+    fs.symlinkSync(outside, path.join(dir, 'plugins', 'team'))
+    assert.equal((await readRepo(dir, 'team')).files.size, 0)
+    fs.unlinkSync(path.join(dir, 'plugins', 'team'))
     // refused before anything is written
     await assert.rejects(writeFiles(dir, new Map([['a.md', bytes('a')], ['../b.md', bytes('b')]]), [], guardFor([])), /Refusing/)
     assert.ok(!fs.existsSync(path.join(dir, 'a.md')))

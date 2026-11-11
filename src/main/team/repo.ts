@@ -2,6 +2,7 @@ import fsp from 'node:fs/promises'
 import path from 'node:path'
 import type { TeamRemote } from '../../shared/api/team.ts'
 import { MANIFEST_NAME, parseManifest, parseRemote, pluginDir, sha256, type RepoView } from './model.ts'
+import { plainParents } from './write.ts'
 
 /**
  * Reading the team folder (src/main/domains/team.ts) as plain files: the plugin folder's files and their hashes, the
@@ -43,6 +44,8 @@ export async function listFiles(root: string): Promise<string[]> {
 
 /** The repo as it is now: what `stateOf` and `buildPlan` compare against. */
 export async function readRepo(dir: string, plugin: string): Promise<RepoView> {
+  // a plugin folder that is a link (or sits behind one) is not read: it could be any folder on the disk
+  if (!(await plainParents(dir, `${pluginDir(plugin)}/x`))) return { files: new Map(), manifest: null, readme: true }
   return readPluginFolder(path.join(dir, ...pluginDir(plugin).split('/')), dir)
 }
 
@@ -73,6 +76,7 @@ export async function readPluginFolder(root: string, marketDir: string | null = 
 /** A file of the team folder (root-relative) as bytes; null when missing or not a plain file. */
 export async function readRepoFile(dir: string, rel: string): Promise<Buffer | null> {
   const abs = path.join(dir, ...rel.split('/'))
+  if (!(await plainParents(dir, rel))) return null
   const st = await fsp.lstat(abs).catch(() => null)
   if (!st?.isFile() || st.size > 20_000_000) return null
   return fsp.readFile(abs).catch(() => null)
