@@ -495,7 +495,7 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
    * Team mode on the fixture's team folder (HOME/team-repo, where Team's folder dialog lands in screenshots): New team
    * setup (`team-new`), Choose with the github server and the fmt.sh hook ticked (`team-choose`), Review with their two
    * blockers (`team-review`), both fixed (`team-review-clear`), Written (`team-written`), and Team with a new and a
-   * changed item (`team-states`). Fails unless the written tree is what the review showed, no file holds the fixture's
+   * changed item (`team-states`), then a teammate's edits in the repo (`team-both`: changed in the repo with its diff open, changed in both, only in the repo, removed) and the repo's release-notes taken back. Fails unless the written tree is what the review showed, no file holds the fixture's
    * fake tokens, a second write writes nothing, and settings.json and the global state file are byte for byte as
    * before; `claude plugin validate` checks the plugin and the marketplace when `claude` is on the path.
    */
@@ -506,6 +506,8 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
     const before = { settings: await fsp.readFile(settingsFile), state: await fsp.readFile(globalStateFile()) }
     const skillFile = path.join(configDir(), 'skills', 'db-migrations', 'SKILL.md')
     const skillBefore = await fsp.readFile(skillFile)
+    const notesFile = path.join(configDir(), 'skills', 'release-notes', 'SKILL.md')
+    const notesBefore = await fsp.readFile(notesFile)
     // each pass starts with no setup and an empty repo
     const reset = async (): Promise<void> => {
       await team.forget()
@@ -581,6 +583,34 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
       await waitFor(`[...document.querySelectorAll('.tm__state')].some((t) => t.textContent === 'New') && [...document.querySelectorAll('.tm__state')].some((t) => t.textContent === 'Changed here')`, 'New and Changed here on Team')
       await shoot(theme, 'team-states')
 
+      // both ways: a teammate changed release-notes and db-migrations in the repo and added onboarding; pdf-extract is unticked
+      const plugin = path.join(repo, 'plugins', 'team')
+      await fsp.appendFile(path.join(plugin, 'skills', 'release-notes', 'SKILL.md'), '\n4. Thank first-time contributors.\n')
+      await fsp.appendFile(path.join(plugin, 'skills', 'db-migrations', 'SKILL.md'), '\n- Run it on a copy first.\n')
+      await fsp.mkdir(path.join(plugin, 'skills', 'onboarding'), { recursive: true })
+      await fsp.writeFile(path.join(plugin, 'skills', 'onboarding', 'SKILL.md'), '---\nname: onboarding\ndescription: Walk a new teammate through the repo.\n---\n\nStart with the README.\n')
+      await team.setTicked(['skill:pdf-extract'], false)
+      const st = await team.get()
+      const stateOfItem = (id: string): string | null | undefined => st.items.find((i) => i.id === id)?.state
+      const want: Record<string, string> = { 'skill:release-notes': 'changed-repo', 'skill:db-migrations': 'changed-both', 'skill:onboarding': 'repo-only', 'skill:pdf-extract': 'removed' }
+      for (const [id, w] of Object.entries(want)) if (stateOfItem(id) !== w) throw new Error(`team: ${id} is ${stateOfItem(id)}, not ${w}`)
+      const rb = await team.review()
+      if (!rb.findings.some((f) => f.itemId === 'skill:db-migrations' && f.code === 'both' && f.blocks)) throw new Error('team: changed in both is not asked about')
+      if (!rb.files.some((f) => f.rel === 'plugins/team/skills/pdf-extract/SKILL.md' && f.change === 'remove')) throw new Error('team: the unticked skill is not removed')
+      if (rb.files.some((f) => f.rel.includes('release-notes'))) throw new Error("team: a write would overwrite the repo's release-notes")
+      emit('system:navigate', { screen: 'today' })
+      await sleep(150)
+      emit('system:navigate', { screen: 'team' })
+      await waitFor(`[...document.querySelectorAll('.tm__state')].some((t) => t.textContent === 'Only in the repo')`, 'the repo-only row')
+      await js(`[...document.querySelectorAll('.ctx__name')].find((b) => b.querySelector('.ctx__label')?.textContent === 'release-notes')?.click()`)
+      await waitFor(`document.querySelector('.ctx__detail .diff')`, "release-notes's diff")
+      await shoot(theme, 'team-both')
+      await click("Take the repo's version")
+      await waitFor(`[...document.querySelectorAll('tr')].some((r) => r.querySelector('.ctx__label')?.textContent === 'release-notes' && r.querySelector('.tm__state')?.textContent === 'Published')`, 'release-notes published after taking it')
+      const mineNow = await fsp.readFile(path.join(configDir(), 'skills', 'release-notes', 'SKILL.md'))
+      if (!mineNow.equals(await fsp.readFile(path.join(plugin, 'skills', 'release-notes', 'SKILL.md')))) throw new Error("team: release-notes is not the repo's after taking it")
+      await waitFor(`!document.querySelector('.toast')`, 'the toast gone')
+
       if (theme === 'light') {
         // the plugin and the marketplace as Claude Code itself reads them, when it is installed here
         for (const target of [path.join(repo, 'plugins', 'team'), repo]) {
@@ -595,6 +625,7 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
       }
     } finally {
       await fsp.writeFile(skillFile, skillBefore)
+      await fsp.writeFile(notesFile, notesBefore)
       await reset()
       // leave Team, so the next visit shows it from the start
       emit('system:navigate', { screen: 'today' })

@@ -6,6 +6,7 @@ import { api } from '@/lib/api'
 import { refreshCounts } from '@/lib/counts'
 import { cx } from '@/lib/cx'
 import { useNav, type ScreenProps } from '@/lib/nav'
+import { useNotify } from '../_ext/ui'
 import { ChooseView } from './ChooseView'
 import { NewTeamSheet } from './NewTeamSheet'
 import { ReviewSheet } from './ReviewSheet'
@@ -104,11 +105,15 @@ export default function TeamScreen(_props: ScreenProps): JSX.Element {
 
   return (
     <>
-      <TeamView state={data} onChoose={() => setView('choose')} onReview={() => setSheet('review')} onForget={() => api.team.forget().then(reload)} />
+      <TeamView state={data} onChoose={() => setView('choose')} onReview={() => setSheet('review')} onForget={() => api.team.forget().then(reload)} onReload={reload} />
       {sheets}
     </>
   )
 }
+
+/** The repo's copy can replace the user's: a skill, agent or command it changed or only it has. */
+const takeable = (i: TeamItem): boolean =>
+  (i.kind === 'skill' || i.kind === 'agent' || i.kind === 'command') && (i.state === 'changed-repo' || i.state === 'changed-both' || i.state === 'repo-only')
 
 function repoLine(s: TeamState): string {
   const setup = s.setup
@@ -118,8 +123,22 @@ function repoLine(s: TeamState): string {
   return setup.remote ? `${where} · ${sent}` : `${where} · No remote yet · ${sent}`
 }
 
-function TeamView({ state, onChoose, onReview, onForget }: { state: TeamState; onChoose: () => void; onReview: () => void; onForget: () => void }): JSX.Element {
+function TeamView({ state, onChoose, onReview, onForget, onReload }: { state: TeamState; onChoose: () => void; onReview: () => void; onForget: () => void; onReload: () => void }): JSX.Element {
   const [open, setOpen] = useState<string | null>(null)
+  const [taking, setTaking] = useState<string | null>(null)
+  const notify = useNotify()
+  const take = async (i: TeamItem): Promise<void> => {
+    setTaking(i.id)
+    try {
+      const r = await api.team.takeRepoVersion(i.id)
+      notify.saved(r.snapshotId, `Took the repo's ${i.name}.`)
+      onReload()
+    } catch (e) {
+      notify.failed(e)
+    } finally {
+      setTaking(null)
+    }
+  }
   const { navigate } = useNav()
   const rows = state.items.filter((i) => i.ticked || i.state === 'removed' || i.state === 'repo-only')
   const setup = state.setup
@@ -152,11 +171,14 @@ function TeamView({ state, onChoose, onReview, onForget }: { state: TeamState; o
           <td />
           <td colSpan={4} className="tm__diff">
             <FetchedDiff load={() => api.team.itemDiff(i.id)} deps={[i.id, state]} beforeLabel="In the repo" afterLabel="Yours" />
-            {i.open ? (
-              <div className="ctx__actions">
-                <Button onClick={() => i.open && navigate(i.open.screen, i.open.id)}>Open</Button>
-              </div>
-            ) : null}
+            <div className="ctx__actions">
+              {takeable(i) ? (
+                <Button loading={taking === i.id} disabled={taking !== null} onClick={() => void take(i)}>
+                  Take the repo's version
+                </Button>
+              ) : null}
+              {i.open ? <Button onClick={() => i.open && navigate(i.open.screen, i.open.id)}>Open</Button> : null}
+            </div>
           </td>
         </tr>
       )

@@ -29,6 +29,7 @@ import { folderKey, writeOwn } from '../connect/folder'
 import { tryReadJson } from '../fsx'
 import { defineDomain } from '../ipcx'
 import { configDir, globalStateFile, installKind, isInside, isSecret, samePath, userDataDir } from '../paths'
+import { safeWriteText, trash } from '../safeWrite'
 import {
   MAX_SCRIPT_BYTES,
   buildOut,
@@ -421,6 +422,15 @@ async function build(opts: { context: boolean }): Promise<Built> {
     states.set(rec.id, state)
     if (state) items.push({ id: rec.id, kind: rec.kind, name: rec.name, detail: rec.hook ? `hook · ${rec.hook.event}` : rec.kind === 'mcp' ? 'MCP' : rec.kind, ticked: false, state, tokens: null })
   }
+  // skills, agents and commands someone else put in the plugin: only the repo has them (or only the repo has them ticked)
+  for (const { kind, name } of repoOnlyOf(view)) {
+    const id = `${kind}:${name}`
+    if (recs.has(id) || (ticked.has(id) && outs.has(id))) continue
+    states.set(id, 'repo-only')
+    const mine = items.find((i) => i.id === id)
+    if (mine) mine.state = 'repo-only'
+    else items.push({ id, kind, name, detail: kind, ticked: false, state: 'repo-only', tokens: null })
+  }
   items.sort((a, b) => (b.tokens ?? -1) - (a.tokens ?? -1) || KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind) || a.name.localeCompare(b.name))
 
   const plan = store && setup && !setup.missing ? buildPlan(store, planItems, view, remote) : null
@@ -443,6 +453,31 @@ async function build(opts: { context: boolean }): Promise<Built> {
   if (has(settings.env)) stays.push({ name: 'Environment variables', reason: "A plugin's settings cannot set them", tokens: null })
 
   return { store, setup, remote, view, rows, items, findings, outs, plan, states, stays, context, home }
+}
+
+/** The skills, agents and commands the plugin folder holds, by the names their files give them. */
+function repoOnlyOf(view: RepoView): { kind: 'skill' | 'agent' | 'command'; name: string }[] {
+  const out = new Map<string, { kind: 'skill' | 'agent' | 'command'; name: string }>()
+  for (const rel of view.files.keys()) {
+    const sk = /^skills\/([^/]+)\/.+/.exec(rel)
+    if (sk) out.set(`skill:${sk[1]}`, { kind: 'skill', name: sk[1] })
+    const md = /^(agents|commands)\/(.+)\.md$/i.exec(rel)
+    if (md) {
+      const kind = md[1] === 'agents' ? 'agent' : 'command'
+      const name = md[2].split('/').join(':')
+      out.set(`${kind}:${name}`, { kind, name })
+    }
+  }
+  return [...out.values()]
+}
+
+/** The plugin-relative files the repo holds for an item. */
+function repoRels(view: RepoView, kind: TeamKind, name: string, rec: ManifestItem | null): string[] {
+  if (kind === 'skill') return [...view.files.keys()].filter((r) => r.startsWith(`skills/${name}/`))
+  if (rec) return rec.files.filter((r) => view.files.has(r))
+  if (kind !== 'agent' && kind !== 'command') return []
+  const want = `${kind}s/${name.split(':').join('/')}.md`.toLowerCase()
+  return [...view.files.keys()].filter((r) => r.toLowerCase() === want)
 }
 
 /* ------------------------------------------------------------------ review */
@@ -637,9 +672,10 @@ async function itemDiff(id: string): Promise<TeamDiff> {
   if (!b.store) throw new Error('There is no team setup in this profile')
   const out = b.outs.get(id) ?? null
   const rec: ManifestItem | null = b.view.manifest?.items.find((r) => r.id === id) ?? null
-  if (!out && !rec) throw new Error('This item is no longer listed')
+  const only = b.states.get(id) === 'repo-only' ? repoOnlyOf(b.view).find((x) => `${x.kind}:${x.name}` === id) : undefined
+  if (!out && !rec && !only) throw new Error('This item is no longer listed')
   const root = pluginDir(b.store.plugin)
-  const kind = out?.kind ?? rec?.kind
+  const kind = out?.kind ?? rec?.kind ?? only?.kind
   if (kind === 'hook') {
     const key = out?.hook?.key ?? rec?.hook?.key ?? ''
     const event = out?.hook?.event ?? rec?.hook?.event ?? ''
@@ -654,7 +690,7 @@ async function itemDiff(id: string): Promise<TeamDiff> {
   }
   // files: the user's as they would be written, the repo's as they are
   const mine = new Map((out?.files ?? []).map((f) => [f.rel, f.data]))
-  const theirsRels = kind === 'skill' ? [...b.view.files.keys()].filter((r) => r.startsWith(`skills/${out?.name ?? rec?.name}/`)) : (rec?.files ?? out?.files.map((f) => f.rel) ?? [])
+  const theirsRels = repoRels(b.view, kind ?? 'skill', out?.name ?? rec?.name ?? only?.name ?? '', rec)
   const rels = [...new Set([...mine.keys(), ...theirsRels])].sort()
   const one = rels.length === 1
   let before = ''
@@ -722,6 +758,54 @@ function forget(): Promise<void> {
   })
 }
 
+/**
+ * The repo's copy of a skill, agent or command replaces the user's own (safeWrite: each file it replaces is snapshotted;
+ * a file only the user's copy has goes to the Trash). A hook or server in the repo may hold placeholders for a secret
+ * or a path, so those are not taken back.
+ */
+function takeRepoVersion(id: string): Promise<{ snapshotId: string | null }> {
+  if (typeof id !== 'string') return Promise.reject(new Error('Unknown item'))
+  const cfg = configDir()
+  return serial(cfg, async () => {
+    const b = await build({ context: false })
+    if (!b.store || b.setup?.missing) throw new Error('There is no team folder to take it from')
+    const kind = id.slice(0, id.indexOf(':'))
+    const name = id.slice(id.indexOf(':') + 1)
+    if (kind !== 'skill' && kind !== 'agent' && kind !== 'command') throw new Error('Only skills, agents and commands can be taken from the repo')
+    if (!name || name.split(':').some((p) => !/^[A-Za-z0-9][A-Za-z0-9._ -]*$/.test(p))) throw new Error('That name cannot be a file name')
+    const rec = b.view.manifest?.items.find((r) => r.id === id) ?? null
+    const rels = repoRels(b.view, kind, name, rec)
+    if (!rels.length) throw new Error('The repo has no copy of it')
+    const root = pluginDir(b.store.plugin)
+    const src = b.rows.find((r) => r.src.id === id)?.src
+    // where each file goes in the config folder
+    const destOf = (rel: string): string =>
+      kind === 'skill' ? `skills/${src?.kind === 'skill' ? src.name : name}/${rel.slice(`skills/${name}/`.length)}` : src && src.kind !== 'skill' && src.kind !== 'hook' && src.kind !== 'mcp' ? `${kind}s/${src.rel}` : rel
+    const texts: [string, string][] = []
+    for (const rel of rels) {
+      const data = await readRepoFile(b.store.dir, `${root}/${rel}`)
+      const text = data ? textOf(data) : null
+      if (text === null) throw new Error(`${rel} is not text; copy it by hand`)
+      texts.push([destOf(rel), text])
+    }
+    const reason = `Take ${name} from the team repo`
+    let snapshotId: string | null = null
+    for (const [rel, text] of texts) {
+      const r = await safeWriteText(rel, text, reason)
+      snapshotId ??= r.snapshotId
+    }
+    // files the user's skill has and the repo's has not
+    if (src?.kind === 'skill') {
+      const keep = new Set(texts.map(([rel]) => rel))
+      for (const f of src.files) {
+        const rel = `skills/${src.name}/${f.rel}`
+        if (!keep.has(rel)) await trash(rel)
+      }
+    }
+    return { snapshotId }
+  })
+}
+
 const notYet = (): Promise<never> => Promise.reject(new Error('Not available yet'))
 
 /** The domain's calls, for screenshot mode's checks (src/main/shot.ts). */
@@ -735,7 +819,7 @@ export const impl: TeamApi = {
   fileDiff,
   itemDiff,
   write,
-  takeRepoVersion: notYet,
+  takeRepoVersion,
   connectPlan: notYet,
   connect: notYet,
   disconnect: notYet,
