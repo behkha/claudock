@@ -103,7 +103,7 @@ Either way the app reads and writes `~/.claude`, or the folder in `CLAUDE_CONFIG
 
 ## Status
 
-Beta (v0.2.0), actively maintained. Bug reports are welcome in [Issues](https://github.com/behkha/claudock/issues).
+Beta (v0.3.0), actively maintained. Bug reports are welcome in [Issues](https://github.com/behkha/claudock/issues).
 
 ## License
 

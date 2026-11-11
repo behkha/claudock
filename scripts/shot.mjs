@@ -49,8 +49,10 @@ if (record) {
 }
 
 // a recording needs today's sessions to be from today: always a fresh fixture
-if (!real && (record || !fs.existsSync(fixture))) {
-  console.log(record ? 'making a fresh fixture' : 'fixture missing, creating it')
+// a fixture made before Team mode has no team folder: the team scenario needs one, so make it again
+const stale = fs.existsSync(fixture) && !fs.existsSync(path.join(root, '.fixture', 'team-repo'))
+if (!real && (record || stale || !fs.existsSync(fixture))) {
+  console.log(record ? 'making a fresh fixture' : stale ? 'fixture is from before Team mode, making it again' : 'fixture missing, creating it')
   const r = spawnSync(process.execPath, ['--experimental-strip-types', '--disable-warning=ExperimentalWarning', '--disable-warning=MODULE_TYPELESS_PACKAGE_JSON', path.join(root, 'scripts', 'make-fixture.mjs')], { stdio: 'inherit' })
   if (r.status !== 0) process.exit(r.status ?? 1)
 }

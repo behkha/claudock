@@ -1,6 +1,6 @@
 {
  "format": 1,
- "builtAt": "2026-10-25T16:03:01.860Z",
+ "builtAt": "2026-11-11T15:36:33.829Z",
  "sources": [
   "https://code.claude.com/docs/en/settings-reference.md",
   "https://code.claude.com/docs/en/env-vars.md",
@@ -576,7 +576,7 @@
     ]
    },
    "autoInstallIdeExtension": {
-    "summary": "Turn off automatic install of the IDE extension from a VS Code terminal",
+    "summary": "Let /ide install the IDE extension from an external terminal",
     "typeText": "Boolean",
     "default": "true",
     "scope": "Global config",
@@ -589,11 +589,11 @@
     "values": [
      {
       "value": true,
-      "summary": "Claude Code installs the IDE extension automatically when you run it from a VS Code terminal"
+      "summary": "/ide installs the extension"
      },
      {
       "value": false,
-      "summary": "Claude Code doesn't install the extension automatically"
+      "summary": "/ide doesn't install the extension"
      }
     ]
    },
@@ -1077,7 +1077,7 @@
    "channelsEnabled": {
     "summary": "Allow channels for your organization",
     "typeText": "Boolean",
-    "default": "unset; channels are blocked on Team and Enterprise plans and on Console accounts with managed settings, and allowed on Pro and Max plans and on Console accounts without managed settings",
+    "default": "unset; channels are blocked on Team and Enterprise plans and on Console accounts with managed settings, and allowed on Pro, Max, and Ultra plans and on Console accounts without managed settings",
     "scope": "Managed",
     "topic": "Plugins and skills",
     "url": "https://code.claude.com/docs/en/settings-reference#channelsenabled",
@@ -2398,7 +2398,7 @@
      },
      {
       "value": false,
-      "summary": "a saved fastMode: true turns fast mode on at the start of every later session"
+      "summary": "a saved fastMode: true works as fastMode describes"
      }
     ]
    },
@@ -2595,11 +2595,11 @@
     "values": [
      {
       "value": "claudeai",
-      "summary": "only claude.ai accounts can log in"
+      "summary": "claude.ai sign-in"
      },
      {
       "value": "console",
-      "summary": "only Claude Console accounts can log in"
+      "summary": "Claude Console sign-in"
      },
      {
       "value": "gateway",
@@ -2609,7 +2609,7 @@
     "closedValues": true
    },
    "forceLoginOrgUUID": {
-    "summary": "Pin claude.ai logins to your organization; only a managed source enforces it",
+    "summary": "Pin claude.ai logins to your organization; only managed settings enforce it",
     "typeText": "string, one UUID, or array of strings, several UUIDs",
     "default": "unset, so any organization can log in",
     "scope": "Any file",
@@ -2647,7 +2647,7 @@
      },
      {
       "value": false,
-      "summary": "Claude Code doesn't block startup on the fetch, though at a sign-in startup it waits up to five seconds for the fetch"
+      "summary": "unless Anthropic requires the settings, Claude Code doesn't block startup on the fetch, though at a sign-in startup it waits up to five seconds for the fetch"
      }
     ]
    },
@@ -11099,16 +11099,6 @@
     "example": "{\n  \"inputNeededNotifEnabled\": true\n}",
     "kinds": [
      "boolean"
-    ],
-    "values": [
-     {
-      "value": true,
-      "summary": "you get a push notification on your phone when a permission prompt or question is waiting, while Remote Control is connected"
-     },
-     {
-      "value": false,
-      "summary": "Claude Code sends no such notifications"
-     }
     ]
    },
    "isolatePeerMachines": {
@@ -11429,8 +11419,8 @@
     ]
    },
    "permissions": {
-    "summary": "Set allow, ask, and deny rules and the starting permission mode",
-    "typeText": "object with allow, ask, deny, additionalDirectories, blockReadsOutsideWorkingDirectories, defaultMode, disableBypassPermissionsMode, and disableAutoMode",
+    "summary": "Set allow, ask, and deny rules and the default permission mode",
+    "typeText": "object with allow, ask, deny, additionalDirectories, blockReadsOutsideWorkingDirectories, blockWritesOutsideWorkingDirectories, defaultMode, denyInsteadOfPrompting, disableBypassPermissionsMode, and disableAutoMode",
     "default": "unset",
     "scope": "Any file",
     "topic": "Permission settings",
@@ -11498,7 +11488,7 @@
       }
      },
      "defaultMode": {
-      "summary": "Set the permission mode new sessions start in",
+      "summary": "Set the default permission mode for new sessions",
       "typeText": "string, one of \"default\", \"acceptEdits\", \"plan\", \"auto\", \"dontAsk\", \"bypassPermissions\" or \"manual\"",
       "default": "unset",
       "scope": "Any file",
@@ -11617,6 +11607,50 @@
        {
         "value": false,
         "summary": "the same as unset; the block still applies if another file sets true"
+       }
+      ]
+     },
+     "blockWritesOutsideWorkingDirectories": {
+      "summary": "Make the Write, Edit, and NotebookEdit tools refuse paths outside the working directories in every permission mode, apart from some of Claude Code's own files",
+      "typeText": "Boolean",
+      "default": "unset, so writes outside the working directories follow your permission mode. The block is also on while Claude Code can't read the permissions object in your managed settings.",
+      "scope": "Any file",
+      "topic": "Permission settings",
+      "url": "https://code.claude.com/docs/en/settings-reference#permissions-blockwritesoutsideworkingdirectories",
+      "example": "{\n  \"permissions\": {\n    \"blockWritesOutsideWorkingDirectories\": true\n  }\n}",
+      "kinds": [
+       "boolean"
+      ],
+      "values": [
+       {
+        "value": true,
+        "summary": "turns the block on"
+       },
+       {
+        "value": false,
+        "summary": "the same as unset; the block still applies if another file sets true"
+       }
+      ]
+     },
+     "denyInsteadOfPrompting": {
+      "summary": "Deny tool calls that would wait on a permission prompt, so a session nobody is watching keeps working",
+      "typeText": "Boolean",
+      "default": "unset, so a call that needs approval prompts you",
+      "scope": "User or managed",
+      "topic": "Permission settings",
+      "url": "https://code.claude.com/docs/en/settings-reference#permissions-denyinsteadofprompting",
+      "example": "{\n  \"permissions\": {\n    \"defaultMode\": \"auto\",\n    \"denyInsteadOfPrompting\": true\n  }\n}",
+      "kinds": [
+       "boolean"
+      ],
+      "values": [
+       {
+        "value": true,
+        "summary": "Claude Code denies calls that would otherwise prompt"
+       },
+       {
+        "value": false,
+        "summary": "the same as unset; calls are still denied if another of these sources sets true"
        }
       ]
      }
@@ -11823,7 +11857,7 @@
     "values": [
      {
       "value": "auto",
-      "summary": "Claude Code sends a desktop notification in iTerm2, Ghostty, and Kitty, rings the bell in Terminal.app only when its audible bell is off, and does nothing elsewhere"
+      "summary": "Claude Code sends a desktop notification when it detects iTerm2, Ghostty, or Kitty, rings the bell in Terminal.app only when its audible bell is off, and does nothing elsewhere"
      },
      {
       "value": "terminal_bell",
@@ -12275,7 +12309,7 @@
         "scope": "Any file",
         "topic": "Sandbox settings",
         "url": "https://code.claude.com/docs/en/settings-reference#sandbox-network-allowmachlookup",
-        "example": "{\n  \"sandbox\": {\n    \"network\": {\n      \"allowMachLookup\": [\"com.apple.coresimulator.*\"]\n    }\n  }\n}",
+        "example": "{\n  \"sandbox\": {\n    \"network\": {\n      \"allowMachLookup\": [\"com.apple.CoreSimulator.*\"]\n    }\n  }\n}",
         "kinds": [
          "array"
         ],
@@ -13427,7 +13461,7 @@
    },
    "sshHostCommands": {
     "summary": "Add SSH connections whose host comes from a command to the Desktop environment selector",
-    "typeText": "array of objects, each with required id, name, and command and optional sshIdentityFile and startDirectory. Desktop starts command without a shell, so write it as a program and plain arguments.",
+    "typeText": "array of objects, each with required id, name, and command and optional sshIdentityFile and startDirectory. Desktop doesn't read command as shell syntax, so pipes and variables don't work: write it as a program and its arguments.",
     "default": "unset",
     "scope": "User or managed",
     "topic": "Remote, desktop, and notifications",
@@ -13658,7 +13692,7 @@
    },
    "strictPluginOnlyCustomization": {
     "summary": "Block skills, agents, hooks, and MCP servers from user and project sources",
-    "typeText": "true to lock all four kinds of customization, or an array naming the kinds to lock, from \"skills\", \"agents\", \"hooks\", and \"mcp\"",
+    "typeText": "true to lock all of them, or an array naming the ones to lock, from \"skills\", \"agents\", \"hooks\", and \"mcp\"",
     "default": "unset, so nothing is locked",
     "scope": "Managed",
     "topic": "Plugins and skills",
@@ -13675,19 +13709,19 @@
      "values": [
       {
        "value": "skills",
-       "summary": "Lock skills to plugin and managed sources"
+       "summary": "Block skills from user and project sources"
       },
       {
        "value": "agents",
-       "summary": "Lock agents to plugin and managed sources"
+       "summary": "Block agents from user and project sources"
       },
       {
        "value": "hooks",
-       "summary": "Lock hooks to plugin and managed sources"
+       "summary": "Block hooks from user and project sources"
       },
       {
        "value": "mcp",
-       "summary": "Lock MCP servers to plugin and managed sources"
+       "summary": "Block MCP servers from user and project sources"
       }
      ],
      "closedValues": true,
@@ -14089,7 +14123,7 @@
     "values": [
      {
       "value": true,
-      "summary": "the same as unset; when auto mode is available, the classifier reviews each shell command during planning instead of prompting you for it, except critical-path removals"
+      "summary": "the same as unset; when auto mode is available, the classifier reviews shell commands during planning"
      },
      {
       "value": false,
@@ -14339,7 +14373,7 @@
       "scope": "Any file",
       "topic": "Agents, sessions, and worktrees",
       "url": "https://code.claude.com/docs/en/settings-reference#worktree-sparsepaths",
-      "example": "{\n  \"worktree\": {\n    \"sparsePaths\": [\"packages/my-app\", \"shared/utils\"]\n  }\n}",
+      "example": "{\n  \"worktree\": {\n    \"sparsePaths\": [\".claude\", \"packages/my-app\", \"shared/utils\"]\n  }\n}",
       "kinds": [
        "array"
       ],
@@ -14830,6 +14864,10 @@
    "summary": "Passphrase for encrypted CLAUDE_CODE_CLIENT_KEY (optional)"
   },
   {
+   "name": "CLAUDE_CODE_CONFIG_LOCK_WAIT_MS",
+   "summary": "Milliseconds that a command adding or removing a user or local scope MCP server, such as claude mcp add, keeps trying for the lock on ~/.claude.json before it fails"
+  },
+  {
    "name": "CLAUDE_CODE_CONNECT_TIMEOUT_MS",
    "summary": "Removed in v2.1.186 and now a no-op"
   },
@@ -14898,12 +14936,16 @@
    "summary": "Set to 1 to stop Claude Code from terminating background shell commands under memory pressure"
   },
   {
+   "name": "CLAUDE_CODE_DISABLE_BG_STABLE_PATH",
+   "summary": "On macOS with the native installer, set to 1 to run each background session's host process from the installed binary, not ~/.local/share/claude/ClaudeCode.app. macOS may then ask again for permissions such as folder access, including after each update"
+  },
+  {
    "name": "CLAUDE_CODE_DISABLE_BUNDLED_SKILLS",
    "summary": "Set to 1 to disable the skills and workflows included with Claude Code: bundled skills and workflows are removed entirely, while built-in commands like /init stay typable but are hidden from the model. /doctor stays typable like the built-in commands; hide it…"
   },
   {
    "name": "CLAUDE_CODE_DISABLE_CFC_PROMPT",
-   "summary": "Set to 1 to keep the Claude in Chrome browser tools available while omitting the Chrome section of the system prompt and the /claude-in-chrome bundled skill"
+   "summary": "For hosts that embed Claude Code and supply their own browser guidance"
   },
   {
    "name": "CLAUDE_CODE_DISABLE_CLAUDE_MDS",
@@ -14915,7 +14957,7 @@
   },
   {
    "name": "CLAUDE_CODE_DISABLE_DANGEROUS_RM_TIMEOUT",
-   "summary": "Set to 1 to turn off the time limit on critical-path removal prompts"
+   "summary": "Set to 1 to turn off the auto and bypassPermissions time limit and denials on critical-path removals"
   },
   {
    "name": "CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS",
@@ -14928,6 +14970,10 @@
   {
    "name": "CLAUDE_CODE_DISABLE_FAST_MODE",
    "summary": "Set to 1 to disable fast mode"
+  },
+  {
+   "name": "CLAUDE_CODE_DISABLE_FEATURE_FLAGS",
+   "summary": "Set to 1 to turn off feature-flag fetching"
   },
   {
    "name": "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY",
@@ -15050,6 +15096,10 @@
    "summary": "Set to 1 to disable workflows"
   },
   {
+   "name": "CLAUDE_CODE_DROP_UNAVAILABLE_DEFERRED_TOOL",
+   "summary": "Set to 1 to drop a deferred tool call whose tool isn't available when you resume with -p"
+  },
+  {
    "name": "CLAUDE_CODE_EFFORT_LEVEL",
    "summary": "Set the effort level for supported models"
   },
@@ -15122,6 +15172,10 @@
    "summary": "Enable the enhanced telemetry (tracing) beta"
   },
   {
+   "name": "CLAUDE_CODE_EVEN_MORE_DANGEROUSLY_SKIP_PERMISSIONS",
+   "summary": "Set to 1 to run dangerous rm commands with no prompt in bypassPermissions mode, which removes a safety prompt for destructive deletes"
+  },
+  {
    "name": "CLAUDE_CODE_EXIT_AFTER_STOP_DELAY",
    "summary": "Time in milliseconds to wait after the query loop becomes idle before automatically exiting"
   },
@@ -15131,7 +15185,7 @@
   },
   {
    "name": "CLAUDE_CODE_EXTRA_BODY",
-   "summary": "JSON object to merge into the top level of every API request body"
+   "summary": "JSON object to merge into the top level of model request bodies except on some requests outside the conversation, such as /model checks"
   },
   {
    "name": "CLAUDE_CODE_FILE_READ_MAX_OUTPUT_TOKENS",
@@ -15183,7 +15237,7 @@
   },
   {
    "name": "CLAUDE_CODE_GLOB_TIMEOUT_SECONDS",
-   "summary": "Timeout in seconds for Glob tool file discovery"
+   "summary": "Timeout in seconds for Glob and Grep tool searches"
   },
   {
    "name": "CLAUDE_CODE_GOAL_CHECKIN_MINUTES",
@@ -15203,7 +15257,7 @@
   },
   {
    "name": "CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL",
-   "summary": "Set to 1 to skip auto-installation of IDE extensions"
+   "summary": "Set to 1 to stop /ide from installing the IDE extension"
   },
   {
    "name": "CLAUDE_CODE_IDE_SKIP_VALID_CHECK",
@@ -15299,7 +15353,7 @@
   },
   {
    "name": "CLAUDE_CODE_OAUTH_REFRESH_TOKEN",
-   "summary": "OAuth refresh token for Claude.ai authentication"
+   "summary": "OAuth refresh token for claude.ai authentication"
   },
   {
    "name": "CLAUDE_CODE_OAUTH_SCOPES",
@@ -15432,6 +15486,10 @@
   {
    "name": "CLAUDE_CODE_RESUME_PROMPT",
    "summary": "Override the continuation message Claude Code sends to Claude when CLAUDE_CODE_RESUME_INTERRUPTED_TURN continues an interrupted turn instead of resending its prompt, or when you resume a deferred tool call with -p"
+  },
+  {
+   "name": "CLAUDE_CODE_RESUME_SHOWS_CUT_OFF_CALLS",
+   "summary": "Set to 1 to keep interrupted tool calls, marked as cut off, in a turn that CLAUDE_CODE_RESUME_INTERRUPTED_TURN continues"
   },
   {
    "name": "CLAUDE_CODE_RETRY_WATCHDOG",
@@ -15683,7 +15741,7 @@
   },
   {
    "name": "CLAUDE_EFFORT",
-   "summary": "Set automatically in Bash tool subprocesses and hook commands to the effort level in effect when the subprocess starts: low, medium, high, xhigh, or max"
+   "summary": "Set automatically in Bash tool subprocesses and hook commands to the effort level setting when the subprocess starts: low, medium, high, xhigh, or max"
   },
   {
    "name": "CLAUDE_ENABLE_BYTE_WATCHDOG",
@@ -15771,7 +15829,7 @@
   },
   {
    "name": "DISABLE_GROWTHBOOK",
-   "summary": "Set to 1 or true to disable feature-flag fetching and use code defaults for every flag"
+   "summary": "Set to 1 to turn off feature-flag fetching"
   },
   {
    "name": "DISABLE_INSTALLATION_CHECKS",
@@ -15859,7 +15917,7 @@
   },
   {
    "name": "FORCE_HYPERLINK",
-   "summary": "Set to 1 to enable clickable OSC 8 hyperlinks when your terminal supports them but isn't auto-detected, or 0 to disable them"
+   "summary": "Set to 1 to enable clickable OSC 8 hyperlinks when your terminal supports them but isn't auto-detected"
   },
   {
    "name": "FORCE_PROMPT_CACHING_5M",
@@ -16075,11 +16133,11 @@
   },
   {
    "name": "OTEL_METRICS_INCLUDE_ACCOUNT_UUID",
-   "summary": "Set to false to exclude account UUID from metrics attributes (default: included)"
+   "summary": "Set to false to exclude account UUID from metric and event attributes (default: included)"
   },
   {
    "name": "OTEL_METRICS_INCLUDE_ENTRYPOINT",
-   "summary": "Set to true to include the session entrypoint in metrics attributes (default: excluded)"
+   "summary": "Set to true to include the session entrypoint in metric and event attributes (default: excluded)"
   },
   {
    "name": "OTEL_METRICS_INCLUDE_REPOSITORY",
@@ -16091,11 +16149,11 @@
   },
   {
    "name": "OTEL_METRICS_INCLUDE_SESSION_ID",
-   "summary": "Set to false to exclude session ID from metrics attributes (default: included)"
+   "summary": "Set to false to exclude session ID from metric and event attributes (default: included)"
   },
   {
    "name": "OTEL_METRICS_INCLUDE_VERSION",
-   "summary": "Set to true to include Claude Code version in metrics attributes (default: excluded)"
+   "summary": "Set to true to include Claude Code version in metric and event attributes (default: excluded)"
   },
   {
    "name": "OTEL_METRIC_EXPORT_INTERVAL",
@@ -16196,6 +16254,10 @@
   {
    "name": "VERTEX_REGION_CLAUDE_FABLE_5_1",
    "summary": "Override region for Claude Fable 5.1 when using Google Cloud's Agent Platform"
+  },
+  {
+   "name": "VERTEX_REGION_CLAUDE_FABLE_5_2",
+   "summary": "Override region for Claude Fable 5.2 when using Google Cloud's Agent Platform"
   },
   {
    "name": "VERTEX_REGION_CLAUDE_HAIKU_4_5",
