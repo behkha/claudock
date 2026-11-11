@@ -24,6 +24,7 @@ import { useSelectId } from '@/lib/hooks'
 import { useNav, type ScreenProps, useNavGuard } from '@/lib/nav'
 import { Dot, FrontmatterFacts, MarkdownPane, PromptDialog, Spacer, Tabs, useDirtyGuard, useNotify, useSaveShortcut } from '../_ext/ui'
 import { FileTree } from './FileTree'
+import { TeamBadge, useTeamMembers } from '../Team/members'
 
 type Filter = 'all' | 'on' | 'off' | 'synced' | 'plugin'
 type SizeInfo = { bytes: number; files: number } | 'err'
@@ -50,6 +51,7 @@ function stateText(s: SkillInfo): string {
 }
 
 export default function SkillsScreen({ selectId }: ScreenProps): JSX.Element {
+  const team = useTeamMembers('skills')
   const { data, error, loading, reload } = useApi(() => api.skills.list(), [])
   const [selected, setSelected] = useSelectId(selectId)
   const [filter, setFilter] = useState<Filter>('all')
@@ -252,7 +254,14 @@ export default function SkillsScreen({ selectId }: ScreenProps): JSX.Element {
                     leading={<Dot on={s.enabled} />}
                     title={s.name}
                     subtitle={stateText(s)}
-                    meta={sz && sz !== 'err' ? <span className="ext-size">{formatBytes(sz.bytes)}</span> : undefined}
+                    meta={
+                      team.has(s.id) || (sz && sz !== 'err') ? (
+                        <>
+                          {team.has(s.id) ? <TeamBadge /> : null}
+                          {sz && sz !== 'err' ? <span className="ext-size">{formatBytes(sz.bytes)}</span> : null}
+                        </>
+                      ) : undefined
+                    }
                     dimmed={!s.enabled}
                     selected={current?.id === s.id}
                     onSelect={() => guard.request(s.id)}

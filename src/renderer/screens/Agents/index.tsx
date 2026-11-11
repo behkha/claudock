@@ -25,6 +25,7 @@ import { useSelectId } from '@/lib/hooks'
 import type { ScreenProps } from '@/lib/nav'
 import { DocEditor } from '../_ext/DocEditor'
 import { ChipList, ChipsInput, Spacer, PromptDialog, useDirtyGuard, useNotify } from '../_ext/ui'
+import { TeamBadge, useTeamMembers } from '../Team/members'
 
 type Filter = 'all' | 'user' | 'plugin'
 
@@ -35,6 +36,7 @@ function findAgent(list: AgentInfo[], sel: string): AgentInfo | undefined {
 }
 
 export default function AgentsScreen({ selectId }: ScreenProps): JSX.Element {
+  const team = useTeamMembers('agents')
   const { data, error, loading, reload } = useApi(() => api.agents.list(), [])
   const [selected, setSelected] = useSelectId(selectId)
   const [filter, setFilter] = useState<Filter>('all')
@@ -130,7 +132,7 @@ export default function AgentsScreen({ selectId }: ScreenProps): JSX.Element {
                 leading={<Bot size={16} strokeWidth={1.8} />}
                 title={a.name}
                 subtitle={a.description || 'No description'}
-                meta={a.model || undefined}
+                meta={team.has(a.id) ? <><TeamBadge />{a.model ? ` ${a.model}` : null}</> : a.model || undefined}
                 selected={current?.id === a.id}
                 onSelect={() => guard.request(a.id)}
               />

@@ -18,7 +18,7 @@ import { alertPrefs, currentAlertPrefs, setAlertPrefs } from './domains/sessions
 import { popoverForShots } from './menubar'
 import { countHooks } from './domains/settings'
 import { emit } from './ipcx'
-import { configDir, globalStateFile, userDataDir } from './paths'
+import { configDir, globalStateFile, setConfigDir, userDataDir } from './paths'
 import { addLocalDays, midnightOf, mondayOf } from './share/week'
 import { setTheme } from './theme'
 import { sumActivity } from './today/activity'
@@ -495,7 +495,7 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
    * Team mode on the fixture's team folder (HOME/team-repo, where Team's folder dialog lands in screenshots): New team
    * setup (`team-new`), Choose with the github server and the fmt.sh hook ticked (`team-choose`), Review with their two
    * blockers (`team-review`), both fixed (`team-review-clear`), Written (`team-written`), and Team with a new and a
-   * changed item (`team-states`), then a teammate's edits in the repo (`team-both`: changed in the repo with its diff open, changed in both, only in the repo, removed) the repo's release-notes taken back, Connect a project (`team-connect`) and Invite (`team-invite`). Fails unless the written tree is what the review showed, no file holds the fixture's
+   * changed item (`team-states`), then a teammate's edits in the repo (`team-both`: changed in the repo with its diff open, changed in both, only in the repo, removed) the repo's release-notes taken back, Connect a project (`team-connect`) and Invite (`team-invite`); the written plugin installed twice into ~/.claude-work as Claude Code does, whose Team shows what the update changed (`team-joined`) with the same ≈ tokens per skill as here. Fails unless the written tree is what the review showed, no file holds the fixture's
    * fake tokens, a second write writes nothing, and settings.json and the global state file are byte for byte as
    * before; `claude plugin validate` checks the plugin and the marketplace when `claude` is on the path.
    */
@@ -515,6 +515,23 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
     }
     await reset()
     const dialog = `document.querySelector('dialog[open]')`
+    // a teammate: the second fixture profile, with the written plugin installed the way Claude Code installs it
+    const home = configDir()
+    const work = path.join(os.homedir(), '.claude-work')
+    const workSettings = path.join(work, 'settings.json')
+    const workSettingsBefore = await fsp.readFile(workSettings)
+    const install = async (version: string, at: number): Promise<void> => {
+      const cache = path.join(work, 'plugins', 'cache', 'claude-setup', 'team')
+      for (const old of await fsp.readdir(cache).catch(() => [] as string[])) await fsp.writeFile(path.join(cache, old, '.orphaned_at'), String(at))
+      const dir = path.join(cache, version)
+      await fsp.cp(path.join(repo, 'plugins', 'team'), dir, { recursive: true })
+      const iso = new Date(at).toISOString()
+      await fsp.writeFile(path.join(work, 'plugins', 'installed_plugins.json'), JSON.stringify({ version: 2, plugins: { 'team@claude-setup': [{ scope: 'user', installPath: dir, version, installedAt: iso, lastUpdated: iso, gitCommitSha: version.padEnd(40, '0') }] } }, null, 2))
+      await fsp.writeFile(path.join(work, 'plugins', 'known_marketplaces.json'), JSON.stringify({ 'claude-setup': { source: { source: 'github', repo: 'acme/claude-setup' }, installLocation: path.join(work, 'plugins', 'marketplaces', 'claude-setup'), lastUpdated: iso } }, null, 2))
+      const st = JSON.parse(workSettingsBefore.toString('utf8')) as Record<string, unknown>
+      await fsp.writeFile(workSettings, JSON.stringify({ ...st, enabledPlugins: { ...((st.enabledPlugins as object) ?? {}), 'team@claude-setup': true } }, null, 2) + '\n')
+      await fsp.utimes(path.join(dir, '.claudock.json'), new Date(at), new Date(at))
+    }
     const tick = (name: string): Promise<void> =>
       js(`(() => {
         const row = [...document.querySelectorAll('tr')].find((r) => r.querySelector('.ctx__label')?.textContent === ${JSON.stringify(name)})
@@ -573,6 +590,8 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
       const again = await team.write(r3.token)
       if (again.files !== 0 || again.removed !== 0) throw new Error(`team: a second write with nothing changed wrote ${again.files} and removed ${again.removed}`)
       await click('Done', dialog)
+      await install('a1b2c3d4e5f6', Date.now() - 2 * 86_400_000)
+      const mine = await listContext(true)
 
       // a new item and one changed here
       await team.setTicked(['skill:team-notes'], true)
@@ -610,6 +629,40 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
       const mineNow = await fsp.readFile(path.join(configDir(), 'skills', 'release-notes', 'SKILL.md'))
       if (!mineNow.equals(await fsp.readFile(path.join(plugin, 'skills', 'release-notes', 'SKILL.md')))) throw new Error("team: release-notes is not the repo's after taking it")
       await waitFor(`!document.querySelector('.toast')`, 'the toast gone')
+
+      // the teammate's Team after Claude Code brought the next version: what changed, and the same numbers as here
+      await install('0f9e8d7c6b5a', Date.now() - 3_600_000)
+      setConfigDir(work)
+      try {
+        const theirs = await listContext(true)
+        for (const id of ['release-notes', 'pdf-extract', 'db-migrations']) {
+          const a = mine.items.find((i) => i.id === `skill:${id}`)?.tokens ?? null
+          const b = theirs.items.find((i) => i.id === `skill:team:${id}`)?.tokens ?? null
+          if (a === null || b === null || Math.abs(a - b) > Math.max(3, 0.15 * Math.max(a, b))) throw new Error(`team: ${id} costs ${a} here and ${b} for a teammate`)
+        }
+        const joined = (await team.get()).joined
+        const changes = Object.fromEntries((joined?.items ?? []).filter((i) => i.change !== 'same').map((i) => [i.name, i.change]))
+        const want = { 'db-migrations': 'changed', onboarding: 'new', 'release-notes': 'changed' }
+        if (JSON.stringify(Object.fromEntries(Object.entries(changes).sort())) !== JSON.stringify(want)) throw new Error(`team: the teammate sees ${JSON.stringify(changes)}`)
+        const badges = await team.members()
+        if (badges.plugin !== 'team@claude-setup' || !badges.skills.some((x) => x.endsWith('/skills/release-notes'))) throw new Error(`team: the teammate's badges are ${JSON.stringify(badges)}`)
+        emit('system:navigate', { screen: 'today' })
+        await sleep(150)
+        emit('system:navigate', { screen: 'team' })
+        await waitFor(`[...document.querySelectorAll('.tm__sub')].some((h) => h.textContent === 'What changed')`, "the teammate's What changed")
+        await js(`[...document.querySelectorAll('.ctx__name')].find((b) => b.querySelector('.ctx__label')?.textContent === 'release-notes')?.click()`)
+        await waitFor(`document.querySelector('.ctx__detail .diff')`, 'the change open')
+        await shoot(theme, 'team-joined')
+        emit('system:navigate', { screen: 'skills' })
+        await waitFor(`[...document.querySelectorAll('.list-row')].some((r) => r.textContent.includes('release-notes') && r.querySelector('.badge')?.textContent === 'team')`, 'the team badge on Skills')
+      } finally {
+        setConfigDir(home)
+        emit('system:navigate', { screen: 'today' })
+        await sleep(150)
+        emit('system:navigate', { screen: 'team' })
+        await sleep(150)
+      }
+      await waitFor(`document.querySelector('.tm__repo')`, 'the Team view again')
 
       // Connect a project: the fixture's acme-web gains exactly the two keys, and Disconnect puts its file back byte for byte
       const projectFile = path.join(os.homedir(), 'acme-web', '.claude', 'settings.json')
@@ -650,6 +703,8 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
     } finally {
       await fsp.writeFile(skillFile, skillBefore)
       await fsp.writeFile(notesFile, notesBefore)
+      await fsp.writeFile(workSettings, workSettingsBefore)
+      await fsp.rm(path.join(work, 'plugins'), { recursive: true, force: true })
       await reset()
       // leave Team, so the next visit shows it from the start
       emit('system:navigate', { screen: 'today' })

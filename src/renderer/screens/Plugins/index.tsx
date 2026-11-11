@@ -185,6 +185,7 @@ export default function PluginsScreen({ selectId }: ScreenProps): JSX.Element {
 
 function PluginDetail({ plugin, busy, onToggle, onOpenMarket }: { plugin: PluginInfo; busy: boolean; onToggle: (v: boolean) => void; onOpenMarket: (name: string) => void }): JSX.Element {
   const { navigate } = useNav()
+  const team = useApi(() => api.team.members(), []).data?.plugin === plugin.key
   const notify = useNotify()
   const c = plugin.contents
   const stats: Array<{ label: string; n: number; screen?: 'skills' | 'agents' | 'commands' | 'hooks' | 'mcp' }> = c
@@ -205,13 +206,19 @@ function PluginDetail({ plugin, busy, onToggle, onOpenMarket }: { plugin: Plugin
         <>
           {plugin.version ? <Badge>v{plugin.version}</Badge> : null}
           {c?.mod ? <Badge tone="oat">mod</Badge> : null}
+          {team ? <Badge tone="oat">team</Badge> : null}
           {!plugin.installed ? <Badge tone="oat">{plugin.marketplace === 'builtin' ? 'built in' : 'not installed'}</Badge> : null}
           {plugin.state === 'unset' ? <Badge tone="oat">not in enabledPlugins</Badge> : null}
         </>
       }
       actions={
-        plugin.rel || c?.mod ? (
+        plugin.rel || c?.mod || team ? (
           <>
+            {team ? (
+              <Button variant="secondary" onClick={() => navigate('team')}>
+                Open in Team
+              </Button>
+            ) : null}
             {c?.mod ? (
               <Button variant="secondary" onClick={() => navigate('mods', plugin.key)}>
                 Open in Mods

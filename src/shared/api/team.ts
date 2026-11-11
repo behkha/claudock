@@ -216,6 +216,17 @@ export interface TeamDiff {
   binary: boolean
 }
 
+/** What is in the team, by each screen's own ids: those rows get a "team" badge. */
+export interface TeamMembers {
+  skills: string[]
+  agents: string[]
+  commands: string[]
+  hooks: string[]
+  mcp: string[]
+  /** The installed team plugin's key (`plugin@marketplace`), for the Plugins screen's link. */
+  plugin: string | null
+}
+
 export interface TeamApi {
   get(): Promise<TeamState>
   /** The system folder dialog. Null when cancelled. */
@@ -240,6 +251,7 @@ export interface TeamApi {
   reveal(): Promise<void>
   /** Stop tracking the team folder. Its files stay as they are. */
   forget(): Promise<void>
+  members(): Promise<TeamMembers>
 }
 
 export interface TeamEvents {}

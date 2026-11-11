@@ -9,6 +9,7 @@ import { useNav, type ScreenProps } from '@/lib/nav'
 import { ClaudockHooks, ClaudockMark } from './ClaudockHooks'
 import { HookForm } from './HookForm'
 import './hooks.css'
+import { TeamBadge, useTeamMembers } from '../Team/members'
 
 const NEW = '__new__'
 /** Selection id of the one row that stands for Claudock's own hooks. */
@@ -30,6 +31,7 @@ function parseTarget(selectId: string | undefined): { file?: SettingsFileName; i
 }
 
 export default function HooksScreen({ selectId }: ScreenProps): JSX.Element {
+  const team = useTeamMembers('hooks')
   const toast = useToast()
   const { seq, navigate } = useNav()
   const target = useMemo(() => parseTarget(selectId), [selectId])
@@ -178,7 +180,7 @@ export default function HooksScreen({ selectId }: ScreenProps): JSX.Element {
                     selected={!creating && selected?.id === e.id}
                     title={<span className="hk-matcher">{e.matcher ?? 'all'}</span>}
                     subtitle={<span className="hk-command">{e.command.replace(/\s+/g, ' ')}</span>}
-                    meta={e.timeout !== null ? `${e.timeout}s` : undefined}
+                    meta={file === 'settings.json' && team.has(e.id) ? <><TeamBadge />{e.timeout !== null ? ` ${e.timeout}s` : null}</> : e.timeout !== null ? `${e.timeout}s` : undefined}
                     leading={e.type !== 'command' ? <Badge>{e.type}</Badge> : undefined}
                     onSelect={() => guard(() => setSel(e.id))}
                   />

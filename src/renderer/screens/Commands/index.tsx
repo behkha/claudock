@@ -24,6 +24,7 @@ import { useSelectId } from '@/lib/hooks'
 import type { ScreenProps } from '@/lib/nav'
 import { DocEditor } from '../_ext/DocEditor'
 import { PromptDialog, Spacer, useDirtyGuard, useNotify } from '../_ext/ui'
+import { TeamBadge, useTeamMembers } from '../Team/members'
 
 type Filter = 'all' | 'user' | 'plugin'
 
@@ -40,6 +41,7 @@ const nameProblem = (v: string, existing: string[], self?: string): string | nul
 }
 
 export default function CommandsScreen({ selectId }: ScreenProps): JSX.Element {
+  const team = useTeamMembers('commands')
   const { data, error, loading, reload } = useApi(() => api.commands.list(), [])
   const [selected, setSelected] = useSelectId(selectId)
   const [filter, setFilter] = useState<Filter>('all')
@@ -135,7 +137,7 @@ export default function CommandsScreen({ selectId }: ScreenProps): JSX.Element {
                 leading={<Terminal size={16} strokeWidth={1.8} />}
                 title={`/${c.name}`}
                 subtitle={c.description || 'No description'}
-                meta={c.model || undefined}
+                meta={team.has(c.id) ? <><TeamBadge />{c.model ? ` ${c.model}` : null}</> : c.model || undefined}
                 selected={current?.id === c.id}
                 onSelect={() => guard.request(c.id)}
               />

@@ -10,6 +10,7 @@ import { useNotify } from '../_ext/ui'
 import { ChooseView } from './ChooseView'
 import { ConnectSheet } from './ConnectSheet'
 import { InviteSheet } from './InviteSheet'
+import { JoinedView } from './JoinedView'
 import { NewTeamSheet } from './NewTeamSheet'
 import { ReviewSheet } from './ReviewSheet'
 import { WrittenSheet } from './WrittenSheet'
@@ -89,6 +90,8 @@ export default function TeamScreen(_props: ScreenProps): JSX.Element {
       <InviteSheet join={data.join} open={sheet === 'invite'} onClose={() => setSheet(null)} />
     </>
   )
+
+  if (!data.setup && data.joined) return <JoinedView joined={data.joined} />
 
   if (!data.setup) {
     return (

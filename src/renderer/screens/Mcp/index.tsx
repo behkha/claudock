@@ -23,6 +23,7 @@ import { api, useApi } from '@/lib/api'
 import { useSelectId } from '@/lib/hooks'
 import { useNavGuard, type ScreenProps } from '@/lib/nav'
 import { KeyValueEditor, ListEditor, Spacer, fromRows, toRows, useDirtyGuard, useNotify, type Rows } from '../_ext/ui'
+import { TeamBadge, useTeamMembers } from '../Team/members'
 
 type Filter = 'all' | 'user' | 'project'
 
@@ -31,6 +32,7 @@ const userId = (name: string): string => `user:${name}`
 const projectId = (path: string, name: string): string => `project:${path}\u0000${name}`
 
 export default function McpScreen({ selectId }: ScreenProps): JSX.Element {
+  const team = useTeamMembers('mcp')
   const { data, error, loading, reload } = useApi(() => api.mcp.list(), [])
   const { data: info } = useApi(() => api.system.configInfo(), [])
   const [selected, setSelected] = useSelectId(selectId)
@@ -113,7 +115,7 @@ export default function McpScreen({ selectId }: ScreenProps): JSX.Element {
                       leading={<Plug size={16} strokeWidth={1.8} />}
                       title={s.name}
                       subtitle={s.summary || 'No command or URL'}
-                      meta={s.off ? 'off' : s.transport}
+                      meta={team.has(s.name) ? <><TeamBadge /> {s.off ? 'off' : s.transport}</> : s.off ? 'off' : s.transport}
                       dimmed={s.off}
                       selected={sel === NEW_ID ? false : selUser?.name === s.name}
                       onSelect={() => guard.request(userId(s.name))}

@@ -43,7 +43,12 @@ export async function listFiles(root: string): Promise<string[]> {
 
 /** The repo as it is now: what `stateOf` and `buildPlan` compare against. */
 export async function readRepo(dir: string, plugin: string): Promise<RepoView> {
-  const root = path.join(dir, ...pluginDir(plugin).split('/'))
+  return readPluginFolder(path.join(dir, ...pluginDir(plugin).split('/')), dir)
+}
+
+/** A plugin folder read the same way: in the team folder (`marketDir` its root), or an installed copy in Claude Code's cache. */
+export async function readPluginFolder(root: string, marketDir: string | null = null): Promise<RepoView> {
+  const dir = marketDir ?? root
   const files = new Map<string, string>()
   for (const rel of await listFiles(root)) {
     if (rel === MANIFEST_NAME) continue
@@ -60,7 +65,7 @@ export async function readRepo(dir: string, plugin: string): Promise<RepoView> {
     hooks: await json(path.join(root, 'hooks', 'hooks.json')),
     mcp: await json(path.join(root, '.mcp.json')),
     pluginJson: await json(path.join(root, '.claude-plugin', 'plugin.json')),
-    marketplace: await json(path.join(dir, '.claude-plugin', 'marketplace.json')),
+    marketplace: marketDir ? await json(path.join(dir, '.claude-plugin', 'marketplace.json')) : undefined,
     readme
   }
 }

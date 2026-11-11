@@ -18,6 +18,9 @@ import {
   type TeamDiff,
   type TeamItem,
   type TeamItemState,
+  type TeamJoined,
+  type JoinedItem,
+  type TeamMembers,
   type TeamKind,
   type TeamProject,
   type TeamRemote,
@@ -33,6 +36,9 @@ import { configDir, globalStateFile, installKind, isInside, isSecret, samePath, 
 import { safeWriteText, trash } from '../safeWrite'
 import {
   MAX_SCRIPT_BYTES,
+  MANIFEST_NAME,
+  canonical,
+  parseManifest,
   buildOut,
   buildPlan,
   fixProblem,
@@ -49,6 +55,7 @@ import {
   pointerText,
   unpointerText,
   repoHook,
+  repoSha,
   sendCommand,
   sha256,
   stateOf,
@@ -57,16 +64,17 @@ import {
   type ItemOut,
   type JsonObj,
   type ManifestItem,
+  type Manifest,
   type Plan,
   type PlanItem,
   type RepoView,
   type SrcFile,
   type Source
 } from '../team/model'
-import { existingNames, gitDirOf, readRemote, readRepo, readRepoFile } from '../team/repo'
+import { existingNames, gitDirOf, readPluginFolder, readRemote, readRepo, readRepoFile } from '../team/repo'
 import { devAllowed, readText, writeFiles, writeOne, type WriteGuard } from '../team/write'
 import { listContext } from './context'
-import { collectMd, readSettings, toPosix } from './extendShared'
+import { collectMd, enabledMap, installedPlugins, readSettings, toPosix, type PluginRecord } from './extendShared'
 import { ourHookCommands } from './sessions'
 import { listProjectSummaries } from './projects'
 import { scanUser } from './skills'
@@ -323,6 +331,7 @@ interface Built {
   context: ContextItem[]
   home: string
   projects: TeamProject[]
+  joined: Joined | null
 }
 
 const KIND_ORDER: TeamKind[] = ['mcp', 'skill', 'agent', 'command', 'hook']
@@ -462,7 +471,8 @@ async function build(opts: { context: boolean }): Promise<Built> {
   if (has(settings.env)) stays.push({ name: 'Environment variables', reason: "A plugin's settings cannot set them", tokens: null })
 
   const projects = store && opts.context ? await projectsOf(store) : []
-  return { store, setup, remote, view, rows, items, findings, outs, plan, states, stays, context, home, projects }
+  const joined = await joinedOf(settings, ctxById, opts.context)
+  return { store, setup, remote, view, rows, items, findings, outs, plan, states, stays, context, home, projects, joined }
 }
 
 /** The skills, agents and commands the plugin folder holds, by the names their files give them. */
@@ -523,12 +533,191 @@ function toState(b: Built): TeamState {
     changes,
     join: b.store && b.remote ? joinCommands(b.store, b.remote, asks) : null,
     projects: b.projects,
-    joined: null,
+    joined: b.joined?.view ?? null,
     writable: b.store ? guard.allowed(b.store.dir) : true
   }
 }
 
 const get = (): Promise<TeamState> => build({ context: true }).then(toState)
+
+/* ------------------------------------------------------------------ a team someone else wrote */
+
+interface Joined {
+  view: TeamJoined
+  plugin: PluginRecord
+  now: RepoView
+  /** The version before this one, while Claude Code keeps its folder. */
+  before: RepoView | null
+  beforeDir: string | null
+}
+
+/** The last two manifests seen of a profile's team plugin, so "What changed" outlives Claude Code's cleanup of old folders. */
+interface Seen {
+  key: string
+  seen: Manifest
+  before: Manifest | null
+}
+const seenFile = (dir: string): string => `${folderKey(dir)}.joined.json`
+
+async function sourceOf(marketplace: string): Promise<string> {
+  const r = await tryReadJson<unknown>(path.join(configDir(), 'plugins', 'known_marketplaces.json'))
+  const m = r.ok && isObj(r.value) && isObj(r.value[marketplace]) ? r.value[marketplace] : null
+  const src = m && isObj(m.source) ? m.source : null
+  if (!src) return marketplace
+  for (const k of ['repo', 'url', 'path']) if (typeof src[k] === 'string') return src[k] as string
+  return marketplace
+}
+
+/** The listing line of a skill, agent or command in a plugin folder, for an estimate. */
+async function listingIn(root: string, rec: ManifestItem, plugin: string): Promise<number | null> {
+  if (rec.kind === 'hook') return 0
+  if (rec.kind === 'mcp') return null
+  const rel = rec.kind === 'skill' ? (rec.files.find((f) => /\/SKILL\.md$/i.test(f)) ?? rec.files[0]) : rec.files[0]
+  if (!rel) return null
+  const data = await readCached(path.join(root, ...rel.split('/')))
+  if (!data) return null
+  return estimateTokens(listingLine(`${plugin}:${rec.name}`, descriptionOf(data)).length)
+}
+
+/**
+ * The installed plugin whose folder holds `.claudock.json`: a team this profile joined. What changed compares it with
+ * the version folder before it in `plugins/cache/<marketplace>/<plugin>/`, else with the manifest seen before.
+ */
+async function joinedOf(settings: Record<string, unknown>, ctx: Map<string, ContextItem>, remember: boolean): Promise<Joined | null> {
+  for (const p of await installedPlugins().catch(() => [] as PluginRecord[])) {
+    if (!p.exists) continue
+    const now = await readPluginFolder(p.dir)
+    if (!now.manifest) continue
+    // the version folder before this one: the newest other folder that holds a manifest too
+    const parent = path.dirname(p.dir)
+    let before: RepoView | null = null
+    let beforeDir: string | null = null
+    let newest = -1
+    for (const e of await fsp.readdir(parent, { withFileTypes: true }).catch(() => [])) {
+      const d = path.join(parent, e.name)
+      if (!e.isDirectory() || samePath(d, p.dir)) continue
+      const st = await fsp.stat(path.join(d, MANIFEST_NAME)).catch(() => null)
+      if (st && st.mtimeMs > newest) {
+        newest = st.mtimeMs
+        beforeDir = d
+      }
+    }
+    if (beforeDir) before = await readPluginFolder(beforeDir)
+    // remember what was seen, for when the old folder is gone
+    const cfg = configDir()
+    const r = await tryReadJson<unknown>(path.join(storeDir(), seenFile(cfg)))
+    const v = r.ok && isObj(r.value) ? r.value : null
+    let seen: Seen | null = v && v.key === p.key ? { key: p.key, seen: parseManifest(v.seen) ?? now.manifest, before: parseManifest(v.before) } : null
+    if (!seen || canonical(seen.seen) !== canonical(now.manifest)) {
+      seen = { key: p.key, seen: now.manifest, before: seen ? seen.seen : null }
+      if (remember) await writeOwn(seenFile(cfg), JSON.stringify(seen, null, 2) + '\n', 0o644, storeDir()).catch(() => undefined)
+    }
+    // every item each version holds: what Claudock wrote, and skills, agents and commands added by hand
+    const prevManifest = before?.manifest ?? seen.before
+    const all = (view: RepoView | null, m: Manifest | null): Map<string, ManifestItem> => {
+      const out = new Map((m?.items ?? []).map((x) => [x.id, x]))
+      if (view) {
+        for (const { kind, name } of repoOnlyOf(view)) {
+          const id = `${kind}:${name}`
+          if (!out.has(id)) out.set(id, { id, kind, name, sha: '', files: repoRels(view, kind, name, null) })
+        }
+      }
+      return out
+    }
+    const nowItems = all(now, now.manifest)
+    const prevItems = all(before, prevManifest)
+    // compared by their files as they are (a teammate's hand edit does not change the manifest)
+    const shaIn = (view: RepoView | null, rec: ManifestItem): string => (view ? (repoSha(rec, view) ?? '') : rec.sha)
+    const items: JoinedItem[] = []
+    for (const rec of nowItems.values()) {
+      const old = prevItems.get(rec.id)
+      const c = rec.kind === 'skill' ? ctx.get(`skill:${p.name}:${rec.name}`) : undefined
+      const tokens = c && c.on && c.tokens !== null ? c.tokens : await listingIn(p.dir, rec, p.name)
+      const change = !prevManifest ? 'same' : !old ? 'new' : shaIn(before, old) !== shaIn(before ? now : null, rec) ? 'changed' : 'same'
+      items.push({ id: rec.id, kind: rec.kind, name: rec.name, detail: rec.hook ? `hook · ${rec.hook.event}` : rec.kind === 'mcp' ? 'MCP' : rec.kind, change, tokens })
+    }
+    for (const old of prevItems.values()) {
+      if (nowItems.has(old.id)) continue
+      const t = beforeDir ? await listingIn(beforeDir, old, p.name) : null
+      items.push({ id: old.id, kind: old.kind, name: old.name, detail: old.hook ? `hook · ${old.hook.event}` : old.kind === 'mcp' ? 'MCP' : old.kind, change: 'removed', tokens: t === null ? null : -t })
+    }
+    const order = { new: 0, changed: 1, removed: 2, same: 3 }
+    items.sort((a, b) => order[a.change] - order[b.change] || (Math.abs(b.tokens ?? 0) - Math.abs(a.tokens ?? 0)) || a.name.localeCompare(b.name))
+    const ms = p.lastUpdated ? Date.parse(p.lastUpdated) : NaN
+    return {
+      view: {
+        marketplace: p.marketplace,
+        plugin: p.name,
+        source: await sourceOf(p.marketplace),
+        updatedAt: Number.isNaN(ms) ? null : ms,
+        enabled: enabledMap(settings)[p.key] === true,
+        items,
+        tokens: items.filter((i) => i.change !== 'removed').reduce((n, i) => n + (i.tokens ?? 0), 0)
+      },
+      plugin: p,
+      now,
+      before,
+      beforeDir
+    }
+  }
+  return null
+}
+
+/** A joined item now and before, for its row's diff. */
+async function joinedDiff(j: Joined, id: string): Promise<TeamDiff> {
+  const find = (v: RepoView | null): ManifestItem | null => {
+    if (!v) return null
+    const m = v.manifest?.items.find((r) => r.id === id)
+    if (m) return m
+    const only = repoOnlyOf(v).find((x) => `${x.kind}:${x.name}` === id)
+    return only ? { id, kind: only.kind, name: only.name, sha: '', files: repoRels(v, only.kind, only.name, null) } : null
+  }
+  const rec = find(j.now)
+  const old = find(j.before)
+  const kind = rec?.kind ?? old?.kind
+  if (!kind) throw new Error('This item is no longer listed')
+  const json = (v: unknown): string => (v ? JSON.stringify(v, null, 2) + '\n' : '')
+  if (kind === 'hook') {
+    const h = rec?.hook ?? old?.hook
+    return { before: j.before && h ? json(repoHook(j.before, h.event, h.key)) : '', after: h ? json(repoHook(j.now, h.event, h.key)) : '', binary: false }
+  }
+  if (kind === 'mcp') {
+    const name = rec?.mcp ?? old?.mcp ?? ''
+    const server = (v: RepoView | null): unknown => (v && isObj(v.mcp) && isObj(v.mcp.mcpServers) && isObj(v.mcp.mcpServers[name]) ? maskSecrets(v.mcp.mcpServers[name] as JsonObj) : null)
+    return { before: json(server(j.before)), after: json(server(j.now)), binary: false }
+  }
+  const text = async (root: string | null, files: string[]): Promise<string> => {
+    if (!root) return ''
+    let out = ''
+    for (const rel of files) {
+      const d = await readCached(path.join(root, ...rel.split('/')))
+      out += (files.length > 1 ? `── ${rel}\n` : '') + (d ? (textOf(d) ?? '(not text)\n') : '')
+    }
+    return out
+  }
+  return { before: await text(j.beforeDir, old?.files ?? []), after: await text(j.plugin.dir, rec?.files ?? []), binary: false }
+}
+
+/* ------------------------------------------------------------------ badges */
+
+async function members(): Promise<TeamMembers> {
+  const b = await build({ context: false })
+  const out: TeamMembers = { skills: [], agents: [], commands: [], hooks: [], mcp: [], plugin: b.joined?.plugin.key ?? null }
+  for (const i of b.items) {
+    if (!i.ticked || !i.open || i.state === null || i.state === 'new') continue
+    const id = i.open.screen === 'hooks' ? i.open.id.replace(/^settings\.json\|/, '') : i.open.screen === 'mcp' ? i.open.id.replace(/^user:/, '') : i.open.id
+    out[i.open.screen].push(id)
+  }
+  if (b.joined) {
+    // the plugin's own skills, agents and commands, by the ids those screens give them
+    const base = toPosix(path.relative(configDir(), b.joined.plugin.dir))
+    for (const rec of b.joined.now.manifest?.items ?? []) {
+      if (rec.kind === 'skill') out.skills.push(`${base}/skills/${rec.name}`)
+      else if (rec.kind === 'agent' || rec.kind === 'command') for (const f of rec.files) out[`${rec.kind}s`].push(`${base}/${f}`)
+    }
+  }
+  return out
+}
 
 /* ------------------------------------------------------------------ connected projects */
 
@@ -749,6 +938,7 @@ function diffOf(before: Uint8Array, after: Uint8Array): TeamDiff {
 async function itemDiff(id: string): Promise<TeamDiff> {
   if (typeof id !== 'string') throw new Error('Unknown item')
   const b = await build({ context: false })
+  if (!b.store && b.joined) return joinedDiff(b.joined, id)
   if (!b.store) throw new Error('There is no team setup in this profile')
   const out = b.outs.get(id) ?? null
   const rec: ManifestItem | null = b.view.manifest?.items.find((r) => r.id === id) ?? null
@@ -904,7 +1094,8 @@ export const impl: TeamApi = {
   disconnect,
   copy,
   reveal,
-  forget
+  forget,
+  members
 }
 
 export function register(ipcMain: IpcMain): void {
