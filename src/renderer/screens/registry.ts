@@ -6,6 +6,7 @@ import SettingsScreen from './Settings'
 import RulesScreen from './Rules'
 import HooksScreen from './Hooks'
 import PermissionsScreen from './Permissions'
+import TeamScreen from './Team'
 import ContextScreen from './Context'
 import SkillsScreen from './Skills'
 import AgentsScreen from './Agents'
@@ -28,6 +29,7 @@ export const SCREEN_COMPONENTS: Record<ScreenId, ComponentType<ScreenProps>> = {
   rules: RulesScreen,
   hooks: HooksScreen,
   permissions: PermissionsScreen,
+  team: TeamScreen,
   context: ContextScreen,
   skills: SkillsScreen,
   agents: AgentsScreen,

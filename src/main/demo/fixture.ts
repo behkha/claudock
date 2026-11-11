@@ -79,7 +79,11 @@ export function buildFixture(dir: string): void {
           { matcher: 'Bash', hooks: [{ type: 'command', command: '~/.claude/hooks/guard-bash.sh', timeout: 10 }] },
           { matcher: 'Edit|Write', hooks: [{ type: 'command', command: 'node ~/.claude/hooks/protect-files.js' }] }
         ],
-        PostToolUse: [{ matcher: 'Edit|Write', hooks: [{ type: 'command', command: 'npx prettier --write "$CLAUDE_FILE_PATHS"' }] }],
+        PostToolUse: [
+          { matcher: 'Edit|Write', hooks: [{ type: 'command', command: 'npx prettier --write "$CLAUDE_FILE_PATHS"' }] },
+          // a script only this computer has (Team mode copies it into the plugin)
+          { matcher: 'Edit|Write', hooks: [{ type: 'command', command: path.join(dir, 'bin', 'fmt.sh'), timeout: 10 }] }
+        ],
         UserPromptSubmit: [{ hooks: [{ type: 'command', command: '~/.claude/hooks/add-date.sh' }] }],
         SessionStart: [{ hooks: [{ type: 'command', command: 'echo "session started" >> ~/.claude/session.log' }] }],
         Stop: [{ hooks: [{ type: 'command', command: 'afplay /System/Library/Sounds/Glass.aiff' }] }],
@@ -138,6 +142,8 @@ Short sentences. No emoji in commit messages.
   skill('legacy-deploy', 'Old deploy checklist kept for reference.', '# Legacy deploy\n\nSuperseded by the CI pipeline. Kept for history.')
   skill('big-assets', 'Generate and optimise large image assets.', '# Big assets\n\nThis skill ships a large sample dataset in `references/`.')
   big('skills/big-assets/references/sample-dataset.bin', 5 * 1024 * 1024, now - 90 * DAY)
+  // names a file on this computer by its full path (Team mode warns before sharing it)
+  skill('team-notes', 'Read the team notes before planning work.', `# Team notes\n\nRead ${path.join(dir, 'notes', 'team.md')} first, then plan.`)
 
   /* ------------------------------------------------------------------ agents + commands */
   w('agents/code-reviewer.md', `---\nname: code-reviewer\ndescription: Reviews a diff for bugs and risky changes. Use proactively after a feature is finished.\ntools: Read, Grep, Glob, Bash\nmodel: sonnet\n---\n\nYou are a careful reviewer. Report correctness bugs first, then risks, then style. Cite file and line.\n`)
@@ -664,6 +670,9 @@ export function register(on) {
     '#!/bin/bash\ninput=$(cat)\nmodel=$(printf \'%s\' "$input" | sed -n \'s/.*"display_name":"\\([^"]*\\)".*/\\1/p\')\n' +
       'dir=$(printf \'%s\' "$input" | sed -n \'s/.*"current_dir":"\\([^"]*\\)".*/\\1/p\')\necho "${model:-Claude} · ${dir##*/}"\n'
   )
+  w('bin/fmt.sh', '#!/bin/sh\n# format the files Claude just edited\nexit 0\n')
+  fs.chmodSync(path.join(dir, 'bin', 'fmt.sh'), 0o755)
+  w('notes/team.md', '# Team notes\n\nShip small.\n')
   w('hooks/guard-bash.sh', '#!/bin/bash\nexit 0\n')
   w('hooks/add-date.sh', '#!/bin/bash\ndate\n')
   {
@@ -740,7 +749,9 @@ export function register(on) {
     mcpServers: {
       filesystem: { type: 'stdio', command: 'npx', args: ['-y', '@modelcontextprotocol/server-filesystem', '/Users/me/code'], env: { LOG_LEVEL: 'info' } },
       'docs-search': { type: 'http', url: 'https://mcp.example.com/docs', headers: { Authorization: 'Bearer ${DOCS_TOKEN}' } },
-      github: { type: 'http', url: 'https://api.githubcopilot.com/mcp/', headers: { Authorization: 'Bearer ${GITHUB_TOKEN}' } }
+      // a token written into the settings (a fake one): Team mode refuses to share it as it is
+      github: { type: 'http', url: 'https://api.githubcopilot.com/mcp/', headers: { Authorization: 'Bearer ghp_FAKEDONOTUSE0000000000000000000000' } },
+      issues: { type: 'stdio', command: 'npx', args: ['-y', 'issues-mcp'], env: { ISSUES_API_KEY: 'fake-key-do-not-use-0000', REGION: 'eu' } }
     },
     // Claude Code's own count of each skill's uses
     skillUsage: {

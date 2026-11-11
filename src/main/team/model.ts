@@ -215,6 +215,16 @@ function replaceSpans(value: string, spans: [number, number][], put: string): st
   return out + value.slice(at)
 }
 
+/** The settings with every literal secret replaced by dots: what may be shown or logged. */
+export function maskSecrets(config: JsonObj): JsonObj {
+  let out = config
+  for (const hit of findSecrets(config)) {
+    const value = valueAt(config, hit.where)
+    if (value !== null) out = withValueAt(out, hit.where, replaceSpans(value, hit.spans, '••••••'))
+  }
+  return out
+}
+
 const CONFIG_KEY_RE = /^[a-z][a-z0-9_]{0,63}$/
 const ENV_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/
 const snake = (s: string): string =>
@@ -440,7 +450,7 @@ const serversOf = (v: unknown): JsonObj => (isObj(v) ? (isObj(v.mcpServers) ? v.
 const userConfigOf = (v: unknown): JsonObj => (isObj(v) && isObj(v.userConfig) ? v.userConfig : {})
 
 /** The repo's hook with this key, as a group of its own; null when it has none. */
-function repoHook(view: RepoView, event: string, key: string): JsonObj | null {
+export function repoHook(view: RepoView, event: string, key: string): JsonObj | null {
   const groups = hooksOf(view.hooks)[event]
   if (!Array.isArray(groups)) return null
   for (const g of groups) {

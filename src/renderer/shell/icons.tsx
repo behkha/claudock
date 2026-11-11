@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   Sparkles,
   Terminal,
+  Users,
   Webhook,
   type LucideIcon
 } from 'lucide-react'
@@ -28,6 +29,7 @@ export const SCREEN_ICONS: Record<ScreenId, LucideIcon> = {
   rules: FileText,
   hooks: Webhook,
   permissions: ShieldCheck,
+  team: Users,
   context: Gauge,
   skills: Sparkles,
   agents: Bot,

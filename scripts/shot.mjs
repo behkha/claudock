@@ -96,16 +96,28 @@ if (!real) {
   // the second profile, where Add profile finds it: ~/.claude-work
   const work = path.join(root, '.fixture', 'claude-work')
   if (fs.existsSync(work)) fs.cpSync(work, path.join(home, '.claude-work'), { recursive: true, preserveTimestamps: true, mode: fs.constants.COPYFILE_FICLONE })
-  // Plugin and marketplace records hold absolute paths (as Claude Code writes them); point them at the copy.
-  const [from, to] = [fixture, copy].map((p) => JSON.stringify(p).slice(1, -1))
+  // Team mode's folders outside the config folder: the team repo (where Team's folder dialog lands in screenshots) and a project
+  for (const name of ['team-repo', 'acme-web']) {
+    const from = path.join(root, '.fixture', name)
+    if (fs.existsSync(from)) fs.cpSync(from, path.join(home, name), { recursive: true, preserveTimestamps: true, mode: fs.constants.COPYFILE_FICLONE })
+  }
+  // Plugin and marketplace records hold absolute paths (as Claude Code writes them), and so do a hook command and a
+  // skill's text; point them at the copy.
+  const pairs = [
+    [fixture, copy],
+    [path.join(root, '.fixture', 'acme-web'), path.join(home, 'acme-web')]
+  ]
   for (const rel of fs.readdirSync(copy, { recursive: true })) {
     const f = path.join(copy, String(rel))
-    if (!f.endsWith('.json') || !fs.statSync(f).isFile()) continue
-    const text = fs.readFileSync(f, 'utf8')
-    if (!text.includes(from)) continue
-    const { atime, mtime } = fs.statSync(f)
-    fs.writeFileSync(f, text.replaceAll(from, to))
-    fs.utimesSync(f, atime, mtime)
+    if (!/\.(json|md)$/.test(f) || !fs.statSync(f).isFile()) continue
+    for (const [a, b] of pairs) {
+      const [from, to] = f.endsWith('.json') ? [a, b].map((p) => JSON.stringify(p).slice(1, -1)) : [a, b]
+      const text = fs.readFileSync(f, 'utf8')
+      if (!text.includes(from)) continue
+      const { atime, mtime } = fs.statSync(f)
+      fs.writeFileSync(f, text.replaceAll(from, to))
+      fs.utimesSync(f, atime, mtime)
+    }
   }
 }
 
