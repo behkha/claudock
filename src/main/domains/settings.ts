@@ -5,7 +5,9 @@ import { SETTINGS_FILES } from '@shared/api/settings'
 import { listDir, readText, stat } from '../fsx'
 import { defineDomain } from '../ipcx'
 import { assertWritable, configDir, resolveInside } from '../paths'
+import { getModelCatalog } from '../modelCatalog'
 import { getSettingsDocs } from '../settingsDocs'
+import { usedModelIds } from './limits'
 import { ourHookCommands } from './sessions'
 import { listSnapshots, readSnapshotText, restoreSnapshot, safeWriteJson, safeWriteText, withFileLock as sharedFileLock } from '../safeWrite'
 
@@ -335,6 +337,11 @@ const impl: SettingsApi = {
 
   docs() {
     return getSettingsDocs()
+  },
+
+  async models() {
+    const [catalog, used] = await Promise.all([getModelCatalog(), usedModelIds().catch(() => [])])
+    return { catalog, used }
   }
 }
 

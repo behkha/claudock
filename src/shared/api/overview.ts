@@ -75,7 +75,7 @@ export interface WeekModel {
   /** Friendly name ("Opus 5.5"), or the id as recorded for a model that isn't Claude. */
   name: string
   tokens: number
-  /** Null when the price table has no row for it: left out of the value. */
+  /** Null when Anthropic's price page has no row for it: left out of the value, and named as unpriced on the card. */
   usd: number | null
 }
 
@@ -103,7 +103,8 @@ export interface WeekStats {
   /** Most tokens first. */
   models: WeekModel[]
   /** The rates this week's messages paid ("Opus 5.5", "Opus 5.5 fast"), and how many web searches they made. */
-  prices: { asOf: string; source: string; rows: Array<Rates & { name: string }>; searches: number }
+  /** `asOf`: the day Anthropic's price page was read (`YYYY-MM-DD`). `searchUsd`: USD per web search. */
+  prices: { asOf: string; source: string; rows: Array<Rates & { name: string }>; searches: number; searchUsd: number }
 }
 
 /** Per profile, in Claudock's own data. */

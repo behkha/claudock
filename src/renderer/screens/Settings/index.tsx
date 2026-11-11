@@ -370,7 +370,7 @@ export default function SettingsScreen({ selectId }: ScreenProps): JSX.Element {
             tone="warn"
             actions={<Button onClick={() => setView('json')}>Open JSON view</Button>}
           >
-            {problem ? describeProblem(problem) : 'This file is not a JSON object.'} The form is off until the JSON is valid.
+            {problem ? `${describeProblem(problem).replace(/[.\s]+$/, '')}.` : 'This file is not a JSON object.'} The form is off until the JSON is valid.
           </Banner>
         )
       ) : null}

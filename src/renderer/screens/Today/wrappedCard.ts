@@ -218,10 +218,12 @@ export async function drawWeekCard(canvas: HTMLCanvasElement, w: WeekStats, plan
   const rest = shown.slice(3).reduce((n, m) => n + amount(m), 0)
   if (rest > 0) keys.push({ name: 'Other', v: rest })
   const total = keys.reduce((n, k) => n + k.v, 0)
+  // a model Anthropic's price page has no row for is named under the key, never dropped: its tokens are not in the value
+  const unpriced = usd ? w.models.filter((m) => m.usd === null && m.tokens > 0) : []
   if (total > 0) {
     const x0 = PAD + daysW + Math.round(INNER * 0.08)
     const width = PAD + INNER - x0
-    const rows = keys.length
+    const rows = keys.length + (unpriced.length ? 1 : 0)
     const keyTop = bottom - rows * 34 + 6
     const barY = keyTop - 34
     const colors = [CLAY, HEAT[1], HEAT[0], LINE]
@@ -246,6 +248,26 @@ export async function drawWeekCard(canvas: HTMLCanvasElement, w: WeekStats, plan
       ctx.fillText(usd ? formatUsd(k.v) : formatTokens(k.v), x0 + width, y)
       ctx.textAlign = 'left'
     })
+    if (unpriced.length) {
+      const y = keyTop + keys.length * 34 + 14
+      ctx.strokeStyle = TEXT_3
+      ctx.lineWidth = 1.5
+      ctx.beginPath()
+      ctx.arc(x0 + 7, y - 6, 6.25, 0, Math.PI * 2)
+      ctx.stroke()
+      ctx.font = `20px ${f.sans}`
+      ctx.fillStyle = TEXT_3
+      const note = 'no price'
+      ctx.textAlign = 'right'
+      ctx.fillText(note, x0 + width, y)
+      ctx.textAlign = 'left'
+      const more = unpriced.length > 1 ? ` +${unpriced.length - 1}` : ''
+      const room = width - 26 - ctx.measureText(note).width - 16
+      let name = unpriced[0].name
+      while (name.length > 1 && ctx.measureText(name + more).width > room) name = name.slice(0, -2).trimEnd() + '…'
+      ctx.fillStyle = TEXT_2
+      ctx.fillText(name + more, x0 + 26, y)
+    }
   }
 
   const list: Array<[string, string]> = [

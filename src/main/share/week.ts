@@ -1,6 +1,7 @@
 import type { WeekModel, WeekStats } from '@shared/api/overview'
 import { friendlyModel, isClaudeModel } from '../../shared/models.ts'
-import { PRICES_AS_OF, PRICES_SOURCE, priceOf, ratesFor, usdAt, type MessageUsage, type Rates } from '../../shared/prices.ts'
+import { MODEL_CATALOG_PAGE, priceIn, type BuiltModelCatalog } from '../../shared/modelCatalog.ts'
+import { ratesFor, usdAt, type MessageUsage, type Rates } from '../../shared/prices.ts'
 import { isObj, userText, type Json } from '../transcripts/parse.ts'
 
 /**
@@ -121,8 +122,11 @@ export const isMonday = (date: unknown): date is string => typeof date === 'stri
 
 /* ------------------------------------------------------------------ the week */
 
-/** Sum the Monday `start` week from the scanned files, each message and prompt once. `earliest` is passed through. */
-export function sumWeek(files: readonly ScannedFile[], start: string, now: number, earliest: string): WeekStats {
+/**
+ * Sum the Monday `start` week from the scanned files, each message and prompt once, at `catalog`'s prices. A model the
+ * catalogue has no price for keeps its tokens and gets no value (`usd: null`). `earliest` is passed through.
+ */
+export function sumWeek(files: readonly ScannedFile[], start: string, now: number, earliest: string, catalog: BuiltModelCatalog): WeekStats {
   const dates = Array.from({ length: 7 }, (_, i) => addLocalDays(start, i))
   const bounds = [...dates.map(midnightOf), midnightOf(addLocalDays(start, 7))]
   const days = dates.map((date, i) => ({ date, tokens: 0, usd: 0, future: bounds[i] > now }))
@@ -153,12 +157,12 @@ export function sumWeek(files: readonly ScannedFile[], start: string, now: numbe
       while (m.t < bounds[i]) i--
       const tk = m.input + m.output + m.write5m + m.write1h + m.read
       const name = friendlyModel(m.model)
-      const price = priceOf(name)
+      const price = priceIn(catalog, name)
       let cost: number | null = null
       if (price) {
         const r = ratesFor(price, m)
         paid.set(r.name, { model: name, rates: r.rates })
-        cost = usdAt(r.rates, m)
+        cost = usdAt(r.rates, m, catalog.webSearchUsd)
         searches += m.webSearches
       }
       days[i].tokens += tk
@@ -203,8 +207,9 @@ export function sumWeek(files: readonly ScannedFile[], start: string, now: numbe
     usd,
     models: ranked,
     prices: {
-      asOf: PRICES_AS_OF,
-      source: PRICES_SOURCE,
+      asOf: catalog.builtAt.slice(0, 10),
+      source: MODEL_CATALOG_PAGE,
+      searchUsd: catalog.webSearchUsd,
       rows: [...paid].sort((a, b) => rank(a[1].model) - rank(b[1].model) || a[0].length - b[0].length || a[0].localeCompare(b[0])).map(([name, p]) => ({ name, ...p.rates })),
       searches
     }

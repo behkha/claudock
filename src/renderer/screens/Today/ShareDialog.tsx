@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Check, ChevronLeft, ChevronRight, Copy, Download, ExternalLink, X } from 'lucide-react'
 import type { ShareCard, ShareSettings, WeekStats, WrappedStats } from '@shared/api/overview'
-import { PLANS, type PlanChoice } from '@shared/prices'
+import { PLANS, formatUsd, type PlanChoice } from '@shared/prices'
 import { formatDay, formatRange, formatSince } from '@shared/wrapped'
 import { Button, EmptyState, IconButton, Segmented, Select, Spinner, Toggle } from '@/components'
 import { api, useApi } from '@/lib/api'
@@ -263,7 +263,7 @@ export function ShareDialog({
                     {w.prices.searches > 0 ? (
                       <tr className="share__unpriced">
                         <th scope="row">Web search</th>
-                        <td colSpan={5}>$10 per 1,000 searches</td>
+                        <td colSpan={5}>{formatUsd(w.prices.searchUsd * 1000)} per 1,000 searches</td>
                       </tr>
                     ) : null}
                     {unpriced.map((m) => (

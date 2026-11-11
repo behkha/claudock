@@ -6,10 +6,13 @@
  *   - `tokens`: summed from the session transcripts under projects/, always available.
  *   - `hits`: a limit Claude Code reported as reached (its `quotaLimits` record, written to the transcript when a
  *     request was refused), until that window resets. Desktop-app sessions write these too.
- *   - `live`: the 5-hour and weekly percentages exactly as Claude Code sent them to the status line. Only with the
- *     live limits step on, and only from terminal sessions: Claude Code doesn't run the status line inside the Claude
- *     desktop app. Claudock never computes or guesses a percentage. Use `limitShown()` from @shared/limits to display
- *     a window: it picks the hit, the percentage or the tokens, and hides a percentage whose window has reset since.
+ *   - `live`: the percentage of every window exactly as Claude Code sent it to the status line (`rate_limits`). Only
+ *     with the live limits step on, and only from terminal sessions: Claude Code doesn't run the status line inside
+ *     the Claude desktop app. Claudock never computes or guesses a percentage.
+ *
+ * Which windows exist is Claude Code's to say, not Claudock's: a window is its key in `rate_limits` / `rateLimitType`
+ * (`five_hour`, `seven_day`, `spend_limit`, whatever comes next). `windows` lists the ones to draw; `limitRows()` in
+ * @shared/limits turns the state into what each one shows (the hit, the percentage or the tokens) and names it.
  */
 
 export interface LimitWindow {
@@ -22,9 +25,8 @@ export interface LimitWindow {
 export interface LiveLimits {
   /** When Claude Code last sent limits (ms since the epoch). */
   at: number
-  /** Absent when Claude Code did not send this window. */
-  fiveHour: LimitWindow | null
-  sevenDay: LimitWindow | null
+  /** By Claude Code's key (`five_hour`, `seven_day`, ...): only the windows it sent. */
+  windows: Record<string, LimitWindow>
 }
 
 export interface TokenWindow {
@@ -34,10 +36,10 @@ export interface TokenWindow {
 }
 
 export interface TokenWindows {
-  fiveHour: TokenWindow
   /** Since local midnight. */
   today: TokenWindow
-  sevenDay: TokenWindow
+  /** By window key, for the windows whose key says how long they are (`five_hour`: the last 5 hours). */
+  windows: Record<string, TokenWindow>
 }
 
 /** Claude Code refused a request because this window's limit was reached. */
@@ -48,11 +50,8 @@ export interface LimitHit {
   resetsAt: number
 }
 
-export interface LimitHits {
-  /** The newest hit per window that has not reset yet. */
-  fiveHour: LimitHit | null
-  sevenDay: LimitHit | null
-}
+/** The newest hit per window (by Claude Code's `rateLimitType`) that has not reset yet. */
+export type LimitHits = Record<string, LimitHit>
 
 /**
  * - `off`: not installed; "Connect to Claude Code" (src/shared/api/connect.ts) installs it.
@@ -67,6 +66,11 @@ export interface LimitsState {
   live: LiveLimits | null
   tokens: TokenWindows
   hits: LimitHits
+  /**
+   * The windows to draw, in order: the ones Claude Code sent lately or reported as reached; before it has sent any,
+   * the ones its docs name (`DEFAULT_WINDOWS` in @shared/limits).
+   */
+  windows: string[]
 }
 
 export interface LimitsApi {

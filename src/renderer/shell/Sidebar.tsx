@@ -28,9 +28,16 @@ export function Sidebar(): JSX.Element {
     refreshCounts()
   })
 
+  // the open screen's item stays in view however you got there (the palette, a link on another screen): the list is
+  // taller than the window at its default size
+  const nav = useRef<HTMLElement>(null)
+  useEffect(() => {
+    nav.current?.querySelector('[aria-current="page"]')?.scrollIntoView({ block: 'nearest' })
+  }, [screen])
+
   return (
     <aside className="sidebar">
-      <nav className="sidebar__nav" aria-label="Sections">
+      <nav className="sidebar__nav" aria-label="Sections" ref={nav}>
         {NAV_GROUPS.map((group) => (
           <div key={group} className="nav-group" role="group" aria-label={group}>
             <div className="nav-group__label" aria-hidden>

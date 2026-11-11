@@ -39,7 +39,7 @@ export function TitleBar(): JSX.Element {
       <span className="titlebar__name">Claudock</span>
       <ProfileMenu dir={info.data?.configDir ?? dir} home={info.data?.home ?? ''} size={sizeText} />
       <span className="titlebar__grow" />
-      <button type="button" className="titlebar__search" onClick={() => setPaletteOpen(true)} aria-label="Search (command palette)" aria-keyshortcuts={mac ? 'Meta+K' : 'Control+K'}>
+      <button type="button" className="titlebar__search" onClick={() => setPaletteOpen(true)} aria-label="Search skills, rules, sessions… (command palette)" aria-keyshortcuts={mac ? 'Meta+K' : 'Control+K'}>
         <Search size={15} strokeWidth={1.8} aria-hidden />
         <span className="titlebar__search-text">Search skills, rules, sessions…</span>
         <Kbd>{mac ? '⌘K' : 'Ctrl K'}</Kbd>

@@ -14,13 +14,13 @@ See inside your `~/.claude`. Claudock is a free desktop app that lists every ski
 
 Claudock opens the Claude Code config folder (`~/.claude`, or wherever `CLAUDE_CONFIG_DIR` points) and the MCP servers in `~/.claude.json`, with one screen for each part:
 
-- **Today:** what each running Claude Code session is doing and which one waits for you, your 5-hour and weekly limits, today's sessions and this week's tokens, and **Share**: your messages, sessions, longest session, peak hour, top model and 26 weeks of activity from Claude Code's own `stats-cache.json`, as a card to copy, save or post on X. The card never shows project names or prompts.
+- **Today:** what each running Claude Code session is doing and which one waits for you, your limits as Claude Code reports them (5-hour and weekly today, and any window it adds), today's sessions and this week's tokens, and **Share**: your messages, sessions, longest session, peak hour, top model and 26 weeks of activity from Claude Code's own `stats-cache.json`, as a card to copy, save or post on X. The card never shows project names or prompts.
 - **Configure:** `settings.json` and `settings.local.json` as a form or raw JSON with history, `CLAUDE.md` and `rules/`, hooks, permissions
 - **Extend:** skills (turn on or off, edit, duplicate), agents, commands, plugins, mods (what each one draws, hooks and reaches; keep the ones Claude drafts), MCP servers
 - **Your data:** every session, kept after Claude Code's 30-day cleanup deletes it, with full-text search, resume from any folder and Markdown export; projects, memory, plans, prompt history
 - **Maintain:** disk use per folder with cleanup suggestions, plus snapshots and `.bak` files you can diff and restore
 
-**Menu bar** (the tray on Windows and Linux): the higher of your 5-hour and weekly limits, and a clay mark while a Claude Code session waits for you. Click it for the waiting sessions, both limits, today's tokens and the alert settings. On macOS, closing the window keeps Claudock running there; quit from its menu. On Windows the tray icon is off until you turn it on in View › Show in Tray.
+**Menu bar** (the tray on Windows and Linux): the highest of your limits (5-hour, weekly, or whichever window Claude Code reports), and a clay mark while a Claude Code session waits for you. Click it for the waiting sessions, every limit, today's tokens and the alert settings. On macOS, closing the window keeps Claudock running there; quit from its menu. On Windows the tray icon is off until you turn it on in View › Show in Tray.
 
 ⌘K (Ctrl+K on Windows and Linux) searches skills, agents, rules, hooks, sessions, memory and settings keys.
 
@@ -35,7 +35,7 @@ Claude Code keeps its config in dozens of JSON, JSONL and Markdown files, and re
 
 What it doesn't do: it doesn't run, update or sign in to Claude Code, and it doesn't sync settings between machines. It only works on the config folder and `~/.claude.json`, not on the `.claude/` folders inside your repositories. If you only change a setting now and then, Claude Code's own `/config` and `/permissions` commands are enough.
 
-At launch Claudock downloads Anthropic's public settings docs (code.claude.com) and the Claude Code JSON schema to power the JSON editor's suggestions. It asks json.schemastore.org and the schema's GitHub mirror (raw.githubusercontent.com) at the same time and uses whichever answers first. It also asks api.github.com for the latest Claudock release, to tell you when there's a newer one. It sends nothing about your config. `CLAUDOCK_OFFLINE=1` turns both off.
+At launch Claudock downloads Anthropic's public settings docs (code.claude.com) and the Claude Code JSON schema to power the JSON editor's suggestions. It asks json.schemastore.org and the schema's GitHub mirror (raw.githubusercontent.com) at the same time and uses whichever answers first. It downloads Anthropic's public pricing page (platform.claude.com) and Claude Code's model configuration page for the model list in Settings and the prices on the share card. It also asks api.github.com for the latest Claudock release, to tell you when there's a newer one. It sends nothing about your config. `CLAUDOCK_OFFLINE=1` turns all of this off.
 
 ## Try it without touching your config
 

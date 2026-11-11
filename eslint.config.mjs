@@ -4,7 +4,8 @@ import reactHooks from 'eslint-plugin-react-hooks'
 import globals from 'globals'
 
 export default tseslint.config(
-  { ignores: ['node_modules', 'out', 'dist', '.fixture', '.shots', 'build', '.claude'] },
+  // site/assets/*.min.js: GSAP as its vendor ships it
+  { ignores: ['node_modules', 'out', 'dist', '.fixture', '.shots', 'build', '.claude', '.dashboard', 'site/assets/*.min.js'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

@@ -536,8 +536,9 @@ textarea.field__control {
 .list-row__main:disabled {
   color: var(--text-3);
 }
-.list-row--dimmed .list-row__text {
-  opacity: 0.55;
+/* off (a skill, mod, plugin or server that is off): the name steps back, nothing fades, so every line stays readable */
+.list-row--dimmed .list-row__title {
+  color: var(--text-2);
 }
 .list-row__leading,
 .list-row__lock {
@@ -653,7 +654,13 @@ textarea.field__control {
   text-align: left;
 }
 .path--link {
+  position: relative;
   border-radius: 4px;
+}
+.path--link::after {
+  content: '';
+  position: absolute;
+  inset: -7px 0; /* ≥32px hit target */
 }
 .path--link:hover {
   color: var(--text);
@@ -672,8 +679,14 @@ textarea.field__control {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.path__head {
+  flex-shrink: 1000; /* the folders give way before the name does */
+}
 .path__tail {
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -1121,4 +1134,36 @@ textarea.field__control {
 .diff__text {
   white-space: pre;
   padding-right: 16px;
+}
+
+/*
+ * Tertiary text on a tinted row. --text-3 holds 4.5:1 on the page, the sidebar, cards and sunken panels, not on the
+ * hover or selected tint over them, so anything that takes that tint reads its tertiary text one step up. A new row
+ * that tints on hover or selection belongs in this list.
+ */
+.list-row:hover,
+.list-row--selected,
+.nav-item:hover,
+.nav-item[aria-current='page'],
+.palette__item[aria-selected='true'],
+.profile-row:hover,
+.profile-row[aria-checked='true'],
+.titlebar__profile:hover,
+.titlebar__profile[aria-expanded='true'],
+.cc__row:hover,
+.hist__row:hover,
+.pop__other:hover,
+.bk__file:hover,
+.bk__file--on,
+.ctx__row:hover,
+.ctx__row--open,
+.prj-table__row:hover,
+.stor__row:hover,
+.stor__row--hl,
+.st-history__item:hover,
+.st-history__item--active,
+.st-links__btn:hover,
+.ext-tree__row:hover,
+.ses-menu__item:hover {
+  --text-3: var(--text-2);
 }

@@ -4,7 +4,7 @@ import type { MenubarState } from '@shared/api/menubar'
 import type { Glance } from '@shared/api/profiles'
 import type { AlertPrefs } from '@shared/api/sessions'
 import { formatCount } from '@shared/format'
-import { LIMITS_STALE_MS, formatTokens, limitsLine } from '@shared/limits'
+import { LIMITS_STALE_MS, formatTokens, limitRows, limitsLine } from '@shared/limits'
 import { Button } from '@/components/Button'
 import { IconButton } from '@/components/IconButton'
 import { Kbd } from '@/components/Kbd'
@@ -94,13 +94,14 @@ export function Popover(): JSX.Element {
     void api.menubar.set(patch).then(setBar, (e: Error) => toast(e.message, { kind: 'error' }))
 
   return (
-    <div className="pop" ref={root}>
+    <main className="pop" ref={root}>
+      <h1 className="sr-only">Claudock</h1>
       {view === 'main' ? (
         <Main glance={glance} prefs={prefs} now={now} onPause={change} onSettings={() => setView('settings')} />
       ) : (
         <SettingsView glance={glance} prefs={prefs} bar={bar} onChange={change} onBar={changeBar} onBack={() => setView('main')} />
       )}
-    </div>
+    </main>
   )
 }
 
@@ -146,8 +147,9 @@ function Main({
       {limitsOn && others.length ? <div className="pop__label">{open?.name}</div> : null}
       {limitsOn ? (
         <div className="pop__meters">
-          <LimitMeter label="5-hour" w={limits.live?.fiveHour} at={limits.live?.at} stale={stale} hit={limits.hits.fiveHour} tokens={limits.tokens.fiveHour.tokens} span="last 5 hours" now={now} />
-          <LimitMeter label="Weekly" w={limits.live?.sevenDay} at={limits.live?.at} stale={stale} hit={limits.hits.sevenDay} tokens={limits.tokens.sevenDay.tokens} span="last 7 days" now={now} />
+          {limitRows(limits, now).map((row) => (
+            <LimitMeter key={row.key} row={row} at={limits.live?.at} stale={stale} now={now} />
+          ))}
         </div>
       ) : null}
       {others.length ? (

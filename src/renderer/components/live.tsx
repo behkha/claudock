@@ -1,6 +1,5 @@
-import type { LimitHit, LimitWindow } from '@shared/api/limits'
 import type { LiveSession } from '@shared/api/sessions'
-import { formatResetTime, formatTokens, limitShown } from '@shared/limits'
+import { formatResetTime, formatTokens, type LimitRow } from '@shared/limits'
 import { activityText, waitText } from '@shared/sessions'
 import { api } from '@/lib/api'
 import { cx } from '@/lib/cx'
@@ -57,39 +56,31 @@ export function SessionRow({ s, now }: { s: LiveSession; now: number }): JSX.Ele
 }
 
 /**
- * One limit window, from what Claude Code really recorded (`limitShown()`): "Limit reached" with the reset time when it
- * refused a request, else the percentage it sent to the status line with a meter, else this window's tokens from the
- * transcripts (sessions in the Claude desktop app never run the status line).
+ * One limit window (a row of `limitRows()`), from what Claude Code really recorded: "Limit reached" with the reset time
+ * when it refused a request, else the percentage it sent to the status line with a meter, else this window's tokens
+ * from the transcripts (sessions in the Claude desktop app never run the status line).
  */
 export function LimitMeter({
-  label,
-  w,
+  row,
   at,
   stale,
-  hit,
-  tokens,
-  span,
   now
 }: {
-  label: string
-  w: LimitWindow | null | undefined
+  row: LimitRow
   /** When Claude Code last sent percentages. */
   at: number | undefined
   stale: boolean
-  hit: LimitHit | null | undefined
-  tokens: number | undefined
-  /** "last 5 hours": the stretch `tokens` covers. */
-  span: string
   now: number
 }): JSX.Element {
-  const shown = limitShown(w, at, hit, now)
+  const { name: label, shown, tokens } = row
+  const span = row.tokenSpan ?? ''
   if (shown.kind === 'tokens') {
-    const value = tokens === undefined ? '–' : formatTokens(tokens)
+    const value = tokens === null ? '–' : formatTokens(tokens)
     return (
       <div className="lim__meter" role="group" aria-label={`${label} limit: ${value} tokens in the ${span}`}>
         <div className="lim__top">
           <span>{label}</span>
-          <b className={cx(tokens === undefined && 'lim__none')}>
+          <b className={cx(tokens === null && 'lim__none')}>
             {value}
             <small className="lim__unit">tokens</small>
           </b>

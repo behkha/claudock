@@ -1,0 +1,364 @@
+{
+ "format": 1,
+ "builtAt": "2026-11-10T21:33:29.151Z",
+ "sources": [
+  "https://platform.claude.com/docs/en/about-claude/pricing.md",
+  "https://code.claude.com/docs/en/model-config.md"
+ ],
+ "models": [
+  {
+   "name": "Fable 5.2",
+   "id": "claude-fable-5-2",
+   "retired": false,
+   "limited": false,
+   "price": {
+    "name": "Fable 5.2",
+    "input": 8,
+    "write5m": 10,
+    "write1h": 16,
+    "read": 0.2,
+    "output": 40,
+    "usOnly": 1.1,
+    "fast": {
+     "input": 16,
+     "output": 80
+    }
+   }
+  },
+  {
+   "name": "Mythos 5.2",
+   "id": "claude-mythos-5-2",
+   "retired": false,
+   "limited": true,
+   "price": {
+    "name": "Mythos 5.2",
+    "input": 8,
+    "write5m": 10,
+    "write1h": 16,
+    "read": 0.2,
+    "output": 40,
+    "usOnly": 1.1,
+    "fast": {
+     "input": 16,
+     "output": 80
+    }
+   }
+  },
+  {
+   "name": "Fable 5.1",
+   "id": "claude-fable-5-1",
+   "retired": false,
+   "limited": false,
+   "price": {
+    "name": "Fable 5.1",
+    "input": 10,
+    "write5m": 12.5,
+    "write1h": 20,
+    "read": 0.25,
+    "output": 50,
+    "usOnly": 1.1
+   }
+  },
+  {
+   "name": "Mythos 5.1",
+   "id": "claude-mythos-5-1",
+   "retired": false,
+   "limited": true,
+   "price": {
+    "name": "Mythos 5.1",
+    "input": 10,
+    "write5m": 12.5,
+    "write1h": 20,
+    "read": 0.25,
+    "output": 50,
+    "usOnly": 1.1
+   }
+  },
+  {
+   "name": "Fable 5",
+   "id": "claude-fable-5",
+   "retired": false,
+   "limited": false,
+   "price": {
+    "name": "Fable 5",
+    "input": 10,
+    "write5m": 12.5,
+    "write1h": 20,
+    "read": 1,
+    "output": 50,
+    "usOnly": 1.1
+   }
+  },
+  {
+   "name": "Mythos 5",
+   "id": "claude-mythos-5",
+   "retired": false,
+   "limited": true,
+   "price": {
+    "name": "Mythos 5",
+    "input": 10,
+    "write5m": 12.5,
+    "write1h": 20,
+    "read": 1,
+    "output": 50,
+    "usOnly": 1.1
+   }
+  },
+  {
+   "name": "Opus 5.5",
+   "id": "claude-opus-5-5",
+   "retired": false,
+   "limited": false,
+   "price": {
+    "name": "Opus 5.5",
+    "input": 4,
+    "write5m": 5,
+    "write1h": 8,
+    "read": 0.2,
+    "output": 20,
+    "usOnly": 1.1,
+    "fast": {
+     "input": 8,
+     "output": 40
+    }
+   }
+  },
+  {
+   "name": "Opus 5",
+   "id": "claude-opus-5",
+   "retired": false,
+   "limited": false,
+   "price": {
+    "name": "Opus 5",
+    "input": 5,
+    "write5m": 6.25,
+    "write1h": 10,
+    "read": 0.5,
+    "output": 25,
+    "usOnly": 1.1,
+    "fast": {
+     "input": 10,
+     "output": 50
+    }
+   }
+  },
+  {
+   "name": "Opus 4.8",
+   "id": "claude-opus-4-8",
+   "retired": false,
+   "limited": false,
+   "price": {
+    "name": "Opus 4.8",
+    "input": 5,
+    "write5m": 6.25,
+    "write1h": 10,
+    "read": 0.5,
+    "output": 25,
+    "usOnly": 1.1,
+    "fast": {
+     "input": 10,
+     "output": 50
+    }
+   }
+  },
+  {
+   "name": "Opus 4.7",
+   "id": "claude-opus-4-7",
+   "retired": false,
+   "limited": false,
+   "price": {
+    "name": "Opus 4.7",
+    "input": 5,
+    "write5m": 6.25,
+    "write1h": 10,
+    "read": 0.5,
+    "output": 25,
+    "usOnly": 1.1
+   }
+  },
+  {
+   "name": "Opus 4.6",
+   "id": "claude-opus-4-6",
+   "retired": false,
+   "limited": false,
+   "price": {
+    "name": "Opus 4.6",
+    "input": 5,
+    "write5m": 6.25,
+    "write1h": 10,
+    "read": 0.5,
+    "output": 25,
+    "usOnly": 1.1
+   }
+  },
+  {
+   "name": "Opus 4.5",
+   "id": "claude-opus-4-5",
+   "retired": false,
+   "limited": false,
+   "price": {
+    "name": "Opus 4.5",
+    "input": 5,
+    "write5m": 6.25,
+    "write1h": 10,
+    "read": 0.5,
+    "output": 25,
+    "usOnly": null
+   }
+  },
+  {
+   "name": "Opus 4.1",
+   "id": "claude-opus-4-1",
+   "retired": true,
+   "limited": false,
+   "price": {
+    "name": "Opus 4.1",
+    "input": 15,
+    "write5m": 18.75,
+    "write1h": 30,
+    "read": 1.5,
+    "output": 75,
+    "usOnly": null
+   }
+  },
+  {
+   "name": "Opus 4",
+   "id": "claude-opus-4",
+   "retired": true,
+   "limited": false,
+   "price": {
+    "name": "Opus 4",
+    "input": 15,
+    "write5m": 18.75,
+    "write1h": 30,
+    "read": 1.5,
+    "output": 75,
+    "usOnly": null
+   }
+  },
+  {
+   "name": "Sonnet 5.5",
+   "id": "claude-sonnet-5-5",
+   "retired": false,
+   "limited": false,
+   "price": {
+    "name": "Sonnet 5.5",
+    "input": 2,
+    "write5m": 2.5,
+    "write1h": 4,
+    "read": 0.1,
+    "output": 10,
+    "usOnly": 1.1
+   }
+  },
+  {
+   "name": "Sonnet 5",
+   "id": "claude-sonnet-5",
+   "retired": false,
+   "limited": false,
+   "price": {
+    "name": "Sonnet 5",
+    "input": 2,
+    "write5m": 2.5,
+    "write1h": 4,
+    "read": 0.2,
+    "output": 10,
+    "usOnly": 1.1
+   }
+  },
+  {
+   "name": "Sonnet 4.6",
+   "id": "claude-sonnet-4-6",
+   "retired": false,
+   "limited": false,
+   "price": {
+    "name": "Sonnet 4.6",
+    "input": 3,
+    "write5m": 3.75,
+    "write1h": 6,
+    "read": 0.3,
+    "output": 15,
+    "usOnly": 1.1
+   }
+  },
+  {
+   "name": "Sonnet 4.5",
+   "id": "claude-sonnet-4-5",
+   "retired": false,
+   "limited": false,
+   "price": {
+    "name": "Sonnet 4.5",
+    "input": 3,
+    "write5m": 3.75,
+    "write1h": 6,
+    "read": 0.3,
+    "output": 15,
+    "usOnly": null
+   }
+  },
+  {
+   "name": "Sonnet 4",
+   "id": "claude-sonnet-4",
+   "retired": true,
+   "limited": false,
+   "price": {
+    "name": "Sonnet 4",
+    "input": 3,
+    "write5m": 3.75,
+    "write1h": 6,
+    "read": 0.3,
+    "output": 15,
+    "usOnly": null
+   }
+  },
+  {
+   "name": "Haiku 5.5",
+   "id": "claude-haiku-5-5",
+   "retired": false,
+   "limited": false,
+   "price": {
+    "name": "Haiku 5.5",
+    "input": 0.1,
+    "write5m": 0.125,
+    "write1h": 0.2,
+    "read": 0.01,
+    "output": 0.5,
+    "usOnly": 1.1,
+    "long": {
+     "input": 0.5,
+     "write5m": 0.625,
+     "write1h": 1,
+     "read": 0.05,
+     "output": 2.5,
+     "over": 100000
+    }
+   }
+  },
+  {
+   "name": "Haiku 4.5",
+   "id": "claude-haiku-4-5",
+   "retired": false,
+   "limited": false,
+   "price": {
+    "name": "Haiku 4.5",
+    "input": 1,
+    "write5m": 1.25,
+    "write1h": 2,
+    "read": 0.1,
+    "output": 5,
+    "usOnly": null
+   }
+  }
+ ],
+ "aliases": [
+  "best",
+  "fable",
+  "sonnet",
+  "opus",
+  "haiku",
+  "sonnet[1m]",
+  "opus[1m]",
+  "opusplan"
+ ],
+ "webSearchUsd": 0.01
+}

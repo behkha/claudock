@@ -3,6 +3,7 @@
  * write keys of the same two files).
  */
 
+import type { ModelCatalog } from '../modelCatalog'
 import type { SettingsDocs } from '../settingsDocs'
 
 /** The two user-level settings files Claudock edits. Anything else is refused. */
@@ -84,6 +85,17 @@ export interface SettingsApi {
    * done, else the cached copy, else the bundled one. Waits a few seconds for a fetch still in flight.
    */
   docs(): Promise<SettingsDocs>
+  /**
+   * For the Model field: the model catalogue (this launch's read of Anthropic's pages, else the last good or bundled
+   * copy, at once) and the model ids in this profile's own transcripts and stats cache.
+   */
+  models(): Promise<SettingsModels>
+}
+
+export interface SettingsModels {
+  catalog: ModelCatalog
+  /** Model ids as Claude Code recorded them (`claude-opus-5-5`, `claude-haiku-4-5-20251001`, another provider's). */
+  used: string[]
 }
 
 export interface SettingsEvents {
@@ -92,4 +104,6 @@ export interface SettingsEvents {
    * the fetch failed, that same older copy with `fetchError` set.
    */
   'settings:docs': SettingsDocs
+  /** This launch's read of the model catalogue finished after `models()` answered with an older copy. */
+  'settings:models': ModelCatalog
 }

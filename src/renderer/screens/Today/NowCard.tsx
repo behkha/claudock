@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { ConnectParts, ConnectPreview } from '@shared/api/connect'
 import type { LimitsState } from '@shared/api/limits'
 import type { SessionsState } from '@shared/api/sessions'
-import { LIMITS_STALE_MS } from '@shared/limits'
+import { LIMITS_STALE_MS, limitRows } from '@shared/limits'
 import { Button, Card, ConfirmDialog, useToast } from '@/components'
 import { ChangeDiff, ConnectSheet } from '@/components/ConnectSheet'
 import { LimitMeter, SessionRow } from '@/components/live'
@@ -11,8 +11,8 @@ import { api, useApi, useEvent } from '@/lib/api'
 const REFRESH_MS = 60_000
 
 /**
- * Claude Code right now, on Today: sessions waiting for you, working or done (from the session hooks) and the 5-hour
- * and weekly limits as Claude Code reported them (from the status line step). "Connect to Claude Code" adds both parts
+ * Claude Code right now, on Today: sessions waiting for you, working or done (from the session hooks) and every
+ * limit window as Claude Code reported it (from the status line step). "Connect to Claude Code" adds both parts
  * in one write; Disconnect removes both. Re-reads when either part reports and once a minute, so "as of", resets and
  * waiting times stay true. `disconnect` (the navigation's seq) opens the Disconnect dialog, for the Hooks screen's
  * Claudock row. `onSessions` hears the running sessions, so Today lists each session once. Nothing on Windows, where
@@ -127,8 +127,9 @@ export function NowCard({ disconnect, onSessions }: { disconnect?: number; onSes
         ) : null}
         {limitsOn ? (
           <div className="lim__meters">
-            <LimitMeter label="5-hour" w={l?.live?.fiveHour} at={l?.live?.at} stale={stale} hit={l?.hits.fiveHour} tokens={l?.tokens.fiveHour.tokens} span="last 5 hours" now={now} />
-            <LimitMeter label="Weekly" w={l?.live?.sevenDay} at={l?.live?.at} stale={stale} hit={l?.hits.sevenDay} tokens={l?.tokens.sevenDay.tokens} span="last 7 days" now={now} />
+            {limitRows(l, now).map((row) => (
+              <LimitMeter key={row.key} row={row} at={l?.live?.at} stale={stale} now={now} />
+            ))}
           </div>
         ) : known && hooksOn ? (
           <Button className="lim__show" onClick={() => openSheet({ statusLine: true, hooks: false })}>

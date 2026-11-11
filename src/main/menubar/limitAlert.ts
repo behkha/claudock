@@ -1,10 +1,11 @@
 import type { LiveLimits } from '@shared/api/limits'
 import type { AlertPrefs } from '@shared/api/sessions'
-import { formatResetTime } from '../../shared/limits.ts'
+import { formatResetTime, windowInfo } from '../../shared/limits.ts'
 import { isPaused } from '../connect/sessionModel.ts'
 
 /**
- * The limit alerts, from the percentages Claude Code hands the status line (src/main/domains/limits.ts). Pure, so
+ * The limit alerts, from the percentages Claude Code hands the status line (src/main/domains/limits.ts), for every
+ * window it sends: a window is its key there, named by `windowInfo()`. Pure, so
  * `npm test` loads it as is; src/main/menubar.ts feeds it every new reading and a tick each minute.
  *   - `limitPercent` set: one alert when a window crosses it, at most once per window. The first reading Claudock sees
  *     of a window is where it starts from, so a window already over the line at launch doesn't alert.
@@ -12,9 +13,8 @@ import { isPaused } from '../connect/sessionModel.ts'
  *   - nothing while alerts are paused (what was skipped stays skipped).
  */
 
-export type LimitKey = 'fiveHour' | 'sevenDay'
-const KEYS: readonly LimitKey[] = ['fiveHour', 'sevenDay']
-const NAME: Record<LimitKey, string> = { fiveHour: '5-hour', sevenDay: 'weekly' }
+/** A window's key in Claude Code's `rate_limits`. */
+export type LimitKey = string
 
 /** Two readings belong to the same window when their reset times are this close (Claude Code may round them). */
 export const SAME_WINDOW_MS = 5 * 60_000
@@ -43,8 +43,8 @@ export class LimitAlertRule {
   update(live: LiveLimits | null, prefs: AlertPrefs, now: number): LimitAlert[] {
     const out: LimitAlert[] = []
     const quiet = isPaused(prefs, now)
-    for (const key of KEYS) {
-      const w = live?.[key] ?? null
+    for (const key of new Set([...Object.keys(live?.windows ?? {}), ...this.tracks.keys()])) {
+      const w = live?.windows[key] ?? null
       let t = this.tracks.get(key)
       if (w && w.resetsAt > now) {
         const pct = w.usedPercentage
@@ -59,7 +59,7 @@ export class LimitAlertRule {
         const line = prefs.limitPercent
         if (line !== null && !t.alerted && t.last < line && pct >= line) {
           t.alerted = true
-          if (!quiet) out.push({ title: `${cap(NAME[key])} limit at ${Math.round(pct)}%`, body: `Resets ${formatResetTime(w.resetsAt, now)}` })
+          if (!quiet) out.push({ title: `${windowInfo(key).name} limit at ${Math.round(pct)}%`, body: `Resets ${formatResetTime(w.resetsAt, now)}` })
         }
         if (pct >= 100) t.hit = true
         t.last = pct
@@ -72,8 +72,9 @@ export class LimitAlertRule {
   private sayReset(t: Track, key: LimitKey, prefs: AlertPrefs, now: number, quiet: boolean, out: LimitAlert[]): void {
     if (!t.hit || t.resetSaid || now < t.resetsAt) return
     t.resetSaid = true
-    if (prefs.limitReset && !quiet) out.push({ title: `Your ${NAME[key]} limit has reset`, body: '' })
+    if (prefs.limitReset && !quiet) out.push({ title: `Your ${lower(windowInfo(key).name)} limit has reset`, body: '' })
   }
 }
 
-const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1)
+/** "Weekly" inside a sentence: "Your weekly limit has reset". */
+const lower = (s: string): string => s.charAt(0).toLowerCase() + s.slice(1)

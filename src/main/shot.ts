@@ -19,6 +19,7 @@ import { configDir, userDataDir } from './paths'
 import { addLocalDays, midnightOf, mondayOf } from './share/week'
 import { setTheme } from './theme'
 import { sumActivity } from './today/activity'
+import { auditPage } from './shotAudit'
 import { driver, sleep } from './shotDrive'
 
 /**
@@ -72,6 +73,8 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
         const file = path.join(opts.dir, `${theme}-${what}.png`)
         await fsp.writeFile(file, img.toPNG())
         console.log(`SHOT ${file} ${width}x${height}`)
+        // --audit: axe, contrast, a keyboard pass and the accessibility tree of the page as shot
+        await auditPage(w, opts.dir, `${theme}-${what}`)
         return
       }
       if (attempt === 20) throw new Error(`${theme}-${what}: captured pixel ${got.join(',')} never matched ${want.join(',')}`)
@@ -576,8 +579,13 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
     errors.push(`SHOT_FAILED ${(e as Error).message}`)
     console.log(`SHOT_FAILED ${(e as Error).message}`)
   }
+  // --state loading: every IPC answer is held back (src/main/ipcx.ts), and the shot is taken while the screen waits
+  const LOADING = process.env.CLAUDOCK_SHOT_LOADING === '1'
   const shoot = (theme: 'light' | 'dark', what: string, w: BrowserWindow = win): Promise<void> =>
-    settle(theme, what, w).then(() => capture(theme, what, w)).catch(fail)
+    (LOADING ? sleep(400) : settle(theme, what, w)).then(() => capture(theme, what, w)).catch(fail)
+  // --size 960x640: the window's content size for this run (the smallest the window goes is 960x640)
+  const size = /^(\d+)x(\d+)$/.exec(process.env.CLAUDOCK_SHOT_SIZE ?? '')
+  if (size) win.setContentSize(Number(size[1]), Number(size[2]))
 
   await fsp.mkdir(opts.dir, { recursive: true })
   const screens = SCREENS.filter((s) => opts.only.length === 0 || opts.only.includes(s.id))

@@ -221,7 +221,9 @@ export default function ContextScreen({ selectId }: ScreenProps): JSX.Element {
                 <th scope="col" className="ctx__tokens">
                   Tokens
                 </th>
-                <th scope="col" />
+                <th scope="col">
+                  <span className="sr-only">Details</span>
+                </th>
               </tr>
             </thead>
             <tbody>

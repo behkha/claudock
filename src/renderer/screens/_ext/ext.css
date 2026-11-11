@@ -237,6 +237,7 @@
   padding: 0 10px;
 }
 .ext-chip__x {
+  position: relative;
   display: grid;
   place-items: center;
   width: 20px;
@@ -245,6 +246,11 @@
   border-radius: 10px;
   background: transparent;
   color: var(--text-2);
+}
+.ext-chip__x::after {
+  content: '';
+  position: absolute;
+  inset: -6px; /* ≥32px hit target */
 }
 .ext-chip__x:hover {
   background: var(--hover);

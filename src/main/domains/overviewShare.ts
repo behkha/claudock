@@ -5,6 +5,7 @@ import { isPlanChoice, type PlanChoice } from '@shared/prices'
 import { formatCount } from '@shared/format'
 import { formatRange, weekValue } from '@shared/wrapped'
 import { postAlert } from '../alerts'
+import { getModelCatalog } from '../modelCatalog'
 import { folderKey, writeOwn } from '../connect/folder'
 import { isPaused } from '../connect/sessionModel'
 import { installKind, openConfigDir, samePath, userDataDir } from '../paths'
@@ -16,7 +17,7 @@ import { currentAlertPrefs } from './sessions'
 
 /**
  * The week card and the Monday recap, per profile folder. Numbers come from the folder's transcripts and the session
- * archive's copies (src/main/share/scan.ts, summed by src/main/share/week.ts at the prices in src/shared/prices.ts).
+ * archive's copies (src/main/share/scan.ts, summed by src/main/share/week.ts at the model catalogue's prices).
  * What the user picked (the plan beside the value, the recap switch) and the last week recapped are Claudock's own
  * data: `<userData>/share/<folder key>.json` (`share.dev` in a git clone), written directly like prefs.json.
  */
@@ -59,7 +60,7 @@ export async function weekIn(dir: string, start: string | null, now = Date.now()
   if (!isMonday(week) || week > current) throw new Error('There is no such week to show')
   const s = await scanned(dir, midnightOf(week))
   const oldest = s.oldest === null ? current : mondayOf(s.oldest)
-  return sumWeek([...s.files.values()], week, now, oldest < current ? oldest : current)
+  return sumWeek([...s.files.values()], week, now, oldest < current ? oldest : current, await getModelCatalog())
 }
 
 /** The week last sent to the window, per folder: Post on X writes the numbers the card was drawn from. */

@@ -17,12 +17,15 @@ const home = path.join(path.sep, 'Users', 'me')
 
 const limits = (five: number | null, week: number | null, extra: Partial<LimitsState> = {}): LimitsState => ({
   step: 'on',
-  tokens: { fiveHour: { tokens: 0, sessions: 0 }, today: { tokens: 1_234_000, sessions: 3 }, sevenDay: { tokens: 0, sessions: 0 } },
-  hits: { fiveHour: null, sevenDay: null },
+  tokens: { today: { tokens: 1_234_000, sessions: 3 }, windows: { five_hour: { tokens: 0, sessions: 0 }, seven_day: { tokens: 0, sessions: 0 } } },
+  hits: {},
+  windows: ['five_hour', 'seven_day'],
   live: {
     at: NOW,
-    fiveHour: five === null ? null : { usedPercentage: five, resetsAt: NOW + H },
-    sevenDay: week === null ? null : { usedPercentage: week, resetsAt: NOW + 50 * H }
+    windows: {
+      ...(five === null ? {} : { five_hour: { usedPercentage: five, resetsAt: NOW + H } }),
+      ...(week === null ? {} : { seven_day: { usedPercentage: week, resetsAt: NOW + 50 * H } })
+    }
   },
   ...extra
 })
@@ -71,7 +74,7 @@ test('a profile in a list: its percentage, a reached limit, else today’s token
   assert.equal(limitsLine(limits(null, 61), NOW, true), 'Weekly 61%')
   assert.equal(limitsLine(limits(42, 61, { step: 'off' }), NOW, true), '1.2M tokens today')
   assert.equal(limitsLine(limits(null, null), NOW, false), '1.2M')
-  assert.equal(limitsLine(limits(42, 61, { hits: { fiveHour: { at: NOW + 1, resetsAt: NOW + H }, sevenDay: null } }), NOW, true), 'Limit reached')
+  assert.equal(limitsLine(limits(42, 61, { hits: { five_hour: { at: NOW + 1, resetsAt: NOW + H } } }), NOW, true), 'Limit reached')
 })
 
 const waiting = (name: string, profile?: string): LiveSession => ({

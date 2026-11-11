@@ -5,20 +5,30 @@ import fsp from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { friendlyModel } from '../../shared/models.ts'
-import { MODEL_PRICES, formatUsd, isPlanChoice, messageUsd, priceOf, ratesFor, type MessageUsage } from '../../shared/prices.ts'
+import { priceIn, type BuiltModelCatalog } from '../../shared/modelCatalog.ts'
+import { validateModelCatalog } from '../../shared/modelCatalogBuild.ts'
+import { formatUsd, isPlanChoice, messageUsd as usdOf, ratesFor, type MessageUsage, type ModelPrice } from '../../shared/prices.ts'
 import { emptyScans, scanSince } from './scan.ts'
 import { addLocalDays, isMonday, localDate, longestRun, midnightOf, mondayOf, msgOf, promptOf, recapDue, sumWeek, type Msg } from './week.ts'
 
 const usage = (u: Partial<MessageUsage>): MessageUsage => ({ input: 0, output: 0, write5m: 0, write1h: 0, read: 0, fast: false, usOnly: false, webSearches: 0, ...u })
+const messageUsd = (p: ModelPrice, u: MessageUsage): number => usdOf(p, u, 0.01)
 const close = (a: number, b: number): void => assert.ok(Math.abs(a - b) < 1e-9, `${a} is not ${b}`)
 
-test('prices: every model in the table has a name friendlyModel gives, and cache writes are 1.25x and 2x of input', () => {
-  for (const p of MODEL_PRICES) {
-    close(p.write5m, p.input * 1.25)
-    close(p.write1h, p.input * 2)
+/** The catalogue as built from Anthropic's pages on the day the bundled copy was made. */
+const CATALOG = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '../modelCatalog.bundled.json'), 'utf8')) as BuiltModelCatalog
+const priceOf = (name: string): ModelPrice | null => priceIn(CATALOG, name)
+
+test('prices: every id reads as the name the catalogue prices, and cache writes are 1.25x and 2x of input', () => {
+  assert.equal(validateModelCatalog(CATALOG), null)
+  for (const m of CATALOG.models) {
+    close(m.price.write5m, m.price.input * 1.25)
+    close(m.price.write1h, m.price.input * 2)
+    assert.equal(friendlyModel(m.id), m.name)
   }
   assert.equal(priceOf(friendlyModel('claude-opus-5-5'))?.name, 'Opus 5.5')
   assert.equal(priceOf(friendlyModel('claude-fable-5-1'))?.name, 'Fable 5.1')
+  assert.equal(priceOf(friendlyModel('claude-fable-5-2'))?.name, 'Fable 5.2', 'in my transcripts since November; the hand-copied table never had it')
   assert.equal(priceOf(friendlyModel('claude-opus-4-20250514'))?.name, 'Opus 4')
   assert.equal(priceOf(friendlyModel('us.anthropic.claude-sonnet-4-5-20250929-v1:0'))?.name, 'Sonnet 4.5')
   assert.equal(priceOf(friendlyModel('claude-haiku-4-5-20251001[1m]'))?.name, 'Haiku 4.5')
@@ -154,7 +164,7 @@ test('sumWeek: each message once across files, the week only, prices per model, 
       ]
     }
   ]
-  const w = sumWeek(files, '2026-10-26', now, '2026-09-28')
+  const w = sumWeek(files, '2026-10-26', now, '2026-09-28', CATALOG)
   assert.equal(w.end, '2026-11-01')
   assert.equal(w.current, true)
   assert.equal(w.earliest, '2026-09-28')
@@ -184,7 +194,7 @@ test('sumWeek: each message once across files, the week only, prices per model, 
     w.prices.rows.map((r) => r.name),
     ['Sonnet 5.5', 'Opus 5.5']
   )
-  const empty = sumWeek([], '2026-10-19', now, '2026-10-19')
+  const empty = sumWeek([], '2026-10-19', now, '2026-10-19', CATALOG)
   assert.equal(empty.usd, null)
   assert.equal(empty.sessions, 0)
   assert.equal(empty.longestSessionMs, null)
@@ -199,7 +209,7 @@ test('sumWeek: the Prices rows are the rates messages paid, and web searches are
       prompts: []
     }
   ]
-  const w = sumWeek(files, '2026-10-26', now, '2026-10-26')
+  const w = sumWeek(files, '2026-10-26', now, '2026-10-26', CATALOG)
   assert.deepEqual(
     w.prices.rows.map((r) => [r.name, r.output]),
     [

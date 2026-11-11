@@ -73,11 +73,13 @@ export function DiffView({ before, after, beforeLabel, afterLabel, context = 3, 
       {unchanged ? (
         <p className="diff__empty">No differences.</p>
       ) : (
-        <div className="diff__scroll" role="table" aria-label={`Diff: ${beforeLabel ?? 'before'} to ${afterLabel ?? 'after'}`}>
+        <div className="diff__scroll" role="table" tabIndex={0} aria-label={`Diff: ${beforeLabel ?? 'before'} to ${afterLabel ?? 'after'}`}>
           {rows.map((r, i) =>
             r.kind === 'skip' ? (
               <div key={i} className="diff__row diff__row--skip" role="row">
-                {r.count} unchanged line{r.count === 1 ? '' : 's'}
+                <span role="cell">
+                  {r.count} unchanged line{r.count === 1 ? '' : 's'}
+                </span>
               </div>
             ) : (
               <div key={i} className={cx('diff__row', `diff__row--${r.kind}`)} role="row">
@@ -87,10 +89,13 @@ export function DiffView({ before, after, beforeLabel, afterLabel, context = 3, 
                 <span className="diff__no" aria-hidden>
                   {r.b ?? ''}
                 </span>
-                <span className="diff__sign" aria-label={r.kind === 'add' ? 'added' : r.kind === 'del' ? 'removed' : 'unchanged'}>
-                  {r.kind === 'add' ? '+' : r.kind === 'del' ? '−' : ' '}
+                <span className="diff__sign" role="cell">
+                  <span aria-hidden>{r.kind === 'add' ? '+' : r.kind === 'del' ? '−' : ' '}</span>
+                  <span className="sr-only">{r.kind === 'add' ? 'added' : r.kind === 'del' ? 'removed' : 'unchanged'}</span>
                 </span>
-                <span className="diff__text">{r.text || ' '}</span>
+                <span className="diff__text" role="cell">
+                  {r.text || ' '}
+                </span>
               </div>
             )
           )}

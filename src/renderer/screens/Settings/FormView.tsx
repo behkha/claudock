@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ChevronRight, Eye, EyeOff, Plus, X } from 'lucide-react'
 import type { ScreenId } from '@shared/nav'
-import type { SettingsSummary } from '@shared/api/settings'
+import type { SettingsModels, SettingsSummary } from '@shared/api/settings'
+import { modelChoices } from '@shared/modelCatalog'
 import { Button, Card, IconButton, Segmented, Select, TextField, Toggle, type SelectOption } from '@/components'
-import { api } from '@/lib/api'
+import { api, useEvent } from '@/lib/api'
 import { useDebounced } from '@/lib/hooks'
 import type { JsonObject } from './json'
 
@@ -66,27 +67,36 @@ function ChoiceField({
 
 /* ------------------------------------------------------------------ known keys */
 
-/** From code.claude.com/docs/en/model-config. Anything else goes through "Other…". */
-const MODEL_PRESETS: SelectOption[] = [
-  ...['best', 'fable', 'opus', 'sonnet', 'haiku', 'opusplan', 'opus[1m]', 'sonnet[1m]'].map((v) => ({ value: v, label: v, group: 'Aliases' })),
-  ...(
-    [
-      ['claude-fable-5-1', 'Fable 5.1'],
-      ['claude-fable-5', 'Fable 5'],
-      ['claude-opus-5-5', 'Opus 5.5'],
-      ['claude-opus-5', 'Opus 5'],
-      ['claude-opus-4-8', 'Opus 4.8'],
-      ['claude-opus-4-7', 'Opus 4.7'],
-      ['claude-opus-4-6', 'Opus 4.6'],
-      ['claude-sonnet-5-5', 'Sonnet 5.5'],
-      ['claude-sonnet-5', 'Sonnet 5'],
-      ['claude-sonnet-4-6', 'Sonnet 4.6'],
-      ['claude-sonnet-4-5', 'Sonnet 4.5'],
-      ['claude-haiku-5-5', 'Haiku 5.5'],
-      ['claude-haiku-4-5', 'Haiku 4.5']
-    ] as const
-  ).map(([value, name]) => ({ value, label: `${name} · ${value}`, group: 'Models' }))
-]
+/** The last answer of `api.settings.models()`, kept across visits so the Model field opens filled. */
+let latestModels: SettingsModels | undefined
+
+/**
+ * The Model field's choices, from the model catalogue (Anthropic's pages, read by the main process) and the ids in
+ * this profile's own transcripts: no list of models in this file. Until the first answer, the value that is set is the
+ * only choice, so the field never flashes "Other…". Anything else goes through "Other…".
+ */
+function useModelChoices(current: string): SelectOption[] {
+  const [models, setModels] = useState(latestModels)
+  useEffect(() => {
+    let on = true
+    api.settings.models().then(
+      (m) => {
+        latestModels = m
+        if (on) setModels(m)
+      },
+      () => undefined
+    )
+    return () => {
+      on = false
+    }
+  }, [])
+  useEvent('settings:models', (catalog) => {
+    latestModels = { catalog, used: latestModels?.used ?? [] }
+    setModels(latestModels)
+  })
+  return useMemo(() => (models ? modelChoices(models.catalog, models.used) : current ? [{ value: current, label: current }] : []), [models, current])
+}
+
 /** effortLevel takes low to xhigh. max is kept only in CLAUDE_CODE_EFFORT_LEVEL, so the form saves it there. */
 const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max']
 const EFFORT_ENV = 'CLAUDE_CODE_EFFORT_LEVEL'
@@ -261,6 +271,7 @@ export function FormView({ obj, onChange, summary, onOpen, onEditJson, focusKey 
   }
 
   const model = typeof obj.model === 'string' ? obj.model : ''
+  const modelPresets = useModelChoices(model)
   const theme = typeof obj.theme === 'string' ? obj.theme : ''
 
   /* effort: CLAUDE_CODE_EFFORT_LEVEL wins over effortLevel, and is the only place max is kept */
@@ -334,7 +345,7 @@ export function FormView({ obj, onChange, summary, onOpen, onEditJson, focusKey 
               <ChoiceField
                 label="Model"
                 value={model}
-                presets={MODEL_PRESETS}
+                presets={modelPresets}
                 defaultLabel="Default (not set)"
                 otherLabel="Full model id"
                 onChange={(v) => set('model', v === '' ? undefined : v)}

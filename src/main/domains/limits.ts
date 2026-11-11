@@ -2,18 +2,19 @@ import type { IpcMain } from 'electron'
 import fs from 'node:fs'
 import fsp from 'node:fs/promises'
 import path from 'node:path'
-import type { LimitHits, LimitWindow, LimitsApi, LimitsState, LiveLimits, TokenWindow, TokenWindows } from '@shared/api/limits'
-import { quotaHit } from '@shared/limits'
+import type { LimitHits, LimitsApi, LimitsState, LiveLimits, TokenWindow, TokenWindows } from '@shared/api/limits'
+import { liveFrom, quotaHit, rememberWindows, windowInfo, windowsToDraw } from '@shared/limits'
 import { connectDir, connectDirFor, folderKey, readConnectState, writeOwn, type ConnectState } from '../connect/folder'
 import { shQuote } from '../connect/hookScript'
+import { stepScript as scriptFor } from '../connect/limitScript'
 import { defineDomain, emit } from '../ipcx'
 import { configDir, onConfigDirChanged, openConfigDir, samePath } from '../paths'
 import type { UsageFile } from '../today/activity'
 import { isObj, readSettings } from './extendShared'
 
 /**
- * Limits: token counts from the transcripts under projects/, and the 5-hour / weekly percentages Claude Code hands to
- * the status line. The status line step is a small sh script in Claudock's connect folder
+ * Limits: token counts from the transcripts under projects/, and the percentages Claude Code hands to the status line
+ * for whatever windows it tracks (which ones is its to say: @shared/limits reads and names them). The status line step is a small sh script in Claudock's connect folder
  * (`<userData>/connect/<config dir hash>/`, never the config folder): it saves `rate_limits` to limits.json there,
  * then runs the statusLine command the user had before, with the same input. "Connect to Claude Code"
  * (src/main/domains/connect.ts) installs and removes it; this file owns the script and reads what it saves.
@@ -24,6 +25,8 @@ const HOUR = 3_600_000
 const WIN = process.platform === 'win32'
 const SCRIPT = 'statusline.sh'
 const LIVE = 'limits.json'
+/** Which windows Claude Code has sent, and when last (`rememberWindows`). */
+const SEEN = 'windows.json'
 
 /** The statusLine.command while the step is on. `conn`: a profile's connect folder (the open one by default). */
 export function stepCommand(conn = connectDir()): string {
@@ -35,95 +38,8 @@ export const isStepOn = (statusLine: unknown, conn = connectDir()): boolean => i
 
 /* ------------------------------------------------------------------ the status line step */
 
-/**
- * Finds the top-level "rate_limits" value in the status line JSON and prints it. String-aware (braces inside strings
- * do not count), so it needs no jq. Single quotes are not allowed in here: the program sits in a sh '...' string.
- */
-const EXTRACT_AWK = String.raw`{ s = s $0 "\n" }
-END {
-  n = length(s); d = 0; i = 1; f = 0
-  while (i <= n) {
-    c = substr(s, i, 1)
-    if (c == "\"") {
-      j = i + 1
-      while (j <= n) { e = substr(s, j, 1); if (e == "\\") j += 2; else if (e == "\"") break; else j++ }
-      k = substr(s, i, j - i + 1); i = j + 1
-      if (d == 1 && k == "\"rate_limits\"") {
-        while (i <= n && substr(s, i, 1) ~ /[ \t\r\n]/) i++
-        if (substr(s, i, 1) == ":") { f = 1; i++; break }
-      }
-      continue
-    }
-    if (c == "{" || c == "[") d++
-    else if (c == "}" || c == "]") d--
-    i++
-  }
-  if (!f) exit 1
-  while (i <= n && substr(s, i, 1) ~ /[ \t\r\n]/) i++
-  if (substr(s, i, 1) != "{") exit 1
-  b = i; d = 0
-  while (i <= n) {
-    c = substr(s, i, 1)
-    if (c == "\"") { j = i + 1; while (j <= n) { e = substr(s, j, 1); if (e == "\\") j += 2; else if (e == "\"") break; else j++ }; i = j + 1; continue }
-    if (c == "{" || c == "[") d++
-    else if (c == "}" || c == "]") { d--; if (d == 0) { print substr(s, b, i - b + 1); exit 0 } }
-    i++
-  }
-  exit 1
-}`
-
-/** For people with no status line of their own: "5h 42% · week 61%", only the windows Claude Code sent. */
-const LINE_AWK = String.raw`{ s = s $0 }
-function pct(name,   w, v) {
-  if (!match(s, "\"" name "\"[ \t\r\n]*:[ \t\r\n]*[{][^}]*[}]")) return ""
-  w = substr(s, RSTART, RLENGTH)
-  if (!match(w, /"used_percentage"[ \t\r\n]*:[ \t\r\n]*-?[0-9.]+/)) return ""
-  v = substr(w, RSTART, RLENGTH); sub(/.*:[ \t\r\n]*/, "", v)
-  return int(v + 0.5) "%"
-}
-END {
-  a = pct("five_hour"); b = pct("seven_day"); o = ""
-  if (a != "") o = "5h " a
-  if (b != "") o = (o == "" ? "" : o " · ") "week " b
-  if (o != "") print o
-}`
-
-/** The step's script. `original` is the previous statusLine.command, run with the same stdin, cwd and env. */
-export function stepScript(original: string | null, conn = connectDir()): string {
-  return [
-    '#!/bin/sh',
-    '# Claudock live limits. Claude Code runs this as your status line: it saves the rate_limits it receives into',
-    '# this folder, then runs the status line you had before. Disconnect in Claudock to put that back.',
-    `dir=${shQuote(conn)}`,
-    `cmd=${shQuote(original ?? '')}`,
-    'in="$dir/.in.$$"',
-    `trap 'rm -f "$in" "$dir/.limits.$$"; exit 143' HUP INT TERM`,
-    'if ! cat 2>/dev/null > "$in"; then',
-    '  rm -f "$in" 2>/dev/null',
-    '  [ -n "$cmd" ] && exec /bin/sh -c "$cmd"',
-    '  exit 0',
-    'fi',
-    `rl=$(LC_ALL=C awk '${EXTRACT_AWK}' "$in" 2>/dev/null)`,
-    'if [ -n "$rl" ]; then',
-    `  if printf '{"v":1,"at":%s,"rate_limits":%s}\\n' "$(date +%s)" "$rl" > "$dir/.limits.$$" 2>/dev/null; then`,
-    '    mv -f "$dir/.limits.$$" "$dir/limits.json" 2>/dev/null || rm -f "$dir/.limits.$$"',
-    '  else',
-    '    rm -f "$dir/.limits.$$" 2>/dev/null',
-    '  fi',
-    'fi',
-    'if [ -n "$cmd" ]; then',
-    '  exec < "$in"',
-    '  rm -f "$in"',
-    '  trap - HUP INT TERM',
-    '  if command -v bash >/dev/null 2>&1; then exec bash -c "$cmd"; fi',
-    '  exec /bin/sh -c "$cmd"',
-    'fi',
-    'rm -f "$in"',
-    `[ -n "$rl" ] && printf '%s\\n' "$rl" | LC_ALL=C awk '${LINE_AWK}'`,
-    'exit 0',
-    ''
-  ].join('\n')
-}
+/** The step's script (src/main/connect/limitScript.ts) for a connect folder: the open profile's by default. */
+export const stepScript = (original: string | null, conn = connectDir()): string => scriptFor(original, conn)
 
 /** The statusLine.command the step wraps (the one the user had before), or null. */
 export const commandOf = (state: ConnectState | null): string | null => {
@@ -133,13 +49,13 @@ export const commandOf = (state: ConnectState | null): string | null => {
 
 /** Write the step's script for the statusLine it wraps. Must exist before settings.json points at it. */
 export async function writeStepScript(original: string | null): Promise<void> {
-  await fsp.rm(path.join(connectDir(), LIVE), { force: true })
+  await Promise.all([LIVE, SEEN].map((n) => fsp.rm(path.join(connectDir(), n), { force: true })))
   await writeOwn(SCRIPT, stepScript(original), 0o755)
 }
 
 /** The step's files, when settings.json never pointed at them (a Connect that failed). */
 export async function removeStepFiles(): Promise<void> {
-  await Promise.all([SCRIPT, LIVE].map((n) => fsp.rm(path.join(connectDir(), n), { force: true })))
+  await Promise.all([SCRIPT, LIVE, SEEN].map((n) => fsp.rm(path.join(connectDir(), n), { force: true })))
 }
 
 /**
@@ -147,40 +63,52 @@ export async function removeStepFiles(): Promise<void> {
  * still runs it until Claude Code reloads settings.json keeps its status line. The next Connect rewrites it.
  */
 export async function retireStepFiles(): Promise<void> {
-  await fsp.rm(path.join(connectDir(), LIVE), { force: true })
+  await Promise.all([LIVE, SEEN].map((n) => fsp.rm(path.join(connectDir(), n), { force: true })))
 }
 
-/** The script is regenerated from state.json if it went missing while settings.json still points at it. */
+/**
+ * The script is regenerated from state.json while settings.json points at it: when it went missing, and when an
+ * earlier Claudock wrote it (its text differs from today's).
+ */
 async function ensureScript(dir: string): Promise<void> {
   if (WIN) return
   const conn = connectDirFor(dir)
   const st = await readConnectState(conn)
-  if (!st?.statusLine || fs.existsSync(path.join(conn, SCRIPT))) return
+  if (!st?.statusLine) return
+  const want = stepScript(commandOf(st), conn)
+  if ((await fsp.readFile(path.join(conn, SCRIPT), 'utf8').catch(() => null)) === want) return
   if (!isStepOn((await readSettings(dir)).data.statusLine, conn)) return
-  await writeOwn(SCRIPT, stepScript(commandOf(st), conn), 0o755, conn)
+  await writeOwn(SCRIPT, want, 0o755, conn)
 }
 
 /* ------------------------------------------------------------------ live limits (from the step) */
 
-function windowOf(v: unknown): LimitWindow | null {
-  if (!isObj(v)) return null
-  const p = v.used_percentage
-  const r = v.resets_at
-  if (typeof p !== 'number' || !Number.isFinite(p) || p < 0 || typeof r !== 'number' || !Number.isFinite(r) || r <= 0) return null
-  return { usedPercentage: p, resetsAt: r * 1000 }
-}
-
 async function readLive(conn: string): Promise<LiveLimits | null> {
   try {
-    const o = JSON.parse(await fsp.readFile(path.join(conn, LIVE), 'utf8')) as unknown
-    if (!isObj(o) || o.v !== 1 || typeof o.at !== 'number' || !isObj(o.rate_limits)) return null
-    const fiveHour = windowOf(o.rate_limits.five_hour)
-    const sevenDay = windowOf(o.rate_limits.seven_day)
-    if (!fiveHour && !sevenDay) return null
-    return { at: o.at * 1000, fiveHour, sevenDay }
+    return liveFrom(JSON.parse(await fsp.readFile(path.join(conn, LIVE), 'utf8')))
   } catch {
     return null
   }
+}
+
+/** Memory is rewritten when a window comes or goes, or its last sighting is this much older than the reading. */
+const SEEN_EVERY = HOUR
+
+/** The windows Claude Code has sent this profile, brought up to date with `live` and saved when that changed them. */
+async function seenWindows(conn: string, live: LiveLimits | null): Promise<Record<string, number> | null> {
+  let had: Record<string, number> | null = null
+  try {
+    const o = JSON.parse(await fsp.readFile(path.join(conn, SEEN), 'utf8')) as unknown
+    if (isObj(o) && o.v === 1 && isObj(o.seen)) had = Object.fromEntries(Object.entries(o.seen).filter((e): e is [string, number] => typeof e[1] === 'number'))
+  } catch {
+    /* nothing remembered yet */
+  }
+  const now = rememberWindows(had, live)
+  if (!now || !live) return now
+  const keys = Object.keys(now)
+  const changed = !had || keys.length !== Object.keys(had).length || keys.some((k) => !(k in had) || now[k] - had[k] >= SEEN_EVERY)
+  if (changed) await writeOwn(SEEN, JSON.stringify({ v: 1, seen: now }) + '\n', 0o644, conn).catch(() => undefined)
+  return now
 }
 
 /* ------------------------------------------------------------------ token windows (from transcripts) */
@@ -203,6 +131,8 @@ interface FileScan {
   cwd: string | null
   /** The newest limit Claude Code reported as reached in this file, per window. */
   hits: LimitHits
+  /** The model ids its assistant lines name. */
+  models: Set<string>
 }
 
 /** One profile's transcripts, read incrementally: the open profile's for Today, every profile's for the menu bar. */
@@ -236,6 +166,7 @@ function entryOf(line: string, cutoff: number, scan?: FileScan): Entry | null {
   const q = scan && o.quotaLimits !== undefined ? quotaHit(o.quotaLimits, t) : null
   if (q && scan && q.hit.at >= (scan.hits[q.window]?.at ?? 0)) scan.hits[q.window] = q.hit
   if (o.message.model === '<synthetic>') return null
+  if (scan && typeof o.message.model === 'string' && o.message.model) scan.models.add(o.message.model)
   if (!Number.isFinite(t) || t < cutoff) return null
   const u = o.message.usage
   const tokens = num(u.input_tokens) + num(u.output_tokens) + num(u.cache_creation_input_tokens) + num(u.cache_read_input_tokens)
@@ -312,7 +243,7 @@ async function recentTranscripts(dir: string, cutoff: number): Promise<{ abs: st
 }
 
 async function scanTranscripts(dir: string, scans: Map<string, FileScan>, now: number): Promise<void> {
-  const cutoff = now - 7 * DAY
+  const cutoff = now - SCAN_MS
   const files = await recentTranscripts(dir, cutoff)
   const live = new Set(files.map((f) => f.abs))
   for (const k of scans.keys()) if (!live.has(k)) scans.delete(k)
@@ -320,7 +251,7 @@ async function scanTranscripts(dir: string, scans: Map<string, FileScan>, now: n
     let s = scans.get(f.abs)
     if (s && s.size === f.size && s.mtimeMs === f.mtimeMs) continue
     // shrunk or rewritten in place: read it all again; grown: read only what was appended
-    if (!s || f.size < s.offset || (f.size === s.size && f.mtimeMs !== s.mtimeMs)) s = { size: 0, mtimeMs: 0, offset: 0, entries: [], cwd: null, hits: { fiveHour: null, sevenDay: null } }
+    if (!s || f.size < s.offset || (f.size === s.size && f.mtimeMs !== s.mtimeMs)) s = { size: 0, mtimeMs: 0, offset: 0, entries: [], cwd: null, hits: {}, models: new Set() }
     try {
       s.offset = await readFrom(f.abs, s.offset, f.size, cutoff, s)
       s.size = f.size
@@ -333,29 +264,36 @@ async function scanTranscripts(dir: string, scans: Map<string, FileScan>, now: n
   for (const s of scans.values()) if (s.entries.length && s.entries[0].t < cutoff) s.entries = s.entries.filter((e) => e.t >= cutoff)
 }
 
-function tokenWindows(scans: Map<string, FileScan>, now: number): TokenWindows {
+/** Transcripts are scanned this far back, so tokens can stand in for windows up to this long. */
+const SCAN_MS = 7 * DAY
+
+/** Tokens since local midnight, and in each of `keys` whose name gives a length the scan covers. */
+function tokenWindows(scans: Map<string, FileScan>, now: number, keys: string[]): TokenWindows {
   const midnight = new Date(now)
   midnight.setHours(0, 0, 0, 0)
-  const starts = { fiveHour: now - 5 * HOUR, today: midnight.getTime(), sevenDay: now - 7 * DAY }
-  const acc = Object.fromEntries(Object.keys(starts).map((k) => [k, { tokens: 0, sessions: new Set<string>() }])) as Record<
-    keyof TokenWindows,
-    { tokens: number; sessions: Set<string> }
-  >
+  const TODAY = ' today'
+  const starts = new Map<string, number>([[TODAY, midnight.getTime()]])
+  for (const k of keys) {
+    const info = windowInfo(k)
+    if (info.tokenSpan && info.spanMs !== null && info.spanMs <= SCAN_MS) starts.set(k, now - info.spanMs)
+  }
+  const acc = new Map([...starts.keys()].map((k) => [k, { tokens: 0, sessions: new Set<string>() }]))
   // a resumed session repeats earlier messages in its new file: count each message once across files
   const seen = new Set<string>()
   for (const s of scans.values()) {
     for (const e of s.entries) {
       if (seen.has(e.key)) continue
       seen.add(e.key)
-      for (const k of Object.keys(starts) as (keyof TokenWindows)[]) {
-        if (e.t < starts[k]) continue
-        acc[k].tokens += e.tokens
-        if (e.session) acc[k].sessions.add(e.session)
+      for (const [k, start] of starts) {
+        if (e.t < start) continue
+        const a = acc.get(k)!
+        a.tokens += e.tokens
+        if (e.session) a.sessions.add(e.session)
       }
     }
   }
-  const out = (k: keyof TokenWindows): TokenWindow => ({ tokens: acc[k].tokens, sessions: acc[k].sessions.size })
-  return { fiveHour: out('fiveHour'), today: out('today'), sevenDay: out('sevenDay') }
+  const out = (k: string): TokenWindow => ({ tokens: acc.get(k)!.tokens, sessions: acc.get(k)!.sessions.size })
+  return { today: out(TODAY), windows: Object.fromEntries([...starts.keys()].filter((k) => k !== TODAY).map((k) => [k, out(k)])) }
 }
 
 /** Scans are incremental and shared: callers within 5 s reuse the last one. */
@@ -387,15 +325,30 @@ export async function transcriptUsage(): Promise<UsageFile[]> {
   return out
 }
 
+/**
+ * The model ids this profile has used, for the Model field in Settings: the last 7 days of transcripts as the scan
+ * keeps them, and every model in Claude Code's own stats cache (all time). Read locally; sent nowhere.
+ */
+export async function usedModelIds(): Promise<string[]> {
+  const ids = new Set<string>()
+  for (const s of (await scan(configDir())).values()) for (const m of s.models) ids.add(m)
+  try {
+    const stats = JSON.parse(await fsp.readFile(path.join(configDir(), 'stats-cache.json'), 'utf8')) as unknown
+    if (isObj(stats) && isObj(stats.modelUsage)) for (const m of Object.keys(stats.modelUsage)) ids.add(m)
+  } catch {
+    /* no stats cache */
+  }
+  return [...ids].filter((m) => m.length <= 120).sort()
+}
+
 /* ------------------------------------------------------------------ state, watching, events */
 
 /** The newest reached limit per window across the scanned transcripts, while its window hasn't reset. */
 function currentHits(scans: Map<string, FileScan>, now: number): LimitHits {
-  const out: LimitHits = { fiveHour: null, sevenDay: null }
+  const out: LimitHits = {}
   for (const s of scans.values())
-    for (const k of ['fiveHour', 'sevenDay'] as const) {
-      const h = s.hits[k]
-      if (h && h.resetsAt > now && h.at >= (out[k]?.at ?? 0)) out[k] = h
+    for (const [k, h] of Object.entries(s.hits)) {
+      if (h.resetsAt > now && h.at >= (out[k]?.at ?? 0)) out[k] = h
     }
   return out
 }
@@ -404,12 +357,16 @@ function currentHits(scans: Map<string, FileScan>, now: number): LimitHits {
 export async function limitsIn(dir: string): Promise<LimitsState> {
   const scans = await scan(dir)
   const now = Date.now()
-  const tokens = tokenWindows(scans, now)
   const hits = currentHits(scans, now)
-  if (WIN) return { step: 'unsupported', live: null, tokens, hits }
+  const state = (step: LimitsState['step'], live: LiveLimits | null, seen: Record<string, number> | null): LimitsState => {
+    const windows = windowsToDraw(seen, hits)
+    return { step, live, tokens: tokenWindows(scans, now, windows), hits, windows }
+  }
+  if (WIN) return state('unsupported', null, null)
   const conn = connectDirFor(dir)
   const on = isStepOn((await readSettings(dir)).data.statusLine, conn)
-  return { step: on ? 'on' : 'off', live: on ? await readLive(conn) : null, tokens, hits }
+  const live = on ? await readLive(conn) : null
+  return state(on ? 'on' : 'off', live, on ? await seenWindows(conn, live) : null)
 }
 
 /** The open profile's limits. */

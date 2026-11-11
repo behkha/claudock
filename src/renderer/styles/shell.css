@@ -77,6 +77,36 @@
   background: var(--sidebar);
   border-right: var(--hair) solid var(--border);
 }
+/*
+ * The list is taller than the window at its default size. Where it is cut, it fades: at the bottom while there is
+ * more below, at the top once it has scrolled. The fade follows the scroll position; a list that fits has none.
+ */
+@property --nav-fade-top {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+@property --nav-fade-bottom {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+@keyframes nav-fade {
+  0% {
+    --nav-fade-top: 0px;
+    --nav-fade-bottom: 36px;
+  }
+  12% {
+    --nav-fade-top: 36px;
+  }
+  88% {
+    --nav-fade-bottom: 36px;
+  }
+  100% {
+    --nav-fade-top: 36px;
+    --nav-fade-bottom: 0px;
+  }
+}
 .sidebar__nav {
   flex: 1;
   min-height: 0;
@@ -85,6 +115,9 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+  mask-image: linear-gradient(to bottom, transparent, #000 var(--nav-fade-top), #000 calc(100% - var(--nav-fade-bottom)), transparent);
+  animation: nav-fade linear both;
+  animation-timeline: scroll(self);
 }
 .nav-group__label {
   padding: 0 10px 4px;
@@ -98,6 +131,7 @@
   gap: 1px;
 }
 .nav-item {
+  scroll-margin-block: 10px; /* scrolled into view with air above and below (Sidebar.tsx) */
   position: relative;
   display: flex;
   align-items: center;

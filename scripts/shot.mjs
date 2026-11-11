@@ -30,6 +30,12 @@ const argVal = (name) => {
 const only = argVal('--only') ?? ''
 // --real: look at the real config folder with every write refused (CLAUDOCK_READONLY), for checking real data
 const real = args.includes('--real')
+// --audit: beside each shot, write audit/<theme>-<what>.json (src/main/shotAudit.ts: axe-core, contrast, keyboard, accessibility tree, layout)
+const audit = args.includes('--audit')
+// --size 960x640: the window's content size. --state empty | long | broken | loading: the fixture with nothing in it, with
+// very long names, with files Claudock can't read, or with every answer from the main process held back 8 s
+const size = argVal('--size') ?? ''
+const state = argVal('--state') ?? ''
 const record = args.includes('--record')
 const outDir = path.resolve(argVal('--out') ?? path.join(root, '.shots', record ? 'record' : ''))
 const fixture = path.join(root, '.fixture', 'claude')
@@ -75,7 +81,18 @@ const userData = path.join(shared ?? tmp, 'userData')
 const home = path.join(shared ?? tmp, 'home')
 if (!real) {
   const copy = path.join(home, '.claude')
-  fs.cpSync(fixture, copy, { recursive: true, preserveTimestamps: true, verbatimSymlinks: true, mode: fs.constants.COPYFILE_FICLONE })
+  if (state === 'empty') {
+    // a folder Claude Code has never written to
+    fs.mkdirSync(copy, { recursive: true })
+    fs.writeFileSync(path.join(copy, '.claudock-fixture'), '')
+  } else fs.cpSync(fixture, copy, { recursive: true, preserveTimestamps: true, verbatimSymlinks: true, mode: fs.constants.COPYFILE_FICLONE })
+  if (state === 'long') longContent(copy)
+  if (state === 'broken') {
+    for (const f of ['settings.json', 'settings.local.json', 'stats-cache.json', '.mcp.json', 'plugins/installed_plugins.json']) {
+      fs.mkdirSync(path.dirname(path.join(copy, f)), { recursive: true })
+      fs.writeFileSync(path.join(copy, f), '{ "model": "opus", broken')
+    }
+  }
   // the second profile, where Add profile finds it: ~/.claude-work
   const work = path.join(root, '.fixture', 'claude-work')
   if (fs.existsSync(work)) fs.cpSync(work, path.join(home, '.claude-work'), { recursive: true, preserveTimestamps: true, mode: fs.constants.COPYFILE_FICLONE })
@@ -119,6 +136,9 @@ const child = spawn(electronPath, [path.join(buildDir, 'main', 'index.js')], {
     ...(record ? { CLAUDOCK_RECORD: '1' } : {}),
     CLAUDOCK_SHOT_DIR: outDir,
     CLAUDOCK_SHOT_ONLY: only,
+    ...(audit ? { CLAUDOCK_AUDIT: path.join(root, 'node_modules', 'axe-core', 'axe.min.js') } : {}),
+    ...(size ? { CLAUDOCK_SHOT_SIZE: size } : {}),
+    ...(state === 'loading' ? { CLAUDOCK_SHOT_LOADING: '1', CLAUDOCK_SHOT_IPC_DELAY: '8000' } : {}),
     CLAUDOCK_USER_DATA: userData
   }
 })
@@ -138,7 +158,7 @@ for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { child.kill('SIG
 child.stdout.on('data', relay)
 child.stderr.on('data', relay)
 
-const limit = record ? 30 * 60 : 180
+const limit = record ? 30 * 60 : audit || state === 'loading' ? 20 * 60 : 180
 const timer = setTimeout(() => {
   console.log(`SHOT_FAILED timeout after ${limit} s`)
   errors++
@@ -157,6 +177,44 @@ child.on('exit', (code) => {
   console.log(`${pngs} image(s) in ${path.relative(root, outDir) || '.'}`)
   process.exit(code === 0 && errors === 0 ? 0 : 1)
 })
+
+/** --state long: names, descriptions and values far longer than anyone writes, in every list the fixture fills. */
+function longContent(dir) {
+  const long = 'a-deliberately-very-long-name-that-keeps-going-to-see-where-the-layout-gives-up-and-whether-anything-overlaps-or-falls-off-the-window'
+  const words = 'This description is far longer than a description should ever be, written to find out what a list row, a card title and a detail pane do with three hundred characters of text that nobody trimmed before saving it into the file, including whether it wraps, truncates with an ellipsis, or pushes its neighbours out of view.'
+  const write = (rel, text) => {
+    fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true })
+    fs.writeFileSync(path.join(dir, rel), text)
+  }
+  write(`skills/${long}/SKILL.md`, `---\nname: ${long}\ndescription: ${words}\n---\n\n# ${long}\n\n${words}\n`)
+  write(`agents/${long}.md`, `---\nname: ${long}\ndescription: ${words}\nmodel: claude-opus-5-5-with-a-suffix-that-is-not-a-real-model-id-but-is-long\n---\n\n${words}\n`)
+  write(`commands/${long}.md`, `---\ndescription: ${words}\n---\n\n${words}\n`)
+  write(`rules/${long}.md`, `# ${long}\n\n${words}\n`)
+  write(`plans/${long}.md`, `# ${words}\n\n${words}\n`)
+  const file = path.join(dir, 'settings.json')
+  const settings = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {}
+  settings.model = `claude-opus-5-5-${long}`
+  settings.permissions = { ...(settings.permissions ?? {}), allow: [...(settings.permissions?.allow ?? []), `Bash(${long.replaceAll('-', ' ')} --with ${long}:*)`] }
+  settings.env = { ...(settings.env ?? {}), [long.toUpperCase().replaceAll('-', '_')]: words }
+  settings.hooks = { ...(settings.hooks ?? {}), PreToolUse: [...(settings.hooks?.PreToolUse ?? []), { matcher: long, hooks: [{ type: 'command', command: `sh ~/.claude/hooks/${long}.sh --flag ${words.slice(0, 160)}` }] }] }
+  fs.writeFileSync(file, JSON.stringify(settings, null, 2))
+  // a model Anthropic's price page has no row for, in the newest transcript: the week card must name it as unpriced
+  const newest = fs
+    .readdirSync(path.join(dir, 'projects'), { recursive: true })
+    .map((f) => path.join(dir, 'projects', String(f)))
+    .filter((f) => f.endsWith('.jsonl') && !f.includes('subagents'))
+    .sort((x, y) => fs.statSync(y).mtimeMs - fs.statSync(x).mtimeMs)[0]
+  const last = newest && fs.readFileSync(newest, 'utf8').split('\n').findLast((l) => l.includes('"type":"assistant"') && l.includes('"usage"'))
+  if (last) {
+    const line = JSON.parse(last)
+    line.message = { ...line.message, id: 'msg_long_unpriced', model: 'kimi-k3-a-model-with-no-price-and-a-long-name' }
+    line.requestId = 'req_long_unpriced'
+    line.uuid = '00000000-0000-4000-8000-00000000long'
+    const { atime, mtime } = fs.statSync(newest)
+    fs.appendFileSync(newest, JSON.stringify(line) + '\n')
+    fs.utimesSync(newest, atime, mtime)
+  }
+}
 
 /** Each take's frames -> <take>.mp4 at a constant 60 fps (each frame held until the next one's time), and the stills at 1920x1080. */
 function encode() {

@@ -1,7 +1,7 @@
 /**
  * Connect domain contract: "Connect to Claude Code" adds two parts to settings.json in one write (one snapshot):
- *   - `statusLine`: the live limits status line step (src/main/domains/limits.ts), which saves the 5-hour and weekly
- *     limits Claude Code sends and runs the user's own status line unchanged.
+ *   - `statusLine`: the live limits status line step (src/main/domains/limits.ts), which saves the limits Claude
+ *     Code sends (every window) and runs the user's own status line unchanged.
  *   - `hooks`: session hooks that note when a session is working, waiting for you or done (src/main/domains/sessions.ts).
  * Both keep their data in Claudock's own folder, never the config folder. `disconnect()` removes both and, when nothing
  * else changed settings.json in the meantime, puts back the exact bytes it had before connecting.

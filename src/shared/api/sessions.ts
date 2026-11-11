@@ -59,7 +59,7 @@ export interface AlertPrefs {
   doneAlert: boolean
   /** Play the system sound with an alert. Off by default. */
   sound: boolean
-  /** Alert once per window when the 5-hour or weekly limit reaches this percentage; null = off (the default). */
+  /** Alert once per window when a limit window (5-hour, weekly, ...) reaches this percentage; null = off (the default). */
   limitPercent: number | null
   /** Alert when a limit resets, only if Claude Code reported 100% in that window. Off by default. */
   limitReset: boolean

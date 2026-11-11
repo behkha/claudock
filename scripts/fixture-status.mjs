@@ -74,20 +74,27 @@ const nextMonday = new Date(now)
 nextMonday.setDate(nextMonday.getDate() + ((8 - nextMonday.getDay()) % 7 || 7))
 nextMonday.setHours(9, 0, 0, 0)
 
+// the status JSON Claude Code 2.1.318 really sent (captured 10 Nov 2026), pointed at this fixture's session
+const real = JSON.parse(fs.readFileSync(path.join(root, 'src/main/connect/fixtures/statusline-2.1.318.json'), 'utf8'))
 const status = {
+  ...real,
   session_id: sessionId,
   transcript_path: transcriptPath,
   cwd,
-  model: { id: 'claude-opus-5-5', display_name: 'Opus 5.5' },
-  workspace: { current_dir: cwd, project_dir: cwd },
-  version: '2.1.300',
+  workspace: { ...real.workspace, current_dir: cwd, project_dir: cwd },
   cost: { total_cost_usd: 3.42, total_duration_ms: 1_845_000, total_api_duration_ms: 612_000, total_lines_added: 214, total_lines_removed: 57 },
-  context_window: { total_input_tokens: 84_210, total_output_tokens: 19_640, context_window_size: 200_000, used_percentage: 38, remaining_percentage: 62 }
+  context_window: { ...real.context_window, total_input_tokens: 84_210, total_output_tokens: 19_640, used_percentage: 38, remaining_percentage: 62 }
 }
+delete status.rate_limits
 if (!args.includes('--no-limits')) {
   status.rate_limits = {
     five_hour: { used_percentage: num('--five', 42), resets_at: Math.floor((args.includes('--expired') ? now - 10 * 60_000 : now + (2 * 60 + 28) * 60_000) / 1000) },
     seven_day: { used_percentage: num('--week', 61), resets_at: Math.floor(nextMonday.getTime() / 1000) }
+  }
+  // --window spend_limit=63: any other window, as Claude Code would send it (resets in 30 days)
+  for (let i = args.indexOf('--window'); i !== -1; i = args.indexOf('--window', i + 1)) {
+    const [key, pct] = (args[i + 1] ?? '').split('=')
+    if (key && Number.isFinite(Number(pct))) status.rate_limits[key] = { used_percentage: Number(pct), resets_at: Math.floor((now + 30 * 86_400_000) / 1000) }
   }
 }
 

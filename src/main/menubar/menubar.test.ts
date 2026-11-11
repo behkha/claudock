@@ -9,17 +9,25 @@ import { autostartEntry, execArg, inNpxCache, launchAgent, unstablePath } from '
 
 const NOW = 1_800_000_000_000
 const H = 3_600_000
-const tokens = { fiveHour: { tokens: 0, sessions: 0 }, today: { tokens: 0, sessions: 0 }, sevenDay: { tokens: 0, sessions: 0 } }
-const hits = { fiveHour: null, sevenDay: null }
+const none = { tokens: 0, sessions: 0 }
+const tokens = { today: none, windows: { five_hour: none, seven_day: none } }
+const hits = {}
+const windows = ['five_hour', 'seven_day']
+/** `rate_limits` as Claude Code sends it: only the windows it has. */
+const sent = (w: Record<string, { usedPercentage: number; resetsAt: number } | null>): LiveLimits['windows'] =>
+  Object.fromEntries(Object.entries(w).filter((e): e is [string, { usedPercentage: number; resetsAt: number }] => e[1] !== null))
 
 const limits = (five: number | null, week: number | null, step: LimitsState['step'] = 'on', resetsIn = H): LimitsState => ({
   step,
   tokens,
   hits,
+  windows,
   live: {
     at: NOW,
-    fiveHour: five === null ? null : { usedPercentage: five, resetsAt: NOW + resetsIn },
-    sevenDay: week === null ? null : { usedPercentage: week, resetsAt: NOW + 50 * H }
+    windows: sent({
+      five_hour: five === null ? null : { usedPercentage: five, resetsAt: NOW + resetsIn },
+      seven_day: week === null ? null : { usedPercentage: week, resetsAt: NOW + 50 * H }
+    })
   }
 })
 
@@ -49,7 +57,7 @@ test('glance: the higher limit is the number; hover text names both', () => {
 
 test('glance: no number while the step is off, before Claude Code reports, or once a window has reset', () => {
   assert.equal(glance(limits(42, 61, 'off'), undefined, NOW).title, '')
-  assert.equal(glance({ step: 'on', live: null, tokens, hits }, undefined, NOW).title, '')
+  assert.equal(glance({ step: 'on', live: null, tokens, hits, windows }, undefined, NOW).title, '')
   assert.equal(glance(undefined, undefined, NOW).title, '')
   // the 5-hour window reset ten minutes ago: only the weekly reading is still true
   const g = glance(limits(99, 30, 'on', -10 * 60_000), undefined, NOW)
@@ -74,8 +82,10 @@ test('glance: the dot only while a session waits; hover text says who', () => {
 const prefs = (over: Partial<AlertPrefs> = {}): AlertPrefs => ({ ...normalizeAlertPrefs(undefined), limitPercent: 80, ...over })
 const reading = (five: number | null, week: number | null = null, fiveResets = NOW + 2 * H): LiveLimits => ({
   at: NOW,
-  fiveHour: five === null ? null : { usedPercentage: five, resetsAt: fiveResets },
-  sevenDay: week === null ? null : { usedPercentage: week, resetsAt: NOW + 90 * H }
+  windows: sent({
+    five_hour: five === null ? null : { usedPercentage: five, resetsAt: fiveResets },
+    seven_day: week === null ? null : { usedPercentage: week, resetsAt: NOW + 90 * H }
+  })
 })
 const titles = (a: { title: string }[]): string[] => a.map((x) => x.title)
 

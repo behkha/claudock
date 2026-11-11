@@ -143,7 +143,7 @@ export function ProfileMenu({ dir, home, size }: { dir: string; home: string; si
             const checked = p.id === s?.open
             const removable = !p.launch && !checked
             return (
-              <div key={p.id} className="profile-menu__item">
+              <div key={p.id} className="profile-menu__item" role="none">
                 <button
                   type="button"
                   role="menuitemradio"
@@ -174,7 +174,9 @@ export function ProfileMenu({ dir, home, size }: { dir: string; home: string; si
                 </button>
                 {rowMenu === p.id ? (
                   <div className="profile-row__menu" role="group" aria-label={p.name}>
+                    {/* the three actions are menu items of this group */}
                     <Button
+                      role="menuitem"
                       variant="ghost"
                       onClick={() => {
                         setRowMenu(null)
@@ -184,12 +186,12 @@ export function ProfileMenu({ dir, home, size }: { dir: string; home: string; si
                       Rename…
                     </Button>
                     {p.exists ? (
-                      <Button variant="ghost" onClick={() => void api.profiles.reveal(p.id).catch((e: Error) => toast(e.message, { kind: 'error' }))}>
+                      <Button role="menuitem" variant="ghost" onClick={() => void api.profiles.reveal(p.id).catch((e: Error) => toast(e.message, { kind: 'error' }))}>
                         {revealLabel}
                       </Button>
                     ) : null}
                     {removable ? (
-                      <Button variant="ghost" onClick={() => remove(p)}>
+                      <Button role="menuitem" variant="ghost" onClick={() => remove(p)}>
                         Remove from Claudock
                       </Button>
                     ) : null}
@@ -199,9 +201,9 @@ export function ProfileMenu({ dir, home, size }: { dir: string; home: string; si
             )
           })}
           {current ? (
-            <div className="profile-menu__cmd">
+            <div className="profile-menu__cmd" role="none">
               <code className="selectable">{current.command}</code>
-              <Button onClick={() => void copy()}>{copied ? 'Copied' : 'Copy'}</Button>
+              <Button role="menuitem" onClick={() => void copy()}>{copied ? 'Copied' : 'Copy'}</Button>
             </div>
           ) : null}
           <button

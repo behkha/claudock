@@ -1,12 +1,9 @@
 /**
- * Anthropic's API list prices, for the share card's "≈ $N at API prices" (src/main/share/week.ts). Copied by hand from
- * the source page on the date below: when Anthropic changes a price or adds a model, add or change its row here and
- * move the date. A model missing from the table has no price and is left out of the value. Plans are the monthly-billing
- * list prices of the same day; Claudock never reads which plan an account has, the user picks it.
+ * The arithmetic of Anthropic's API list prices, for the share card's "≈ $N at API prices" (src/main/share/week.ts).
+ * The prices themselves are not in here: they come from the model catalogue (src/shared/modelCatalog.ts), read from
+ * Anthropic's pricing page. A model the catalogue has no row for has no price. Plans are the monthly-billing list
+ * prices, copied by hand on 29 Oct 2026; Claudock never reads which plan an account has, the user picks it.
  */
-
-export const PRICES_AS_OF = '2026-10-29'
-export const PRICES_SOURCE = 'https://platform.claude.com/docs/en/about-claude/pricing'
 
 /** USD per million tokens, as the price page lists them. */
 export interface Rates {
@@ -26,51 +23,9 @@ export interface ModelPrice extends Rates {
   fast?: { input: number; output: number }
   /** A request whose prompt (input, cache writes and cache reads) is over `over` tokens pays these instead. */
   long?: Rates & { over: number }
-  /** `inference_geo: "us"` costs 1.1x on every rate (Claude 4.6 and later). */
-  usOnly: boolean
+  /** What `inference_geo: "us"` multiplies every rate by (1.1 on Claude 4.6 and later); null where it doesn't apply. */
+  usOnly: number | null
 }
-
-const row = (name: string, input: number, write5m: number, write1h: number, read: number, output: number, more: Partial<ModelPrice> = {}): ModelPrice => ({
-  name,
-  input,
-  write5m,
-  write1h,
-  read,
-  output,
-  usOnly: true,
-  ...more
-})
-
-export const MODEL_PRICES: readonly ModelPrice[] = [
-  row('Fable 5.1', 10, 12.5, 20, 0.25, 50),
-  row('Mythos 5.1', 10, 12.5, 20, 0.25, 50),
-  row('Fable 5', 10, 12.5, 20, 1, 50),
-  row('Mythos 5', 10, 12.5, 20, 1, 50),
-  row('Opus 5.5', 4, 5, 8, 0.2, 20, { fast: { input: 8, output: 40 } }),
-  row('Opus 5', 5, 6.25, 10, 0.5, 25, { fast: { input: 10, output: 50 } }),
-  row('Opus 4.8', 5, 6.25, 10, 0.5, 25, { fast: { input: 10, output: 50 } }),
-  row('Opus 4.7', 5, 6.25, 10, 0.5, 25),
-  row('Opus 4.6', 5, 6.25, 10, 0.5, 25),
-  row('Opus 4.5', 5, 6.25, 10, 0.5, 25, { usOnly: false }),
-  row('Opus 4.1', 15, 18.75, 30, 1.5, 75, { usOnly: false }),
-  row('Opus 4', 15, 18.75, 30, 1.5, 75, { usOnly: false }),
-  row('Sonnet 5.5', 2, 2.5, 4, 0.1, 10),
-  row('Sonnet 5', 2, 2.5, 4, 0.2, 10),
-  row('Sonnet 4.6', 3, 3.75, 6, 0.3, 15),
-  row('Sonnet 4.5', 3, 3.75, 6, 0.3, 15, { usOnly: false }),
-  row('Sonnet 4', 3, 3.75, 6, 0.3, 15, { usOnly: false }),
-  row('Haiku 5.5', 0.1, 0.125, 0.2, 0.01, 0.5, { long: { over: 100_000, input: 0.5, write5m: 0.625, write1h: 1, read: 0.05, output: 2.5 } }),
-  row('Haiku 4.5', 1, 1.25, 2, 0.1, 5, { usOnly: false }),
-  row('Haiku 3.5', 0.8, 1, 1.6, 0.08, 4, { usOnly: false })
-]
-
-/** USD per web search (server tool), on top of tokens. */
-export const WEB_SEARCH_USD = 10 / 1000
-
-const byName = new Map(MODEL_PRICES.map((p) => [p.name, p]))
-
-/** The price of a model by its friendly name; null when the table has none. */
-export const priceOf = (name: string): ModelPrice | null => byName.get(name) ?? null
 
 /** What one assistant message's usage line says, in tokens. */
 export interface MessageUsage {
@@ -103,18 +58,19 @@ export function ratesFor(p: ModelPrice, u: MessageUsage): { name: string; rates:
     name += ' fast'
   }
   if (u.usOnly && p.usOnly) {
-    r = { input: r.input * 1.1, write5m: r.write5m * 1.1, write1h: r.write1h * 1.1, read: r.read * 1.1, output: r.output * 1.1 }
+    const x = p.usOnly
+    r = { input: r.input * x, write5m: r.write5m * x, write1h: r.write1h * x, read: r.read * x, output: r.output * x }
     name += ' US-only'
   }
   return { name, rates: r }
 }
 
-/** USD for one message at `r`, its web searches included. */
-export const usdAt = (r: Rates, u: MessageUsage): number =>
-  (u.input * r.input + u.write5m * r.write5m + u.write1h * r.write1h + u.read * r.read + u.output * r.output) / 1e6 + u.webSearches * WEB_SEARCH_USD
+/** USD for one message at `r`, its web searches included at `searchUsd` each. */
+export const usdAt = (r: Rates, u: MessageUsage, searchUsd: number): number =>
+  (u.input * r.input + u.write5m * r.write5m + u.write1h * r.write1h + u.read * r.read + u.output * r.output) / 1e6 + u.webSearches * searchUsd
 
 /** USD for one message at `p`'s list prices. */
-export const messageUsd = (p: ModelPrice, u: MessageUsage): number => usdAt(ratesFor(p, u).rates, u)
+export const messageUsd = (p: ModelPrice, u: MessageUsage, searchUsd: number): number => usdAt(ratesFor(p, u).rates, u, searchUsd)
 
 export type PlanId = 'pro' | 'max5' | 'max20' | 'team'
 

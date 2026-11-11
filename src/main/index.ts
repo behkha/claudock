@@ -5,6 +5,7 @@ import { buildMenu } from './menu'
 import { initTheme, onThemeChanged } from './theme'
 import { runRecord } from './record'
 import { runShots } from './shot'
+import { startModelCatalogFetch } from './modelCatalog'
 import { startSettingsDocsFetch } from './settingsDocs'
 import { menuBarShown, onMenuBarChanged, openedAtLogin, startMenuBar } from './menubar'
 import { installKind } from './paths'
@@ -61,6 +62,7 @@ void app.whenReady().then(async () => {
   await loadProfiles()
   registerAll(ipcMain)
   startSettingsDocsFetch()
+  startModelCatalogFetch()
   onThemeChanged(buildMenu)
   onMenuBarChanged(buildMenu)
   // A packaged app gets its Dock icon from the bundle; `npm run dev` would show Electron's.

@@ -2,25 +2,31 @@ import type { BrowserWindow } from 'electron'
 import fsp from 'node:fs/promises'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
+import real from './connect/fixtures/statusline-2.1.318.json'
 import { configDir } from './paths'
 
 export const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
 export type Session = { id: string; cwd: string }
 
-/** The status JSON Claude Code sends the status line, with `rate_limits` (the fields Claudock reads). */
-export function statusInput(fiveHour: number, dir = '/tmp/"rate_limits": {}', week = 61.4): string {
+/**
+ * The status JSON Claude Code sends the status line: the one captured from 2.1.318 (connect/fixtures), with this
+ * scene's folder and percentages in the windows it holds. `more` adds or replaces windows as Claude Code would send them.
+ */
+export function statusInput(fiveHour: number, dir = '/tmp/"rate_limits": {}', week = 61.4, more: Record<string, { used_percentage: number; resets_at: number }> = {}): string {
   const now = Date.now()
   const monday = new Date(now)
   monday.setDate(monday.getDate() + ((8 - monday.getDay()) % 7 || 7))
   monday.setHours(9, 0, 0, 0)
   return JSON.stringify({
+    ...real,
     session_id: 'shot',
-    model: { id: 'claude-opus-5-5', display_name: 'Opus 5.5' },
-    workspace: { current_dir: dir, project_dir: dir },
+    cwd: dir,
+    workspace: { ...real.workspace, current_dir: dir, project_dir: dir },
     rate_limits: {
       five_hour: { used_percentage: fiveHour, resets_at: Math.floor((now + 148 * 60_000) / 1000) },
-      seven_day: { used_percentage: week, resets_at: Math.floor(monday.getTime() / 1000) }
+      seven_day: { used_percentage: week, resets_at: Math.floor(monday.getTime() / 1000) },
+      ...more
     }
   })
 }
