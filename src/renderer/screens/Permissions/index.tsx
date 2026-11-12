@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { AlertTriangle, X } from 'lucide-react'
 import type { PermissionsData, RuleList } from '@shared/api/permissions'
 import { SETTINGS_FILES, type SettingsFileName } from '@shared/api/settings'
 import { Button, Card, ConfirmDialog, EmptyState, IconButton, PageLayout, Segmented, SearchField, Select, Spinner, TextField, useToast } from '@/components'
 import { api } from '@/lib/api'
 import { useNav, type ScreenProps } from '@/lib/nav'
+import { ProjectsView } from './Projects'
 import './permissions.css'
 
 const FILE_LABEL: Record<SettingsFileName, string> = { 'settings.json': 'settings.json', 'settings.local.json': 'settings.local.json' }
@@ -144,7 +145,30 @@ function RuleCard({
 
 /* ------------------------------------------------------------------ screen */
 
+type Scope = 'profile' | 'projects'
+const SCOPES: { value: Scope; label: string }[] = [
+  { value: 'profile', label: 'This profile' },
+  { value: 'projects', label: 'Projects' }
+]
+
+/**
+ * Permissions: "This profile" (the open profile's own rules, in its settings.json or settings.local.json) and
+ * "Projects" (every rule saved in the projects Claude Code knows; ./Projects.tsx). `selectId`: a settings file name
+ * opens This profile on it; `projects` opens Projects, `projects:to-check` on its flagged rules (Today's chip, the alert).
+ */
 export default function PermissionsScreen({ selectId }: ScreenProps): JSX.Element {
+  const { seq } = useNav()
+  const wantsProjects = selectId === 'projects' || selectId?.startsWith('projects:') === true
+  const [scope, setScope] = useState<Scope>(wantsProjects ? 'projects' : 'profile')
+  // arriving again while the screen is open (the chip on Today, then back, then the alert)
+  useEffect(() => {
+    if (wantsProjects) setScope('projects')
+  }, [wantsProjects, seq])
+  const switcher = <Segmented<Scope> aria-label="Rules of" value={scope} onChange={setScope} options={SCOPES} />
+  return scope === 'projects' ? <ProjectsView scope={switcher} start={selectId === 'projects:to-check' ? 'check' : undefined} /> : <ProfileView selectId={selectId} scope={switcher} />
+}
+
+function ProfileView({ selectId, scope }: ScreenProps & { scope: ReactNode }): JSX.Element {
   const toast = useToast()
   const { navigate } = useNav()
   const [file, setFile] = useState<SettingsFileName>(SETTINGS_FILES.find((f) => selectId === f || selectId?.startsWith(`${f}:`)) ?? 'settings.json')
@@ -222,13 +246,12 @@ export default function PermissionsScreen({ selectId }: ScreenProps): JSX.Elemen
     <PageLayout
       title="Permissions"
       description={`${SUBTITLE[file]}. What Claude Code may do without asking, what it must ask about, and what it can never do.`}
-      actions={<Segmented<SettingsFileName> aria-label="Settings file" value={file} onChange={setFile} options={fileOptions} />}
+      actions={scope}
       toolbar={
-        data && total > 8 ? (
-          <div className="pm-toolbar">
-            <SearchField value={filter} onChange={setFilter} placeholder="Filter rules" />
-          </div>
-        ) : undefined
+        <div className="pm-toolbar">
+          <Segmented<SettingsFileName> aria-label="Settings file" value={file} onChange={setFile} options={fileOptions} />
+          {data && total > 8 ? <SearchField value={filter} onChange={setFilter} placeholder="Filter rules" /> : null}
+        </div>
       }
     >
       {!data ? (

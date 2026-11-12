@@ -1,8 +1,21 @@
 import type { IpcMain } from 'electron'
-import type { PermissionsApi, PermissionsData, RuleList } from '@shared/api/permissions'
+import fsp from 'node:fs/promises'
+import path from 'node:path'
+import type { GitState, PermissionsApi, PermissionsData, ProjectRules, RuleFile, RuleList } from '@shared/api/permissions'
 import type { SettingsFileName } from '@shared/api/settings'
+import { folderKey } from '../connect/folder'
 import { defineDomain } from '../ipcx'
+import { configDir, globalStateFile } from '../paths'
+import { gitState } from '../permissions/git'
+import { RULE_FILES, buildRows, ruleId, rulesIn, type RuleFileRead, type SavedRule } from '../permissions/rows'
 import { assertSettingsFile, isPlainObject, readSettingsObject, updateSettingsObject, type JsonObject } from './settings'
+
+/**
+ * Permissions: the open profile's own rules ("This profile": the `permissions` key of its settings.json and
+ * settings.local.json), and the rules saved in projects ("Projects"): every `<project>/.claude/settings.json` and
+ * `settings.local.json` of the projects Claude Code knows, read only, each rule classified in the main process
+ * (src/main/permissions/) so a secret in one never reaches the window in full.
+ */
 
 const LISTS: RuleList[] = ['allow', 'ask', 'deny', 'additionalDirectories']
 const LIST_LABEL: Record<RuleList, string> = { allow: 'allow', ask: 'ask', deny: 'deny', additionalDirectories: 'additional directories' }
@@ -89,6 +102,7 @@ function cleanRule(rule: unknown, list: RuleList): string {
 
 const impl: PermissionsApi = {
   get,
+  projectRules: () => projectRules(),
 
   async setDefaultMode(fileIn, mode) {
     const file = assertSettingsFile(fileIn)
@@ -163,6 +177,96 @@ const impl: PermissionsApi = {
     return get(file)
   }
 }
+
+/* ------------------------------------------------------------------ rules saved in projects */
+
+/** A rule file is not read past this size: no settings file is this large. */
+const MAX_RULE_FILE = 2_000_000
+
+/** One rule file as last read, kept while its size and time stay the same. */
+interface CachedFile {
+  size: number
+  mtimeMs: number
+  /** Null: not readable as JSON. */
+  rules: SavedRule[] | null
+  git: GitState
+  /** The repo's index time the git state was read at: `git add` changes what git says without touching the file. */
+  indexMtimeMs: number
+}
+
+/** Per profile folder: its projects' rule files, and each listed rule as saved (which never leaves this process). */
+interface Scan {
+  files: Map<string, CachedFile>
+  saved: Map<string, { projectPath: string; file: RuleFile; rule: SavedRule }>
+}
+const scans = new Map<string, Scan>()
+const scanOf = (dir: string): Scan => {
+  const k = folderKey(dir)
+  let s = scans.get(k)
+  if (!s) scans.set(k, (s = { files: new Map(), saved: new Map() }))
+  return s
+}
+
+/** The projects Claude Code knows: the keys of `projects` in the profile's global state file (absolute folder paths). */
+async function knownProjects(): Promise<string[]> {
+  try {
+    const o = JSON.parse(await fsp.readFile(globalStateFile(), 'utf8')) as unknown
+    if (!isPlainObject(o) || !isPlainObject(o.projects)) return []
+    return Object.keys(o.projects).filter((p) => path.isAbsolute(p))
+  } catch {
+    return []
+  }
+}
+
+/** `<project>/.claude/<file>` when it is a regular file in a real `.claude` folder (neither reached through a link). */
+async function plainRuleFile(project: string, file: RuleFile): Promise<{ abs: string; size: number; mtimeMs: number } | null> {
+  const folder = await fsp.lstat(path.join(project, '.claude')).catch(() => null)
+  if (!folder?.isDirectory()) return null
+  const abs = path.join(project, '.claude', file)
+  const st = await fsp.lstat(abs).catch(() => null)
+  return st?.isFile() ? { abs, size: st.size, mtimeMs: st.mtimeMs } : null
+}
+
+/**
+ * Every rule file of every known project, re-reading only the files that changed, and git asked only about files that
+ * hold rules. `dismissed`: the ids marked "Not a secret".
+ */
+async function scanProjectRules(dismissed: ReadonlySet<string> = new Set()): Promise<ProjectRules> {
+  const scan = scanOf(configDir())
+  const reads: RuleFileRead[] = []
+  const seen = new Set<string>()
+  let unreadable = 0
+  for (const project of await knownProjects()) {
+    for (const file of RULE_FILES) {
+      const at = await plainRuleFile(project, file)
+      if (!at || seen.has(at.abs)) continue
+      seen.add(at.abs)
+      const indexMtimeMs = await fsp.stat(path.join(project, '.git', 'index')).then((s) => s.mtimeMs, () => 0)
+      let c = scan.files.get(at.abs)
+      if (!c || c.size !== at.size || c.mtimeMs !== at.mtimeMs) {
+        const text = at.size <= MAX_RULE_FILE ? await fsp.readFile(at.abs, 'utf8').catch(() => null) : null
+        c = { size: at.size, mtimeMs: at.mtimeMs, rules: text === null ? null : rulesIn(text), git: null, indexMtimeMs: -1 }
+        scan.files.set(at.abs, c)
+      }
+      if (!c.rules) {
+        unreadable++
+        continue
+      }
+      if (c.rules.length === 0) continue
+      if (c.indexMtimeMs !== indexMtimeMs) {
+        c.git = await gitState(project, `.claude/${file}`)
+        c.indexMtimeMs = indexMtimeMs
+      }
+      reads.push({ projectPath: project, file, mtimeMs: c.mtimeMs, git: c.git, rules: c.rules })
+    }
+  }
+  for (const abs of scan.files.keys()) if (!seen.has(abs)) scan.files.delete(abs)
+  scan.saved = new Map(reads.flatMap((f) => f.rules.map((rule) => [ruleId(f.projectPath, f.file, rule.list, rule.rule), { projectPath: f.projectPath, file: f.file, rule }] as const)))
+  return buildRows(reads, dismissed, unreadable)
+}
+
+/** Every permission rule saved in the projects Claude Code knows, for Permissions › Projects. */
+export const projectRules = (): Promise<ProjectRules> => scanProjectRules()
 
 export function register(ipcMain: IpcMain): void {
   defineDomain(ipcMain, 'permissions', impl)

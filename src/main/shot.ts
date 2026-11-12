@@ -11,6 +11,7 @@ import { app } from 'electron'
 import { connectDir, folderKey } from './connect/folder'
 import { archiveRootOf, list as archiveList, markdownOf, search as archiveSearch, sweepNow } from './domains/archive'
 import { listContext } from './domains/context'
+import { projectRules } from './domains/permissions'
 import { impl as team } from './domains/team'
 import { GROUP_MS, isPaused } from './connect/sessionModel'
 import { postedAlertTexts, postedAlerts } from './alerts'
@@ -584,6 +585,69 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
   }
 
   /**
+   * The saved-rules check, on the fixture's projects (HOME/shop-api, whose settings.local.json git ignores, HOME/docs-site,
+   * where it is tracked, and Team mode's acme-web): Permissions › Projects on "To check" with the six rules that hold an
+   * invented secret, each covered (`permissions-projects`), "Runs any script" (`permissions-broad`), "All"
+   * (`permissions-all`), the sheet of a flagged rule in the ignored file (`permissions-sheet`) and in the tracked one
+   * (`permissions-sheet-tracked`), and no project with rules (`permissions-empty`). Fails if a fixture secret reaches
+   * the window, in the rows the main process sends or in the page's text.
+   */
+  async function rulesFlow(theme: 'light' | 'dark'): Promise<void> {
+    if (process.env.CLAUDOCK_READONLY === '1' || !configDir().includes(`${path.sep}.shots${path.sep}.tmp-`)) return
+    const SECRETS = /FAKEfake0000|fake-db-pass|fake-key-0000|fake0000bearer|fake-pass-do-not-use|fake-netlify-token/
+    const t = await projectRules()
+    if (t.toCheck !== 6 || t.broad !== 4 || t.total !== 24 || t.unreadable !== 0) throw new Error(`rules: counted ${JSON.stringify({ toCheck: t.toCheck, broad: t.broad, total: t.total, unreadable: t.unreadable })}`)
+    if (SECRETS.test(JSON.stringify(t))) throw new Error('rules: a fixture secret is in the rows sent to the window')
+    const gitOf = (project: string, file: string): string | null | undefined => t.rules.find((r) => r.projectName === project && r.file === file)?.git
+    if (gitOf('docs-site', 'settings.local.json') !== 'tracked' || gitOf('shop-api', 'settings.local.json') !== 'ignored') {
+      throw new Error(`rules: git says ${gitOf('docs-site', 'settings.local.json')} for docs-site and ${gitOf('shop-api', 'settings.local.json')} for shop-api`)
+    }
+    const rows = `document.querySelectorAll('.pm-prow').length`
+    const chip = (label: string): string => `[...document.querySelectorAll('.pm-filters .chip')].find((c) => c.firstChild.textContent === ${JSON.stringify(label)})`
+    const dialog = `document.querySelector('dialog[open]')`
+    emit('system:navigate', { screen: 'permissions', id: 'projects' })
+    await waitFor(`${chip('To check')}?.getAttribute('aria-pressed') === 'true' && ${chip('To check')}.textContent === 'To check6' && ${rows} === 6 && document.querySelectorAll('.pm-dot').length === 6`, 'Projects on To check with six flagged rules')
+    if (await js<boolean>(`${SECRETS}.test(document.body.innerText)`)) throw new Error('rules: a fixture secret is on the page')
+    await shoot(theme, 'permissions-projects')
+    await js(`${chip('Runs any script')}.click()`)
+    await waitFor(`${rows} === 4 && !document.querySelector('.pm-dot')`, 'the four rules that run any script')
+    await shoot(theme, 'permissions-broad')
+    await js(`${chip('All')}.click()`)
+    await waitFor(`${rows} === 24 && ${chip('All')}.textContent === 'All24'`, 'all 24 rules')
+    if (await js<boolean>(`${SECRETS}.test(document.body.innerText)`)) throw new Error('rules: a fixture secret is on the page')
+    await shoot(theme, 'permissions-all')
+    const open = (start: string): Promise<void> => js(`[...document.querySelectorAll('.pm-prow__open')].find((b) => b.textContent.startsWith(${JSON.stringify(start)})).click()`)
+    await open('Bash(API_TOKEN=ghp_')
+    await waitFor(`${dialog}?.querySelector('.dialog__title')?.textContent === 'This rule holds a secret' && ${dialog}.textContent.includes('shop-api · .claude/settings.local.json') && ${dialog}.textContent.includes(' · ignored by git')`, 'the sheet of the rule in the ignored file')
+    await shoot(theme, 'permissions-sheet')
+    await js(`${dialog}.dispatchEvent(new Event('cancel', { cancelable: true }))`)
+    await waitFor(`!${dialog}`, 'the sheet closed')
+    await open('Bash(NETLIFY_AUTH_TOKEN=')
+    await waitFor(`${dialog}?.textContent.includes('docs-site · .claude/settings.local.json') && ${dialog}.textContent.includes(' · tracked by git')`, 'the sheet of the rule in the tracked file')
+    await shoot(theme, 'permissions-sheet-tracked')
+    await js(`${dialog}.dispatchEvent(new Event('cancel', { cancelable: true }))`)
+    await waitFor(`!${dialog}`, 'the sheet closed')
+
+    // no project with rules: the copy's global state file without its projects, then put back byte for byte
+    const state = globalStateFile()
+    const bytes = await fsp.readFile(state)
+    const { atime, mtime } = await fsp.stat(state)
+    try {
+      await fsp.writeFile(state, JSON.stringify({ ...(JSON.parse(bytes.toString('utf8')) as object), projects: {} }))
+      emit('system:navigate', { screen: 'today' })
+      await sleep(150)
+      emit('system:navigate', { screen: 'permissions', id: 'projects' })
+      await waitFor(`document.querySelector('.empty__title')?.textContent === 'No rules saved in your projects' && !document.querySelector('.pm-filters')`, 'Projects with no rules')
+      await shoot(theme, 'permissions-empty')
+    } finally {
+      await fsp.writeFile(state, bytes)
+      await fsp.utimes(state, atime, mtime)
+      emit('system:navigate', { screen: 'today' })
+      await sleep(150)
+    }
+  }
+
+  /**
    * Team mode on the fixture's team folder (HOME/team-repo, where Team's folder dialog lands in screenshots): New team
    * setup (`team-new`), Choose with the github server and the fmt.sh hook ticked (`team-choose`), Review with their two
    * blockers (`team-review`), both fixed (`team-review-clear`), Written (`team-written`), and Team with a new and a
@@ -962,6 +1026,9 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
       }
       if (opts.only.length === 0 || opts.only.includes('context')) {
         await contextFlow(theme).catch(fail)
+      }
+      if (opts.only.length === 0 || opts.only.includes('saved-rules')) {
+        await rulesFlow(theme).catch(fail)
       }
       if (opts.only.length === 0 || opts.only.includes('team')) {
         await teamFlow(theme).catch(fail)

@@ -1167,6 +1167,7 @@ textarea.field__control {
 .st-history__item--active,
 .st-links__btn:hover,
 .ext-tree__row:hover,
-.ses-menu__item:hover {
+.ses-menu__item:hover,
+.pm-prow:hover {
   --text-3: var(--text-2);
 }

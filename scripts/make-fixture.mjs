@@ -2,7 +2,8 @@
 /**
  * Builds ./.fixture/claude with the synthetic config from src/main/demo/fixture.ts (nothing is copied from the real ~/.claude),
  * and ./.fixture/claude-work beside it (src/main/demo/workFixture.ts), the second profile Add profile finds, and Team mode's
- * ./.fixture/team-repo and ./.fixture/acme-web (src/main/demo/teamFixture.ts).
+ * ./.fixture/team-repo and ./.fixture/acme-web (src/main/demo/teamFixture.ts), and the saved-rules check's
+ * ./.fixture/shop-api and ./.fixture/docs-site (src/main/demo/rulesFixture.ts).
  * Run with `npm run fixture`; then point the app at it with CLAUDE_CONFIG_DIR=./.fixture/claude (`npm run dev` does).
  * Node runs the TypeScript directly, so callers pass --experimental-strip-types (the default from Node 22.18).
  */
@@ -12,6 +13,7 @@ import { fileURLToPath } from 'node:url'
 import { buildFixture } from '../src/main/demo/fixture.ts'
 import { buildWorkFixture } from '../src/main/demo/workFixture.ts'
 import { buildTeamFixture } from '../src/main/demo/teamFixture.ts'
+import { buildRulesFixture } from '../src/main/demo/rulesFixture.ts'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const base = path.join(root, '.fixture')
@@ -22,6 +24,8 @@ buildFixture(dir)
 buildWorkFixture(path.join(base, 'claude-work'))
 // Team mode's folders outside the config folder: the team repo and a project to connect
 buildTeamFixture(base)
+// the saved-rules check's projects: two git repositories with saved permission rules, known to Claude Code
+buildRulesFixture(base)
 
 // sanity: the fixture must not contain anything from a real home folder
 const fixtureSize = (function size(p) {

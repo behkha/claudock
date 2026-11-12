@@ -50,9 +50,10 @@ if (record) {
 
 // a recording needs today's sessions to be from today: always a fresh fixture
 // a fixture made before Team mode has no team folder: the team scenario needs one, so make it again
-const stale = fs.existsSync(fixture) && !fs.existsSync(path.join(root, '.fixture', 'team-repo'))
+// (and one made before the saved-rules check has no projects with saved rules)
+const stale = fs.existsSync(fixture) && !['team-repo', 'shop-api'].every((n) => fs.existsSync(path.join(root, '.fixture', n)))
 if (!real && (record || stale || !fs.existsSync(fixture))) {
-  console.log(record ? 'making a fresh fixture' : stale ? 'fixture is from before Team mode, making it again' : 'fixture missing, creating it')
+  console.log(record ? 'making a fresh fixture' : stale ? 'fixture is from an earlier version, making it again' : 'fixture missing, creating it')
   const r = spawnSync(process.execPath, ['--experimental-strip-types', '--disable-warning=ExperimentalWarning', '--disable-warning=MODULE_TYPELESS_PACKAGE_JSON', path.join(root, 'scripts', 'make-fixture.mjs')], { stdio: 'inherit' })
   if (r.status !== 0) process.exit(r.status ?? 1)
 }
@@ -98,8 +99,9 @@ if (!real) {
   // the second profile, where Add profile finds it: ~/.claude-work
   const work = path.join(root, '.fixture', 'claude-work')
   if (fs.existsSync(work)) fs.cpSync(work, path.join(home, '.claude-work'), { recursive: true, preserveTimestamps: true, mode: fs.constants.COPYFILE_FICLONE })
-  // Team mode's folders outside the config folder: the team repo (where Team's folder dialog lands in screenshots) and a project
-  for (const name of ['team-repo', 'acme-web']) {
+  // Team mode's folders outside the config folder: the team repo (where Team's folder dialog lands in screenshots) and a project;
+  // and the saved-rules check's two projects (git repositories with rules saved in their .claude folder)
+  for (const name of ['team-repo', 'acme-web', 'shop-api', 'docs-site']) {
     const from = path.join(root, '.fixture', name)
     if (fs.existsSync(from)) fs.cpSync(from, path.join(home, name), { recursive: true, preserveTimestamps: true, mode: fs.constants.COPYFILE_FICLONE })
   }
@@ -107,7 +109,9 @@ if (!real) {
   // skill's text; point them at the copy.
   const pairs = [
     [fixture, copy],
-    [path.join(root, '.fixture', 'acme-web'), path.join(home, 'acme-web')]
+    [path.join(root, '.fixture', 'acme-web'), path.join(home, 'acme-web')],
+    [path.join(root, '.fixture', 'shop-api'), path.join(home, 'shop-api')],
+    [path.join(root, '.fixture', 'docs-site'), path.join(home, 'docs-site')]
   ]
   for (const rel of fs.readdirSync(copy, { recursive: true })) {
     const f = path.join(copy, String(rel))

@@ -24,6 +24,55 @@ export interface PermissionsData {
   problem: string | null
 }
 
+/* ------------------------------------------------------------------ rules saved in projects (Permissions › Projects) */
+
+/** The two files a project keeps permission rules in, under its `.claude` folder. */
+export type RuleFile = 'settings.json' | 'settings.local.json'
+export type ProjectRuleList = 'allow' | 'ask' | 'deny'
+
+/**
+ * What git says about a rule file: `tracked` (it is committed, so a secret in it travels with the repo), `ignored`,
+ * `not-ignored` (it can be committed), `repo` (in a git repository, and git could not say more), or null (no repository).
+ * From two read-only git commands (src/main/permissions/git.ts).
+ */
+export type GitState = 'tracked' | 'ignored' | 'not-ignored' | 'repo' | null
+
+/** One permission rule saved in a project's `.claude/settings.json` or `settings.local.json`. */
+export interface ProjectRule {
+  /** A hash of the project, the file, the list and the rule as saved. */
+  id: string
+  /** Last folder name of the project. */
+  projectName: string
+  projectPath: string
+  file: RuleFile
+  list: ProjectRuleList
+  /** The rule with any secret covered (the public start of a known token, then dots). The rule in full never leaves the main process. */
+  text: string
+  /** The rule holds what looks like a secret. */
+  secret: boolean
+  /** The covered parts of `text`, as `[start, end)`. */
+  secretSpans: [number, number][]
+  /** The rule lets Claude run any script (`Bash`, `Bash(python3:*)`). A filter, never a flag. */
+  broad: boolean
+  /** When the file was last changed. */
+  fileMtimeMs: number
+  git: GitState
+  /** Marked "Not a secret": the rule is no longer flagged. */
+  dismissed: boolean
+}
+
+export interface ProjectRules {
+  /** Flagged rules first (a secret, not dismissed), then by project, then by rule. */
+  rules: ProjectRule[]
+  /** Rules that hold a secret and were not marked "Not a secret": Today's chip, the sidebar count, the "To check" filter. */
+  toCheck: number
+  /** Rules that run any script. */
+  broad: number
+  total: number
+  /** Rule files that could not be read as JSON; their rules are not listed. */
+  unreadable: number
+}
+
 export interface PermissionsApi {
   get(file: SettingsFileName): Promise<PermissionsData>
   /** Pass null to remove `defaultMode` (Claude Code then uses "default"). */
@@ -32,6 +81,8 @@ export interface PermissionsApi {
   removeRule(file: SettingsFileName, list: RuleList, rule: string): Promise<PermissionsData>
   /** Remove from `from` and append to `to` in one write. */
   moveRule(file: SettingsFileName, from: RuleList, to: RuleList, rule: string): Promise<PermissionsData>
+  /** Every permission rule saved in the projects Claude Code knows (the keys of `projects` in the global state file). */
+  projectRules(): Promise<ProjectRules>
 }
 
 export interface PermissionsEvents {}

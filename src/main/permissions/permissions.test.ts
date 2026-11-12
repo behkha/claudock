@@ -2,6 +2,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { MASK, maskText, secretsInText } from '../../shared/secrets.ts'
 import { classifyRule, isBroad } from './classify.ts'
+import { gitArgs, gitStateOf } from './git.ts'
+import { buildRows, projectName, ruleId, rulesIn, type RuleFileRead } from './rows.ts'
 
 /* Every value below is invented for these tests. */
 const GH = 'ghp_FAKEDONOTUSE0123456789abcdefABCD'
@@ -102,4 +104,74 @@ test('broad rules: any shell command, or an interpreter or runner with a wildcar
   for (const rule of ['Bash(npm run test:*)', 'Bash(python3 scripts/build.py)', 'Bash(node scripts/check.mjs:*)', 'Bash(nodemon:*)', 'Bash(git status)', 'Read(~/.zshrc)', 'WebFetch(domain:example.test)', 'mcp__github__get_issue', 'Bash(npx prettier:*)']) {
     assert.equal(isBroad(rule), false, rule)
   }
+})
+
+/* ------------------------------------------------------------------ the rows of Permissions › Projects */
+
+test('project rules: the rules of a settings file, list by list; a file that is not a JSON object is unreadable', () => {
+  const text = JSON.stringify({ model: 'opus', permissions: { defaultMode: 'default', allow: ['Bash(npm test)', 7, ''], ask: ['Bash(git push:*)'], deny: ['Read(./.env)'], additionalDirectories: ['~/notes'] } })
+  assert.deepEqual(rulesIn(text), [
+    { list: 'allow', rule: 'Bash(npm test)' },
+    { list: 'ask', rule: 'Bash(git push:*)' },
+    { list: 'deny', rule: 'Read(./.env)' }
+  ])
+  assert.deepEqual(rulesIn('{"model":"opus"}'), [])
+  assert.deepEqual(rulesIn('{"permissions":{"allow":"Bash"}}'), [])
+  assert.equal(rulesIn('{ "permissions": broken'), null)
+  assert.equal(rulesIn('[]'), null)
+})
+
+const read = (projectPath: string, rules: string[], over: Partial<RuleFileRead> = {}): RuleFileRead => ({ projectPath, file: 'settings.local.json', mtimeMs: 1_800_000_000_000, git: null, rules: rules.map((rule) => ({ list: 'allow', rule })), ...over })
+
+test('project rules: flagged first, then by project, then by rule, with the counts the filters show', () => {
+  const secret = `Bash(API_TOKEN=${GH} npm run sync)`
+  const t = buildRows([read('/work/web', ['Bash(python3:*)', 'Bash(npm test)']), read('/work/shop-api', ['Bash(npm test)', secret, 'Bash(node:*)'], { git: 'ignored' })], new Set(), 1)
+  assert.deepEqual(t.rules.map((r) => `${r.projectName} ${r.text}`), [`shop-api Bash(API_TOKEN=ghp_${MASK} npm run sync)`, 'shop-api Bash(node:*)', 'shop-api Bash(npm test)', 'web Bash(npm test)', 'web Bash(python3:*)'])
+  assert.deepEqual([t.toCheck, t.broad, t.total, t.unreadable], [1, 2, 5, 1])
+  assert.equal(t.rules[0].git, 'ignored')
+  // nothing a row carries holds the secret
+  assert.equal(JSON.stringify(t).includes(GH), false)
+  // the same rule saved twice in one list is one row
+  assert.equal(buildRows([read('/work/web', ['Bash(npm test)', 'Bash(npm test)'])], new Set()).total, 1)
+  assert.equal(projectName('C:\\work\\shop-api'), 'shop-api')
+})
+
+test('project rules: "Not a secret" is remembered for that exact rule, in that file and list', () => {
+  const secret = 'Bash(PGPASSWORD=correct-horse-fake psql -h db:*)'
+  const files = [read('/work/shop-api', [secret]), read('/work/web', [secret])]
+  const id = ruleId('/work/shop-api', 'settings.local.json', 'allow', secret)
+  const t = buildRows(files, new Set([id]))
+  assert.deepEqual(t.rules.map((r) => [r.projectName, r.secret, r.dismissed]), [
+    ['web', true, false],
+    ['shop-api', true, true]
+  ])
+  assert.equal(t.toCheck, 1)
+  // the id says nothing about the rule, and another list or file is another rule
+  assert.match(id, /^[0-9a-f]{32}$/)
+  assert.notEqual(id, ruleId('/work/shop-api', 'settings.local.json', 'ask', secret))
+  assert.notEqual(id, ruleId('/work/shop-api', 'settings.json', 'allow', secret))
+  // a rule that holds no secret is never "dismissed"
+  assert.equal(buildRows([read('/work/web', ['Bash(npm test)'])], new Set([ruleId('/work/web', 'settings.local.json', 'allow', 'Bash(npm test)')])).rules[0].dismissed, false)
+})
+
+/* ------------------------------------------------------------------ what git says about a rule file */
+
+test('git line: tracked wins, then ignored or not; anything git could not say is "in a git repository"', () => {
+  assert.equal(gitStateOf(true, 0, null), 'tracked')
+  // ignored by a pattern but already committed: still tracked
+  assert.equal(gitStateOf(true, 0, 0), 'tracked')
+  assert.equal(gitStateOf(true, 1, 0), 'ignored')
+  assert.equal(gitStateOf(true, 1, 1), 'not-ignored')
+  // git missing or timed out (null), not a repository it accepts (128)
+  assert.equal(gitStateOf(true, null, null), 'repo')
+  assert.equal(gitStateOf(true, 128, null), 'repo')
+  assert.equal(gitStateOf(true, 1, 128), 'repo')
+  assert.equal(gitStateOf(true, 1, null), 'repo')
+  // no .git above the file: nothing to say, and git is not run
+  assert.equal(gitStateOf(false, 0, 0), null)
+})
+
+test('git line: only two commands, both read-only, with the fsmonitor hook off', () => {
+  assert.deepEqual(gitArgs('/work/shop-api', 'tracked', '.claude/settings.local.json'), ['-C', '/work/shop-api', '-c', 'core.fsmonitor=false', 'ls-files', '--error-unmatch', '--', '.claude/settings.local.json'])
+  assert.deepEqual(gitArgs('/work/shop-api', 'ignored', '.claude/settings.local.json'), ['-C', '/work/shop-api', '-c', 'core.fsmonitor=false', 'check-ignore', '-q', '--', '.claude/settings.local.json'])
 })

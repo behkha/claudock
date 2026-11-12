@@ -4,7 +4,16 @@
   place-items: center;
   padding: 40px 0;
 }
+/* This profile: which of its two files, then the filter once there are enough rules to need one */
 .pm-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.pm-toolbar .search-field {
+  flex: 1;
+  min-width: 180px;
   max-width: 360px;
 }
 .pm-note {
@@ -108,4 +117,112 @@
   background: var(--surface);
   color: var(--text-2);
   font-size: var(--fs-caption);
+}
+
+/* ---------- Projects: every rule saved in a project, one table ---------- */
+.pm-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.pm-table-wrap {
+  border: var(--hair) solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  overflow: hidden;
+}
+.pm-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.pm-table th {
+  padding: 8px 14px;
+  background: var(--surface-sunken);
+  color: var(--text-3);
+  font-size: var(--fs-caption);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-align: left;
+}
+.pm-table td {
+  padding: 0 14px;
+  border-top: var(--hair) solid var(--border);
+  vertical-align: middle;
+}
+.pm-table .pm-table__dot {
+  width: 30px;
+  padding-right: 0;
+}
+.pm-table th:last-child,
+.pm-table__project {
+  width: 26%;
+  text-align: right;
+}
+.pm-table__project {
+  color: var(--text-3);
+  font-size: var(--fs-small);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pm-prow:hover {
+  background: var(--hover);
+}
+/* a flagged rule: it holds a secret */
+.pm-dot {
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger);
+}
+.pm-table__rule {
+  padding: 0;
+}
+/* the rule is the row's button: it opens the rule's sheet */
+.pm-prow__open {
+  display: block;
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pm-prow__open:focus-visible {
+  outline-offset: -2px;
+}
+.pm-prow__open code {
+  font-size: var(--fs-small);
+}
+/* the covered part of a rule */
+.pm-table mark,
+.pm-sheet mark {
+  padding: 0 2px;
+  border-radius: 2px;
+  background: var(--oat);
+  color: var(--text);
+}
+
+/* ---------- the rule's sheet ---------- */
+.pm-sheet__rule {
+  display: block;
+  padding: 10px 12px;
+  border-radius: var(--radius-control);
+  background: var(--surface-sunken);
+  font-size: var(--fs-small);
+  overflow-wrap: anywhere;
+}
+.pm-sheet__meta {
+  display: grid;
+  gap: 2px;
+  color: var(--text-2);
+  font-size: var(--fs-small);
 }
