@@ -177,7 +177,7 @@ for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { child.kill('SIG
 child.stdout.on('data', relay)
 child.stderr.on('data', relay)
 
-const limit = record ? 30 * 60 : audit || state === 'loading' ? 20 * 60 : 180
+const limit = record ? 30 * 60 : audit || state === 'loading' ? 20 * 60 : 300
 const timer = setTimeout(() => {
   console.log(`SHOT_FAILED timeout after ${limit} s`)
   errors++

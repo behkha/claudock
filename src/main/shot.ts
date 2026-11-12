@@ -13,6 +13,7 @@ import { archiveRootOf, list as archiveList, markdownOf, search as archiveSearch
 import { listContext } from './domains/context'
 import { projectRules } from './domains/permissions'
 import { impl as team } from './domains/team'
+import { contextIn } from './connect/context'
 import { GROUP_MS, isPaused } from './connect/sessionModel'
 import { postedAlertTexts, postedAlerts } from './alerts'
 import { transcriptUsage } from './domains/limits'
@@ -26,7 +27,7 @@ import { addLocalDays, midnightOf, mondayOf } from './share/week'
 import { setTheme } from './theme'
 import { sumActivity } from './today/activity'
 import { auditPage } from './shotAudit'
-import { driver, sleep } from './shotDrive'
+import { driver, sleep, type Session } from './shotDrive'
 
 /**
  * Screenshot mode (CLAUDOCK_SHOT=1, driven by scripts/shot.mjs): visits every screen in light then dark through the
@@ -153,6 +154,13 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
 
   /** The context sizes on the session rows, in order, as one string. */
   const SIZES = `[...document.querySelectorAll('.cc__size')].map((e) => e.textContent).join(' ')`
+  /**
+   * The context each played session's transcript records (waiting, working, done: the order of the rows). Which three
+   * sessions play depends on what ran before (the archive check dates one session now), so nothing here is a fixed number.
+   */
+  const transcriptOf = (x: Session): string => path.join(configDir(), 'projects', x.cwd.replace(/[^A-Za-z0-9]/g, '-'), `${x.id}.jsonl`)
+  const contextsOf = (played: Session[]): Promise<(number | null)[]> => Promise.all(played.map(async (x) => contextIn(await fsp.readFile(transcriptOf(x), 'utf8'))))
+  const sizesText = (contexts: (number | null)[]): string => contexts.filter((c): c is number => c !== null).map(formatTokens).join(' ')
 
   /**
    * Today -> Connect to Claude Code -> the sheet (shot) -> Connect -> one status line run and three sessions through
@@ -172,7 +180,8 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
     await playStatusLine()
     const steps = await hookSteps()
     const alerts = postedAlerts().length
-    const [a] = await playSessions(steps)
+    const played = await playSessions(steps)
+    const [a] = played
     await waitFor(
       `document.querySelectorAll('.cc__row--waiting').length === 1 && document.querySelectorAll('.cc__row--done').length === 1 && [...document.querySelectorAll('.lim__top b')].map((b) => b.textContent).join(' ') === '42% 61%'`,
       'one waiting, one working, one done session and the limits'
@@ -183,7 +192,9 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
     const want = `${path.basename(a.cwd)} is waiting for you`
     if (posted.length !== 1 || posted[0] !== want) throw new Error(`connect: expected one alert "${want}", got ${JSON.stringify(posted)}`)
     // each running row ends with the context its transcript records; no line is set, so no bar
-    await waitFor(`${SIZES} === '726k 265k 182k' && !document.querySelector('.cc__bar')`, 'the three context sizes, no bar')
+    const sizes = sizesText(await contextsOf(played))
+    if (!sizes) throw new Error('connect: no played session has a reply with usage in its transcript')
+    await waitFor(`${SIZES} === ${JSON.stringify(sizes)} && !document.querySelector('.cc__bar')`, `the context sizes ${sizes}, no bar`)
     await shoot(theme, 'connected')
     const own = String(countHooks((JSON.parse(before.toString('utf8')) as { hooks?: unknown }).hooks).commands)
     emit('system:navigate', { screen: 'hooks' })
@@ -227,7 +238,10 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
     await js(`document.querySelectorAll('.toast__close').forEach((b) => b.click())`)
     await playStatusLine()
     const steps = await hookSteps()
-    const [a, b] = await playSessions(steps)
+    const played = await playSessions(steps)
+    const [a, b] = played
+    const contexts = await contextsOf(played)
+    const sizes = sizesText(contexts)
     const pop = await popoverForShots()
     const inPop = (code: string): Promise<unknown> => jsOn(pop, code)
     const waitPop = (cond: string, what: string): Promise<unknown> =>
@@ -241,13 +255,16 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
       `document.querySelector('.cc__row--waiting')?.textContent.includes(${JSON.stringify(path.basename(a.cwd))}) && document.querySelectorAll('.cc__row').length === 3 && [...document.querySelectorAll('.lim__top b')].map((b) => b.textContent).join(' ') === '42% 61%'`,
       'the waiting session and both limits'
     )
-    await waitPop(`${SIZES} === '726k 265k 182k' && !document.querySelector('.cc__bar')`, 'the three context sizes, no bar')
+    await waitPop(`${SIZES} === ${JSON.stringify(sizes)} && !document.querySelector('.cc__bar')`, `the context sizes ${sizes}, no bar`)
     await shoot(theme, 'menubar', pop)
-    // a line at 500k: every row gets its bar, and the one session over it reads strong with a full clay bar
+    // a line at 500k: every row with a size gets its bar, and a session at or over it reads strong with a full clay bar
     const line = (await alertPrefs()).contextLine
-    await setAlertPrefs({ contextLine: 500_000 })
+    const LINE = 500_000
+    const known = contexts.filter((c): c is number => c !== null)
+    const widths = known.map((c) => Math.min(1, c / LINE) * 100)
+    await setAlertPrefs({ contextLine: LINE })
     try {
-      const drawn = `document.querySelectorAll('.cc__bar').length === 3 && document.querySelectorAll('.cc__fill--over').length === 1 && document.querySelector('.cc__size--over')?.textContent === '726k' && [...document.querySelectorAll('.cc__fill')].map((e) => e.style.width).join(' ') === '100% 53% 36.4%'`
+      const drawn = `document.querySelectorAll('.cc__bar').length === ${known.length} && document.querySelectorAll('.cc__fill--over').length === ${known.filter((c) => c >= LINE).length} && [...document.querySelectorAll('.cc__size--over')].map((e) => e.textContent).join(' ') === ${JSON.stringify(sizesText(known.filter((c) => c >= LINE)))} && JSON.stringify([...document.querySelectorAll('.cc__fill')].map((e) => Math.round(parseFloat(e.style.width) * 10))) === ${JSON.stringify(JSON.stringify(widths.map((w) => Math.round(w * 10))))}`
       await waitPop(drawn, 'the bars toward 500k in the popover')
       await shoot(theme, 'menubar-line', pop)
       await waitFor(drawn, 'the bars toward 500k on Today')
@@ -303,10 +320,10 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
       const posted = postedAlerts().slice(alerts).filter((t) => t.includes('limit'))
       if (posted.length !== 1 || posted[0] !== '5-hour limit at 85%') throw new Error(`menubar: expected one alert "5-hour limit at 85%", got ${JSON.stringify(posted)}`)
 
-      // the context alert, on the shot's own copy: with the line at 500k the waiting session (726k) is where it starts;
-      // the working one's transcript grows to 507k (one alert) and on to 520k (no second one)
-      if (process.env.CLAUDOCK_READONLY !== '1' && configDir().includes(`${path.sep}.shots${path.sep}.tmp-`)) {
-        const transcript = path.join(configDir(), 'projects', b.cwd.replace(/[^A-Za-z0-9]/g, '-'), `${b.id}.jsonl`)
+      // the context alert, on the shot's own copy: with the line at 500k every session starts where it is (one already
+      // over it posts nothing); the working one's transcript grows to 507k (one alert) and on to 520k (no second one)
+      if (process.env.CLAUDOCK_READONLY !== '1' && configDir().includes(`${path.sep}.shots${path.sep}.tmp-`) && (contexts[1] ?? 0) < LINE) {
+        const transcript = transcriptOf(b)
         const bytes = await fsp.readFile(transcript)
         const { atime, mtime } = await fsp.stat(transcript)
         const last = bytes.toString('utf8').split('\n').findLast((l) => l.includes('"type":"assistant"') && l.includes('"usage"'))
@@ -321,12 +338,12 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
           line.message.usage = { ...line.message.usage, input_tokens: 10, cache_creation_input_tokens: 1990, cache_read_input_tokens: context - 2000 }
           await fsp.appendFile(transcript, JSON.stringify(line) + '\n')
           await tool()
-          await waitFor(`${SIZES} === '726k ${formatTokens(context)} 182k'`, `the working session at ${formatTokens(context)}`)
+          await waitFor(`${SIZES} === ${JSON.stringify(sizesText([contexts[0], context, contexts[2]]))}`, `the working session at ${formatTokens(context)}`)
           await sleep(500)
         }
         const title = await js<string>(`document.querySelector('.cc__row--working .cc__name').firstChild.textContent`)
         const before = postedAlertTexts().length
-        await setAlertPrefs({ contextLine: 500_000 })
+        await setAlertPrefs({ contextLine: LINE })
         try {
           await sleep(300)
           await grow(507_000, 1)
@@ -337,7 +354,7 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
           await fsp.utimes(transcript, atime, mtime)
           await tool()
         }
-        await waitFor(`${SIZES} === '726k 265k 182k'`, 'the working session back at 265k')
+        await waitFor(`${SIZES} === ${JSON.stringify(sizes)}`, 'the working session back where it was')
         const said = postedAlertTexts().slice(before).filter((t) => t.title.includes('context'))
         if (said.length !== 1 || said[0].title !== `${title} is at 500k context` || !new RegExp(`^${path.basename(b.cwd)} · .+ in$`).test(said[0].body)) {
           throw new Error(`menubar: expected one alert "${title} is at 500k context", got ${JSON.stringify(said)}`)
