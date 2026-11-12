@@ -738,6 +738,15 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
     await js(`[...document.querySelectorAll('.today__chip')].find((c) => c.textContent.includes('to check')).click()`)
     await waitFor(`${chip('To check')}?.getAttribute('aria-pressed') === 'true' && ${rows} === 6`, 'Projects on To check, from the chip')
 
+    // after all of the above (a rule removed, restored, marked and unmarked, two saved and alerted about): no fixture
+    // secret anywhere in Claudock's own data, the browser's caches included
+    for (const rel of await fsp.readdir(userDataDir(), { recursive: true })) {
+      const abs = path.join(userDataDir(), String(rel))
+      const st = await fsp.stat(abs).catch(() => null)
+      if (!st?.isFile() || st.size > 16 * 1024 * 1024) continue
+      if (SECRETS.test((await fsp.readFile(abs)).toString('latin1'))) throw new Error(`rules: ${rel} in Claudock's data holds a fixture secret`)
+    }
+
     // no project with rules: the copy's global state file without its projects, then put back byte for byte
     const state = globalStateFile()
     const bytes = await fsp.readFile(state)
