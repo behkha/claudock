@@ -87,6 +87,11 @@ export interface SnapshotInfo {
   reason: string
   /** Paths relative to the config dir (the global state file is `.claude.json`). */
   files: string[]
+  /**
+   * Set when the files are not the config folder's: the folder they came from (a project's `.claude`, when a rule was
+   * removed from Permissions › Projects). `files` are then names in that folder, and a restore writes there.
+   */
+  outside?: string
 }
 
 export interface SizeProgress {

@@ -589,8 +589,10 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
    * where it is tracked, and Team mode's acme-web): Permissions › Projects on "To check" with the six rules that hold an
    * invented secret, each covered (`permissions-projects`), "Runs any script" (`permissions-broad`), "All"
    * (`permissions-all`), the sheet of a flagged rule in the ignored file (`permissions-sheet`) and in the tracked one
-   * (`permissions-sheet-tracked`), and no project with rules (`permissions-empty`). Fails if a fixture secret reaches
-   * the window, in the rows the main process sends or in the page's text.
+   * (`permissions-sheet-tracked`), and no project with rules (`permissions-empty`). Remove rule must take exactly its own
+   * line out of the file and leave a snapshot that Backups names by the file's real path, shows with the token covered
+   * (`backups-rule`) and restores byte for byte; Not a secret must keep the rule's id only and leave the file alone, and
+   * Undo flags it again. Fails if a fixture secret reaches the window, in the rows the main process sends or in the page's text.
    */
   async function rulesFlow(theme: 'light' | 'dark'): Promise<void> {
     if (process.env.CLAUDOCK_READONLY === '1' || !configDir().includes(`${path.sep}.shots${path.sep}.tmp-`)) return
@@ -627,6 +629,44 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
     await shoot(theme, 'permissions-sheet-tracked')
     await js(`${dialog}.dispatchEvent(new Event('cancel', { cancelable: true }))`)
     await waitFor(`!${dialog}`, 'the sheet closed')
+
+    // Remove rule: exactly that line leaves the file, a snapshot is kept, and Backups puts the file back byte for byte
+    const ruleFile = path.join(os.homedir(), 'shop-api', '.claude', 'settings.local.json')
+    const fileBefore = await fsp.readFile(ruleFile, 'utf8')
+    const line = fileBefore.split('\n').find((l) => l.includes('API_TOKEN=ghp_'))
+    if (!line) throw new Error('rules: the fixture rule with a token is not in the file')
+    await open('Bash(API_TOKEN=ghp_')
+    await click('Remove rule', dialog)
+    await waitFor(`!${dialog} && ${chip('To check')}.textContent === 'To check5' && ${rows} === 23`, 'the rule removed')
+    if ((await fsp.readFile(ruleFile, 'utf8')) !== fileBefore.replace(`${line}\n`, '')) throw new Error('rules: Remove rule changed more than its own line')
+    await waitFor(`!document.querySelector('.toast')`, 'the toast gone')
+    emit('system:navigate', { screen: 'backups' })
+    const snapRow = `[...document.querySelectorAll('.list-row')].find((r) => r.textContent.includes('Remove an allow rule from shop-api/.claude/settings.local.json'))`
+    await waitFor(snapRow, 'the snapshot in Backups')
+    await js(`${snapRow}.querySelector('button').click()`)
+    await waitFor(`document.querySelector('.bk__file .bk__mono')?.textContent === ${JSON.stringify(ruleFile)} && document.querySelector('.bk__diff')?.textContent.includes('API_TOKEN=ghp_••••••')`, "the project file's snapshot, named by its real path, with the token covered")
+    if (await js<boolean>(`${SECRETS}.test(document.body.innerText)`)) throw new Error('rules: a fixture secret is on the Backups page')
+    await shoot(theme, 'backups-rule')
+    await click('Restore this file')
+    await click('Restore', dialog)
+    await waitFor(`!${dialog}`, 'the restore')
+    if ((await fsp.readFile(ruleFile, 'utf8')) !== fileBefore) throw new Error('rules: the file restored from Backups is not byte for byte what it was')
+    await waitFor(`!document.querySelector('.toast')`, 'the toast gone')
+
+    // Not a secret: the flag goes and only the rule's id is kept; Undo flags it again
+    emit('system:navigate', { screen: 'permissions', id: 'projects:to-check' })
+    await waitFor(`${chip('To check')}?.textContent === 'To check6' && ${rows} === 6`, 'six flagged rules again')
+    await open('Bash(PGPASSWORD=')
+    await click('Not a secret', dialog)
+    await waitFor(`!${dialog} && ${chip('To check')}.textContent === 'To check5' && ${rows} === 5`, 'the rule marked as not a secret')
+    const kept = path.join(userDataDir(), 'rules.dev', `${folderKey(configDir())}.json`)
+    const keptText = await fsp.readFile(kept, 'utf8')
+    if (SECRETS.test(keptText) || (JSON.parse(keptText) as { dismissed: string[] }).dismissed.length !== 1) throw new Error(`rules: "Not a secret" kept ${keptText}`)
+    if ((await fsp.readFile(ruleFile, 'utf8')) !== fileBefore) throw new Error('rules: "Not a secret" changed the file')
+    await click('Undo', `document.querySelector('.toast')`)
+    await waitFor(`${chip('To check')}.textContent === 'To check6' && ${rows} === 6`, 'the rule flagged again')
+    if ((JSON.parse(await fsp.readFile(kept, 'utf8')) as { dismissed: string[] }).dismissed.length !== 0) throw new Error('rules: Undo left the rule marked')
+    await waitFor(`!document.querySelector('.toast')`, 'the toast gone')
 
     // no project with rules: the copy's global state file without its projects, then put back byte for byte
     const state = globalStateFile()

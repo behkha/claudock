@@ -83,6 +83,13 @@ export interface PermissionsApi {
   moveRule(file: SettingsFileName, from: RuleList, to: RuleList, rule: string): Promise<PermissionsData>
   /** Every permission rule saved in the projects Claude Code knows (the keys of `projects` in the global state file). */
   projectRules(): Promise<ProjectRules>
+  /**
+   * Remove one rule from its project file: the file is read again, exactly that rule is taken out of its list (the first
+   * copy), a snapshot is kept in Backups, and every other byte stays. Returns the list as it is afterwards.
+   */
+  removeProjectRule(id: string): Promise<ProjectRules>
+  /** Mark a flagged rule "Not a secret" (or flag it again): remembered for that exact rule, as its id, never its text. */
+  setNotSecret(id: string, value: boolean): Promise<ProjectRules>
 }
 
 export interface PermissionsEvents {}

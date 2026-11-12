@@ -255,7 +255,8 @@ function SnapshotDetail({ snap, onChanged }: { snap: SnapshotInfo; onChanged: ()
               <li key={f}>
                 <button type="button" className={cx('bk__file', f === file && 'bk__file--on')} aria-pressed={f === file} onClick={() => setFileRel(f)}>
                   <FileText size={14} strokeWidth={1.8} aria-hidden />
-                  <span className="bk__mono">{f}</span>
+                  {/* a project's rule file is named by where it really is */}
+                  <span className="bk__mono">{snap.outside ? `${snap.outside}${snap.outside.includes('\\') ? '\\' : '/'}${f}` : f}</span>
                 </button>
               </li>
             ))}

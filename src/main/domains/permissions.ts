@@ -1,20 +1,24 @@
-import type { IpcMain } from 'electron'
+import { shell, type IpcMain } from 'electron'
 import fsp from 'node:fs/promises'
 import path from 'node:path'
 import type { GitState, PermissionsApi, PermissionsData, ProjectRules, RuleFile, RuleList } from '@shared/api/permissions'
 import type { SettingsFileName } from '@shared/api/settings'
 import { folderKey } from '../connect/folder'
 import { defineDomain } from '../ipcx'
-import { configDir, globalStateFile } from '../paths'
+import { configDir, globalStateFile, installKind, samePath, userDataDir } from '../paths'
 import { gitState } from '../permissions/git'
-import { RULE_FILES, buildRows, ruleId, rulesIn, type RuleFileRead, type SavedRule } from '../permissions/rows'
+import { RULE_FILES, buildRows, projectName, ruleId, rulesIn, type RuleFileRead, type SavedRule } from '../permissions/rows'
+import { removeRuleFromText } from '../permissions/ruleFile'
+import { snapshotOutside } from '../safeWrite'
+import { devAllowed, readText, writeOne, type WriteGuard } from '../team/write'
 import { assertSettingsFile, isPlainObject, readSettingsObject, updateSettingsObject, type JsonObject } from './settings'
 
 /**
  * Permissions: the open profile's own rules ("This profile": the `permissions` key of its settings.json and
  * settings.local.json), and the rules saved in projects ("Projects"): every `<project>/.claude/settings.json` and
  * `settings.local.json` of the projects Claude Code knows, read only, each rule classified in the main process
- * (src/main/permissions/) so a secret in one never reaches the window in full.
+ * (src/main/permissions/) so a secret in one never reaches the window in full. One write goes there: removing a rule,
+ * through the guarded writer for folders outside the config folder (src/main/team/write.ts), with a snapshot first.
  */
 
 const LISTS: RuleList[] = ['allow', 'ask', 'deny', 'additionalDirectories']
@@ -103,6 +107,8 @@ function cleanRule(rule: unknown, list: RuleList): string {
 const impl: PermissionsApi = {
   get,
   projectRules: () => projectRules(),
+  removeProjectRule: (id) => removeProjectRule(id),
+  setNotSecret: (id, value) => setNotSecret(id, value),
 
   async setDefaultMode(fileIn, mode) {
     const file = assertSettingsFile(fileIn)
@@ -237,6 +243,8 @@ async function scanProjectRules(dismissed: ReadonlySet<string> = new Set()): Pro
   const seen = new Set<string>()
   let unreadable = 0
   for (const project of await knownProjects()) {
+    // the home folder as a project: its .claude is this profile's own folder, which "This profile" already shows
+    if (samePath(path.join(project, '.claude'), configDir())) continue
     for (const file of RULE_FILES) {
       const at = await plainRuleFile(project, file)
       if (!at || seen.has(at.abs)) continue
@@ -265,8 +273,113 @@ async function scanProjectRules(dismissed: ReadonlySet<string> = new Set()): Pro
   return buildRows(reads, dismissed, unreadable)
 }
 
+/* ------------------------------------------------------------------ "Not a secret" */
+
+/**
+ * The rules marked "Not a secret", per profile folder: `<userData>/rules/<folder key>.json` (`rules.dev` in a git clone,
+ * like the other per-profile data), `{ v: 1, dismissed: [id…] }`. Ids only (hashes): a rule's text is never written here.
+ */
+const dismissedFile = (dir: string): string => path.join(userDataDir(), installKind() === 'dev' ? 'rules.dev' : 'rules', `${folderKey(dir)}.json`)
+
+async function readDismissed(dir = configDir()): Promise<Set<string>> {
+  try {
+    const o = JSON.parse(await fsp.readFile(dismissedFile(dir), 'utf8')) as unknown
+    if (isPlainObject(o) && Array.isArray(o.dismissed)) return new Set(o.dismissed.filter((x): x is string => typeof x === 'string' && /^[0-9a-f]{32}$/.test(x)))
+  } catch {
+    /* nothing dismissed yet */
+  }
+  return new Set()
+}
+
+async function writeDismissed(ids: ReadonlySet<string>, dir = configDir()): Promise<void> {
+  const file = dismissedFile(dir)
+  await fsp.mkdir(path.dirname(file), { recursive: true })
+  const tmp = `${file}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`
+  await fsp.writeFile(tmp, JSON.stringify({ v: 1, dismissed: [...ids].sort() }, null, 2) + '\n')
+  await fsp.rename(tmp, file)
+}
+
 /** Every permission rule saved in the projects Claude Code knows, for Permissions › Projects. */
-export const projectRules = (): Promise<ProjectRules> => scanProjectRules()
+export async function projectRules(): Promise<ProjectRules> {
+  return scanProjectRules(await readDismissed())
+}
+
+/** Mark a flagged rule "Not a secret", or flag it again. Only a rule that is listed and holds a secret can be marked. */
+async function setNotSecret(id: unknown, value: unknown): Promise<ProjectRules> {
+  if (typeof id !== 'string' || typeof value !== 'boolean') throw new Error('Unknown rule')
+  const ids = await readDismissed()
+  const now = await scanProjectRules(ids)
+  if (!now.rules.some((r) => r.id === id && r.secret)) throw new Error('That rule is no longer in the file. Reload and try again.')
+  if (value) ids.add(id)
+  else ids.delete(id)
+  // ids of rules that are gone are let go
+  const listed = new Set(now.rules.map((r) => r.id))
+  await writeDismissed(new Set([...ids].filter((x) => listed.has(x))))
+  return projectRules()
+}
+
+/* ------------------------------------------------------------------ the one write: a rule out of a project file */
+
+/** Same rule as Team mode's: a development build writes a project only when it is synthetic, or when real writes were allowed. */
+const guard: WriteGuard = {
+  allowed: (dir) => devAllowed(dir, { readonly: process.env.CLAUDOCK_READONLY === '1', dev: installKind() === 'dev', allowReal: process.env.CLAUDOCK_ALLOW_REAL_WRITES === '1' }),
+  trash: (abs) => shell.trashItem(abs)
+}
+
+/** One write at a time per rule file. */
+const writing = new Map<string, Promise<unknown>>()
+function oneAtATime<T>(abs: string, fn: () => Promise<T>): Promise<T> {
+  const run = (writing.get(abs) ?? Promise.resolve()).then(fn, fn)
+  const tail = run.catch(() => undefined)
+  writing.set(abs, tail)
+  void tail.then(() => writing.get(abs) === tail && writing.delete(abs))
+  return run
+}
+
+/** The project and file a write may touch: a project this profile's Claude Code knows, and one of its two rule files. */
+async function ruleFileTarget(project: string, file: string): Promise<{ project: string; file: RuleFile; rel: string }> {
+  if (!(RULE_FILES as readonly string[]).includes(file)) throw new Error('Not a rule file')
+  const known = (await knownProjects()).find((p) => samePath(p, project))
+  if (!known || samePath(path.join(known, '.claude'), configDir())) throw new Error('That project is not one Claude Code knows in this profile')
+  if (!guard.allowed(known)) throw new Error('Writes to this folder are turned off in development (it has no .claudock-fixture file).')
+  return { project: known, file: file as RuleFile, rel: `.claude/${file}` }
+}
+
+/** Write `<project>/.claude/<file>`: a snapshot of the current file first, never through a link, a temp file renamed over it. */
+async function writeRuleFile(t: { project: string; file: RuleFile; rel: string }, text: string, reason: string): Promise<{ snapshotId: string | null }> {
+  const snap = await snapshotOutside(path.join(t.project, '.claude'), [t.file], reason)
+  await writeOne(t.project, t.rel, text, guard)
+  return { snapshotId: snap?.id ?? null }
+}
+
+/**
+ * Remove one rule from its project file. The file is read again right before the write (Claude Code may have saved
+ * another rule meanwhile) and exactly that rule is taken out of its list: the first copy, nothing else.
+ */
+async function removeProjectRule(id: unknown): Promise<ProjectRules> {
+  if (typeof id !== 'string') throw new Error('Unknown rule')
+  await projectRules()
+  const saved = scanOf(configDir()).saved.get(id)
+  if (!saved) throw new Error('That rule is no longer in the file. Reload and try again.')
+  const target = await ruleFileTarget(saved.projectPath, saved.file)
+  await oneAtATime(path.join(target.project, '.claude', target.file), async () => {
+    const text = await readText(target.project, target.rel)
+    const next = text === null ? null : removeRuleFromText(text, saved.rule.list, saved.rule.rule)
+    if (next === null) throw new Error('That rule is no longer in the file. Reload and try again.')
+    await writeRuleFile(target, next, `Remove ${saved.rule.list === 'allow' ? 'an' : 'a'} ${saved.rule.list} rule from ${projectName(target.project)}/${target.rel}`)
+  })
+  return projectRules()
+}
+
+/**
+ * Put a project's rule file back from a snapshot (Backups): `folder` is the project's `.claude`, as the snapshot
+ * recorded it. The same guarded write, so the version being replaced is snapshotted first.
+ */
+export async function restoreRuleFile(folder: string, file: string, text: string, reason: string): Promise<{ snapshotId: string | null }> {
+  if (path.basename(folder) !== '.claude') throw new Error('Not a rule file')
+  const target = await ruleFileTarget(path.dirname(folder), file)
+  return oneAtATime(path.join(target.project, '.claude', target.file), () => writeRuleFile(target, text, reason))
+}
 
 export function register(ipcMain: IpcMain): void {
   defineDomain(ipcMain, 'permissions', impl)

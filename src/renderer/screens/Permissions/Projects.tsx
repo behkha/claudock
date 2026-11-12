@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Button, Chip, EmptyState, PageLayout, Spinner } from '@/components'
+import type { ProjectRule, ProjectRules } from '@shared/api/permissions'
+import { Button, Chip, EmptyState, PageLayout, Spinner, useToast } from '@/components'
 import { api, useApi } from '@/lib/api'
 import { RuleSheet, RuleText } from './RuleSheet'
 
@@ -13,9 +14,32 @@ import { RuleSheet, RuleText } from './RuleSheet'
 export type RuleFilter = 'check' | 'broad' | 'all'
 
 export function ProjectsView({ scope, start }: { scope: ReactNode; start?: RuleFilter }): JSX.Element {
-  const { data, error, reload } = useApi(() => api.permissions.projectRules(), [])
+  const loaded = useApi(() => api.permissions.projectRules(), [])
+  const { error, reload } = loaded
+  // a write answers with the list as it is afterwards
+  const [after, setAfter] = useState<ProjectRules>()
+  useEffect(() => setAfter(undefined), [loaded.data])
+  const data = after ?? loaded.data
+  const toast = useToast()
   const [picked, setPicked] = useState<RuleFilter | null>(start ?? null)
   const [openId, setOpenId] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  async function change(op: () => Promise<ProjectRules>, done: string, undo?: () => Promise<ProjectRules>): Promise<void> {
+    setBusy(true)
+    try {
+      setAfter(await op())
+      setOpenId(null)
+      toast(done, { kind: 'success', action: undo ? { label: 'Undo', onClick: () => void undo().then(setAfter, (e: Error) => toast(e.message, { kind: 'error' })) } : undefined })
+    } catch (e) {
+      toast((e as Error).message, { kind: 'error' })
+      reload()
+    } finally {
+      setBusy(false)
+    }
+  }
+  const remove = (r: ProjectRule): void => void change(() => api.permissions.removeProjectRule(r.id), 'Rule removed. Snapshot kept in Backups.')
+  const notSecret = (r: ProjectRule): void => void change(() => api.permissions.setNotSecret(r.id, true), 'Marked as not a secret.', () => api.permissions.setNotSecret(r.id, false))
   useEffect(() => {
     if (start) setPicked(start)
   }, [start])
@@ -93,7 +117,7 @@ export function ProjectsView({ scope, start }: { scope: ReactNode; start?: RuleF
       {data && data.unreadable > 0 ? (
         <p className="pm-note">{data.unreadable === 1 ? '1 rule file could not be read.' : `${data.unreadable} rule files could not be read.`}</p>
       ) : null}
-      <RuleSheet rule={open} onClose={() => setOpenId(null)} />
+      <RuleSheet rule={open} busy={busy} onClose={() => setOpenId(null)} onRemove={remove} onNotSecret={notSecret} />
     </PageLayout>
   )
 }

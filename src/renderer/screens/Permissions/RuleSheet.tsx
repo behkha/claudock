@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import type { GitState, ProjectRule } from '@shared/api/permissions'
+import { Button } from '@/components'
 
 const GIT_LINE: Record<Exclude<GitState, null>, string> = {
   tracked: 'tracked by git',
@@ -34,9 +35,22 @@ function day(ms: number): string {
 
 /**
  * One saved rule: the rule (a secret covered), where it is saved, when its file last changed and what git says about
- * that file. A flagged rule also says that removing it does not change the secret.
+ * that file. A flagged rule also says that removing it does not change the secret, and offers Not a secret (the flag
+ * goes, remembered for that exact rule) beside Remove rule (the rule is taken out of its file; a snapshot is kept in Backups).
  */
-export function RuleSheet({ rule, onClose }: { rule: ProjectRule | null; onClose: () => void }): JSX.Element {
+export function RuleSheet({
+  rule,
+  busy,
+  onClose,
+  onRemove,
+  onNotSecret
+}: {
+  rule: ProjectRule | null
+  busy: boolean
+  onClose: () => void
+  onRemove: (rule: ProjectRule) => void
+  onNotSecret: (rule: ProjectRule) => void
+}): JSX.Element {
   const ref = useRef<HTMLDialogElement>(null)
   useEffect(() => {
     const d = ref.current
@@ -53,10 +67,10 @@ export function RuleSheet({ rule, onClose }: { rule: ProjectRule | null; onClose
       aria-labelledby="pm-sheet-title"
       onCancel={(e) => {
         e.preventDefault()
-        onClose()
+        if (!busy) onClose()
       }}
       onClick={(e) => {
-        if (e.target === ref.current) onClose()
+        if (e.target === ref.current && !busy) onClose()
       }}
     >
       {rule ? (
@@ -77,6 +91,16 @@ export function RuleSheet({ rule, onClose }: { rule: ProjectRule | null; onClose
             </span>
           </div>
           {flagged ? <p className="pm-sheet__meta">Removing the rule does not change the secret. Change it where it was issued.</p> : null}
+          <div className="dialog__actions">
+            {flagged ? (
+              <Button variant="secondary" disabled={busy} onClick={() => onNotSecret(rule)}>
+                Not a secret
+              </Button>
+            ) : null}
+            <Button variant="primary" loading={busy} onClick={() => onRemove(rule)}>
+              Remove rule
+            </Button>
+          </div>
         </div>
       ) : null}
     </dialog>

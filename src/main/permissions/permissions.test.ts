@@ -4,6 +4,7 @@ import { MASK, maskText, secretsInText } from '../../shared/secrets.ts'
 import { classifyRule, isBroad } from './classify.ts'
 import { gitArgs, gitStateOf } from './git.ts'
 import { buildRows, projectName, ruleId, rulesIn, type RuleFileRead } from './rows.ts'
+import { maskRuleFile, removeRuleFromText } from './ruleFile.ts'
 
 /* Every value below is invented for these tests. */
 const GH = 'ghp_FAKEDONOTUSE0123456789abcdefABCD'
@@ -174,4 +175,66 @@ test('git line: tracked wins, then ignored or not; anything git could not say is
 test('git line: only two commands, both read-only, with the fsmonitor hook off', () => {
   assert.deepEqual(gitArgs('/work/shop-api', 'tracked', '.claude/settings.local.json'), ['-C', '/work/shop-api', '-c', 'core.fsmonitor=false', 'ls-files', '--error-unmatch', '--', '.claude/settings.local.json'])
   assert.deepEqual(gitArgs('/work/shop-api', 'ignored', '.claude/settings.local.json'), ['-C', '/work/shop-api', '-c', 'core.fsmonitor=false', 'check-ignore', '-q', '--', '.claude/settings.local.json'])
+})
+
+/* ------------------------------------------------------------------ taking one rule out of a rule file */
+
+const FILE = `{
+  "model": "opus",
+  "permissions": {
+    "defaultMode": "default",
+    "allow": [
+      "Bash(npm test)",
+      "Bash(TOKEN=fake-token-value npm run sync)",
+      "Bash(git status)"
+    ],
+    "ask": ["Bash(git push:*)", "Bash(npm test)"],
+    "deny": [
+      "Read(./.env)"
+    ]
+  },
+  "env": { "A": "Bash(npm test)" }
+}
+`
+
+test('remove a rule: only that item goes; every other byte stays', () => {
+  // from the middle, the start and the end of a list written one item a line
+  assert.equal(removeRuleFromText(FILE, 'allow', 'Bash(TOKEN=fake-token-value npm run sync)'), FILE.replace('      "Bash(TOKEN=fake-token-value npm run sync)",\n', ''))
+  assert.equal(removeRuleFromText(FILE, 'allow', 'Bash(npm test)'), FILE.replace('      "Bash(npm test)",\n', ''))
+  assert.equal(removeRuleFromText(FILE, 'allow', 'Bash(git status)'), FILE.replace(',\n      "Bash(git status)"', ''))
+  // a list on one line; the same text in another list and in another key is left alone
+  assert.equal(removeRuleFromText(FILE, 'ask', 'Bash(npm test)'), FILE.replace('["Bash(git push:*)", "Bash(npm test)"]', '["Bash(git push:*)"]'))
+  assert.equal(removeRuleFromText(FILE, 'ask', 'Bash(git push:*)'), FILE.replace('["Bash(git push:*)", "Bash(npm test)"]', '["Bash(npm test)"]'))
+  // the only rule of a list: the list stays, empty
+  assert.equal(removeRuleFromText(FILE, 'deny', 'Read(./.env)'), FILE.replace('[\n      "Read(./.env)"\n    ]', '[]'))
+})
+
+test('remove a rule: tabs, Windows line ends, no trailing newline and escaped text survive', () => {
+  const tabs = '{\r\n\t"permissions": {\r\n\t\t"allow": [\r\n\t\t\t"Bash(echo \\"a, b\\")",\r\n\t\t\t"Bash(npm test)"\r\n\t\t]\r\n\t}\r\n}'
+  assert.equal(removeRuleFromText(tabs, 'allow', 'Bash(echo "a, b")'), tabs.replace('\t\t\t"Bash(echo \\"a, b\\")",\r\n', ''))
+  assert.equal(removeRuleFromText(tabs, 'allow', 'Bash(npm test)'), tabs.replace(',\r\n\t\t\t"Bash(npm test)"', ''))
+  // a rule that itself looks like JSON punctuation
+  const odd = '{"permissions":{"allow":["Bash(a],[b)","Bash(c)"]}}'
+  assert.equal(removeRuleFromText(odd, 'allow', 'Bash(a],[b)'), '{"permissions":{"allow":["Bash(c)"]}}')
+})
+
+test('remove a rule: a rule saved twice loses its first copy; a missing rule, list or readable file changes nothing', () => {
+  const twice = '{\n  "permissions": {\n    "allow": [\n      "Bash(a)",\n      "Bash(b)",\n      "Bash(a)"\n    ]\n  }\n}\n'
+  assert.equal(removeRuleFromText(twice, 'allow', 'Bash(a)'), '{\n  "permissions": {\n    "allow": [\n      "Bash(b)",\n      "Bash(a)"\n    ]\n  }\n}\n')
+  assert.equal(removeRuleFromText(FILE, 'allow', 'Bash(rm -rf:*)'), null)
+  assert.equal(removeRuleFromText(FILE, 'deny', 'Bash(npm test)'), null)
+  assert.equal(removeRuleFromText('{"model":"opus"}', 'allow', 'Bash(a)'), null)
+  assert.equal(removeRuleFromText('{"permissions":{"allow":"Bash(a)"}}', 'allow', 'Bash(a)'), null)
+  assert.equal(removeRuleFromText('{ "permissions": { "allow": ["Bash(a)"', 'allow', 'Bash(a)'), null)
+  // the same list name elsewhere in the file is not the permissions list
+  assert.equal(removeRuleFromText('{"other":{"allow":["Bash(a)"]},"permissions":{"allow":["Bash(b)"]}}', 'allow', 'Bash(a)'), null)
+})
+
+test('a rule file shown in Backups has its secrets covered, in JSON and in text that is not', () => {
+  const shown = maskRuleFile(FILE)
+  assert.equal(shown.includes('fake-token-value'), false)
+  assert.equal(shown, FILE.replace('fake-token-value', MASK).replace('["Bash(git push:*)", "Bash(npm test)"]', '[\n      "Bash(git push:*)",\n      "Bash(npm test)"\n    ]').replace('{ "A": "Bash(npm test)" }', '{\n    "A": "Bash(npm test)"\n  }'))
+  const quoted = JSON.stringify({ permissions: { allow: ['Bash(mysql --password="fake pass words" shop)'] } })
+  assert.equal(maskRuleFile(quoted).includes('fake pass words'), false)
+  assert.equal(maskRuleFile(`{ broken "Bash(API_TOKEN=${GH} npm run sync)"`).includes(GH), false)
 })

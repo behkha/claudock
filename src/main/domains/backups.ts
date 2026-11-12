@@ -2,10 +2,14 @@ import type { IpcMain } from 'electron'
 import fsp from 'node:fs/promises'
 import path from 'node:path'
 import type { BackupsApi, BackupsList, FileCompare, LooseBackup } from '@shared/api/backups'
+import type { SnapshotInfo } from '@shared/types'
 import { exists, invalidateSizes, stat } from '../fsx'
 import { defineDomain } from '../ipcx'
+import { restoreRuleFile } from './permissions'
 import { GLOBAL_STATE_REL, assertWritable, configDir, globalStateFile, isSecret, isSecretReal, resolveInside } from '../paths'
+import { maskRuleFile } from '../permissions/ruleFile'
 import {
+  listOutsideSnapshots,
   listSnapshots,
   readSnapshotText,
   restoreSnapshot,
@@ -191,6 +195,36 @@ async function compareFiles(backupAbs: string, backupMtimeMs: number | null, liv
   }
 }
 
+/**
+ * A snapshot of a project's rule file (taken before Permissions › Projects removed a rule) against the file as it is
+ * now. Both sides are shown with their secrets covered: the rule was removed for holding one.
+ */
+async function compareRuleFile(backupAbs: string, backupMtimeMs: number | null, folder: string, name: string): Promise<FileCompare> {
+  const backup = await loadText(backupAbs)
+  const liveAbs = path.join(folder, name)
+  const st = await fsp.lstat(liveAbs).catch(() => null)
+  const live = st?.isFile() ? await loadText(liveAbs) : { text: '', exists: false, binary: false, tooLarge: false }
+  return {
+    liveRel: name,
+    liveExists: live.exists,
+    backup: maskRuleFile(backup.text),
+    live: live.exists ? maskRuleFile(live.text) : '',
+    backupMtimeMs,
+    binary: backup.binary || live.binary,
+    tooLarge: backup.tooLarge || live.tooLarge,
+    mode: 'file',
+    differingKeys: [],
+    canRestoreKey: false,
+    restoreBlockedReason: null
+  }
+}
+
+/** The open profile's snapshots: of its own files, and of the project rule files it changed. Newest first. */
+async function everySnapshot(): Promise<SnapshotInfo[]> {
+  const [own, outside] = await Promise.all([listSnapshots(), listOutsideSnapshots()])
+  return [...own, ...outside].sort((a, b) => b.at.localeCompare(a.at))
+}
+
 /* ------------------------------------------------------------------ helpers */
 
 /** A loose backup is a `*.bak*` file in the config root or any file under backups/. Anything else is refused. */
@@ -225,23 +259,26 @@ async function restoreMcpFrom(backupText: string, reason: string): Promise<{ sna
 
 const impl: BackupsApi = {
   async list(): Promise<BackupsList> {
-    const [snapshots, loose] = await Promise.all([listSnapshots(), scanLoose()])
+    const [snapshots, loose] = await Promise.all([everySnapshot(), scanLoose()])
     return { snapshots, loose }
   },
 
   async snapshotFile(id, rel) {
-    const snaps = await listSnapshots()
+    const snaps = await everySnapshot()
     const snap = snaps.find((s) => s.id === id)
     if (!snap || !snap.files.includes(rel)) throw new Error('That file is not in this snapshot')
     const abs = await snapshotFilePath(id, rel) // validates the id format and that the file is in the manifest
+    if (snap.outside) return compareRuleFile(abs, Date.parse(snap.at) || null, snap.outside, rel)
     return compareFiles(abs, Date.parse(snap.at) || null, rel)
   },
 
   async restoreSnapshotFile(id, rel) {
-    assertWritable()
-    const snaps = await listSnapshots()
+    const snaps = await everySnapshot()
     const snap = snaps.find((s) => s.id === id)
     if (!snap || !snap.files.includes(rel)) throw new Error('That file is not in this snapshot')
+    // a project's rule file goes back where it came from, through the guarded writer (which snapshots the current one first)
+    if (snap.outside) return restoreRuleFile(snap.outside, rel, await readSnapshotText(id, rel), `Restore of ${rel} in ${snap.outside} from snapshot ${id}`)
+    assertWritable()
     if (rel === GLOBAL_STATE_REL) {
       const text = await readSnapshotText(id, rel)
       return restoreMcpFrom(text, `Restore mcpServers in .claude.json from snapshot ${id}`)
@@ -249,7 +286,7 @@ const impl: BackupsApi = {
     await restoreSnapshot(id, rel)
     // restoreSnapshot snapshots the current file first: find the new one (the one that was not there before)
     const known = new Set(snaps.map((s) => s.id))
-    const after = await listSnapshots()
+    const after = await everySnapshot()
     return { snapshotId: after.find((s) => !known.has(s.id) && s.files.includes(rel))?.id ?? null }
   },
 
@@ -311,6 +348,6 @@ export function register(ipcMain: IpcMain): void {
 
 /** Sidebar badge: Claudock snapshots plus loose backup files. */
 export async function count(): Promise<number> {
-  const [snaps, loose] = await Promise.all([listSnapshots(), scanLoose()])
+  const [snaps, loose] = await Promise.all([everySnapshot(), scanLoose()])
   return snaps.length + loose.filter((l) => !l.hidden).length
 }

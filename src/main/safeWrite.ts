@@ -114,11 +114,41 @@ export async function snapshot(relPaths: string[], reason: string): Promise<Snap
   return info
 }
 
+/**
+ * Snapshot files of a folder outside the config folder (a project's `.claude`, before Permissions › Projects removes
+ * a rule there): `names` are plain file names in `folder`. The manifest keeps `folder` as its `dir` and the profile it
+ * was taken for, so Backups lists it for that profile, labelled by its real path, and a restore goes back to `folder`.
+ * Links and missing files are skipped. Returns null if nothing was copied.
+ */
+export async function snapshotOutside(folder: string, names: string[], reason: string): Promise<SnapshotInfo | null> {
+  const copied: string[] = []
+  const { id, dir, at } = await uniqueSnapshotDir()
+  for (const name of names) {
+    if (!name || name !== path.basename(name) || name.startsWith('.') || isSecret(name)) continue
+    const abs = path.join(folder, name)
+    const st = await fsp.lstat(abs).catch(() => null)
+    if (!st || !st.isFile()) continue
+    await fsp.copyFile(abs, path.join(dir, name))
+    copied.push(name)
+  }
+  if (copied.length === 0) {
+    await fsp.rm(dir, { recursive: true, force: true })
+    return null
+  }
+  await fsp.writeFile(path.join(dir, 'manifest.json'), JSON.stringify({ at, reason, files: copied, dir: folder, profile: configDir() }, null, 2) + '\n')
+  invalidateSnapshotIndex()
+  return { id, at, reason, files: copied, outside: folder }
+}
+
 /* ---- snapshot index: cached, keyed on the snapshots folder's mtime, invalidated on create / trash */
 
 const MANIFEST_CONCURRENCY = 16
 /** A snapshot and the config folder it was taken in (null: taken before profiles, see `legacySnapshotDir`). */
-type Stored = SnapshotInfo & { dir: string | null }
+type Stored = SnapshotInfo & {
+  dir: string | null
+  /** Set on a snapshot of files outside the config folder (`snapshotOutside`): the profile it was taken for; `dir` is then the folder the files came from. */
+  profile: string | null
+}
 let indexCache: { mtimeMs: number; list: Stored[] } | null = null
 let indexGen = 0
 
@@ -140,10 +170,20 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promis
   return out
 }
 
-/** The open profile's snapshots, newest first. */
+/** The open profile's snapshots of its own files, newest first. */
 export async function listSnapshots(): Promise<SnapshotInfo[]> {
   const here = configDir()
-  return (await allSnapshots()).filter((s) => (s.dir === null ? samePath(here, legacySnapshotDir()) : samePath(here, s.dir))).map(({ dir: _dir, ...info }) => info)
+  return (await allSnapshots())
+    .filter((s) => s.profile === null && (s.dir === null ? samePath(here, legacySnapshotDir()) : samePath(here, s.dir)))
+    .map(({ dir: _dir, profile: _profile, ...info }) => info)
+}
+
+/** The open profile's snapshots of files outside the config folder (project rule files), newest first, each with `outside`. */
+export async function listOutsideSnapshots(): Promise<SnapshotInfo[]> {
+  const here = configDir()
+  return (await allSnapshots())
+    .filter((s) => s.profile !== null && s.dir !== null && samePath(here, s.profile))
+    .map(({ dir, profile: _profile, ...info }) => ({ ...info, outside: dir as string }))
 }
 
 async function allSnapshots(): Promise<Stored[]> {
@@ -165,8 +205,9 @@ async function allSnapshots(): Promise<Stored[]> {
         reason: string
         files: string[]
         dir?: unknown
+        profile?: unknown
       }
-      return { id, at: m.at, reason: m.reason, files: m.files, dir: typeof m.dir === 'string' && m.dir ? m.dir : null }
+      return { id, at: m.at, reason: m.reason, files: m.files, dir: typeof m.dir === 'string' && m.dir ? m.dir : null, profile: typeof m.profile === 'string' && m.profile ? m.profile : null }
     } catch {
       return null /* not a snapshot folder (or still being written) */
     }
@@ -180,7 +221,7 @@ async function allSnapshots(): Promise<Stored[]> {
 /** The snapshot `id`, only if it has the exact id format AND is one of ours (listed with a manifest). */
 async function requireSnapshot(id: string): Promise<SnapshotInfo> {
   assertSnapshotId(id)
-  const snap = (await listSnapshots()).find((s) => s.id === id)
+  const snap = (await listSnapshots()).find((s) => s.id === id) ?? (await listOutsideSnapshots()).find((s) => s.id === id)
   if (!snap) throw new Error('That snapshot no longer exists')
   return snap
 }
