@@ -1,5 +1,6 @@
 import crypto from 'node:crypto'
 import type { Finding, Fix, FixChoice, JoinCommands, TeamItemState, TeamKind, TeamRemote } from '@shared/api/team'
+import { MASK, secretSpans } from '../../shared/secrets.ts'
 
 /**
  * The pure parts of Team mode (src/main/domains/team.ts): what is wrong with an item before it may be shared, the
@@ -118,54 +119,13 @@ export function namesHome(text: string, home: string): boolean {
   return home.length > 1 && new RegExp(`${escapeRe(home)}(?![A-Za-z0-9_.-])`).test(text)
 }
 
-/* ------------------------------------------------------------------ secrets */
-
-const SECRET_NAME = /(token|secret|passw(or)?d|api[-_]?key|apikey|authorization|credential|private[-_]?key|access[-_]?key|^auth$)/i
-const SCHEME = /^(Bearer|Basic|Token|token|bearer)\s+/
-const SHAPES: RegExp[] = [
-  /gh[pousr]_[A-Za-z0-9]{20,}/g,
-  /github_pat_[A-Za-z0-9_]{20,}/g,
-  /glpat-[A-Za-z0-9_-]{16,}/g,
-  /sk-[A-Za-z0-9_-]{20,}/g,
-  /xox[abprs]-[A-Za-z0-9-]{10,}/g,
-  /AKIA[0-9A-Z]{16}/g,
-  /eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g
-]
-const URL_USERINFO = /:\/\/([^/@\s:]+:[^/@\s]+)@/
-const URL_PARAM = /[?&](?:token|key|api[-_]?key|apikey|access[-_]?token|secret|password)=([^&#\s]+)/gi
+/* ------------------------------------------------------------------ secrets (the patterns are in src/shared/secrets.ts, shared with the saved-rules check) */
 
 export interface SecretHit {
   /** `headers.<name>`, `env.<name>`, `args.<index>` or `url`. */
   where: string
   /** The parts of the value that are the secret, in order, not overlapping. */
   spans: [number, number][]
-}
-
-const insideVar = (v: string, i: number): boolean => {
-  const open = v.lastIndexOf('${', i)
-  return open >= 0 && v.indexOf('}', open) >= i
-}
-
-function secretSpans(value: string, name: string | null, isUrl: boolean): [number, number][] {
-  const spans: [number, number][] = []
-  const add = (s: number, e: number): void => {
-    if (e > s && !insideVar(value, s) && !spans.some(([a, b]) => s < b && e > a)) spans.push([s, e])
-  }
-  for (const re of SHAPES) for (const m of value.matchAll(re)) add(m.index, m.index + m[0].length)
-  if (isUrl) {
-    const u = URL_USERINFO.exec(value)
-    if (u) add(u.index + 3, u.index + 3 + u[1].length)
-    for (const m of value.matchAll(URL_PARAM)) add(m.index + m[0].length - m[1].length, m.index + m[0].length)
-  }
-  if (name !== null && spans.length === 0) {
-    const scheme = SCHEME.exec(value)
-    const start = scheme ? scheme[0].length : 0
-    const rest = value.slice(start)
-    const named = SECRET_NAME.test(name)
-    // under a secret's name, anything that is not a variable; under any name, "Bearer <long value>"
-    if (!rest.includes('${') && ((named && rest.length >= 8) || (scheme && /^[A-Za-z0-9._~+/=-]{20,}$/.test(rest)))) add(start, value.length)
-  }
-  return spans.sort((a, b) => a[0] - b[0])
 }
 
 /** Every literal secret in an MCP server's settings. Values already read from a variable (`${…}`) are left alone. */
@@ -220,7 +180,7 @@ export function maskSecrets(config: JsonObj): JsonObj {
   let out = config
   for (const hit of findSecrets(config)) {
     const value = valueAt(config, hit.where)
-    if (value !== null) out = withValueAt(out, hit.where, replaceSpans(value, hit.spans, '••••••'))
+    if (value !== null) out = withValueAt(out, hit.where, replaceSpans(value, hit.spans, MASK))
   }
   return out
 }
