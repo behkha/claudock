@@ -89,7 +89,9 @@ export function ProjectsView({ scope, start }: { scope: ReactNode; start?: RuleF
           <table className="pm-table">
             <thead>
               <tr>
-                <th className="pm-table__dot" />
+                <th scope="col" className="pm-table__dot">
+                  <span className="sr-only">Holds a secret</span>
+                </th>
                 <th scope="col">Rule</th>
                 <th scope="col">Project</th>
               </tr>
