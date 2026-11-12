@@ -57,6 +57,7 @@ export function Popover(): JSX.Element {
     setGlance(v)
   })
   useEvent('menubar:changed', setBar)
+  useEvent('sessions:alertPrefs', setPrefs)
   useEvent('menubar:opened', () => {
     setView('main')
     load()
@@ -140,7 +141,7 @@ function Main({
       {list.length > 0 ? (
         <ul className="cc__sessions pop__sessions" aria-label="Sessions">
           {list.map((s) => (
-            <SessionRow key={s.id} s={s} now={now} />
+            <SessionRow key={s.id} s={s} now={now} line={prefs?.contextLine ?? null} />
           ))}
         </ul>
       ) : null}

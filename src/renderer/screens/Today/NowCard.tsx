@@ -21,6 +21,11 @@ const REFRESH_MS = 60_000
 export function NowCard({ disconnect, onSessions }: { disconnect?: number; onSessions?: (s: SessionsState) => void }): JSX.Element | null {
   const limits = useApi(() => api.limits.get(), [])
   const live = useApi(() => api.sessions.get(), [])
+  // the line the rows' bars fill toward: set in the menu bar popover's alert settings
+  const alerts = useApi(() => api.sessions.alertPrefs(), [])
+  const [line, setLine] = useState<number | null>(null)
+  useEffect(() => setLine(alerts.data?.contextLine ?? null), [alerts.data])
+  useEvent('sessions:alertPrefs', (p) => setLine(p.contextLine))
   const [limitsState, setLimits] = useState<LimitsState | undefined>()
   const [sessionsState, setSessions] = useState<SessionsState | undefined>()
   const [now, setNow] = useState(Date.now())
@@ -116,7 +121,7 @@ export function NowCard({ disconnect, onSessions }: { disconnect?: number; onSes
         {sessions.length > 0 ? (
           <ul className="cc__sessions" aria-label="Sessions">
             {sessions.map((x) => (
-              <SessionRow key={x.id} s={x} now={now} />
+              <SessionRow key={x.id} s={x} now={now} line={line} />
             ))}
           </ul>
         ) : null}

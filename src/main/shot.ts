@@ -148,6 +148,9 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
   }
 
 
+  /** The context sizes on the session rows, in order, as one string. */
+  const SIZES = `[...document.querySelectorAll('.cc__size')].map((e) => e.textContent).join(' ')`
+
   /**
    * Today -> Connect to Claude Code -> the sheet (shot) -> Connect -> one status line run and three sessions through
    * the real hooks (one ends up waiting on a permission prompt, one working, one done) -> exactly one alert -> the card
@@ -176,6 +179,8 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
     const posted = postedAlerts().slice(alerts)
     const want = `${path.basename(a.cwd)} is waiting for you`
     if (posted.length !== 1 || posted[0] !== want) throw new Error(`connect: expected one alert "${want}", got ${JSON.stringify(posted)}`)
+    // each running row ends with the context its transcript records; no line is set, so no bar
+    await waitFor(`${SIZES} === '726k 265k 182k' && !document.querySelector('.cc__bar')`, 'the three context sizes, no bar')
     await shoot(theme, 'connected')
     const own = String(countHooks((JSON.parse(before.toString('utf8')) as { hooks?: unknown }).hooks).commands)
     emit('system:navigate', { screen: 'hooks' })
@@ -229,7 +234,20 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
       `document.querySelector('.cc__row--waiting')?.textContent.includes(${JSON.stringify(path.basename(a.cwd))}) && document.querySelectorAll('.cc__row').length === 3 && [...document.querySelectorAll('.lim__top b')].map((b) => b.textContent).join(' ') === '42% 61%'`,
       'the waiting session and both limits'
     )
+    await waitPop(`${SIZES} === '726k 265k 182k' && !document.querySelector('.cc__bar')`, 'the three context sizes, no bar')
     await shoot(theme, 'menubar', pop)
+    // a line at 500k: every row gets its bar, and the one session over it reads strong with a full clay bar
+    const line = (await alertPrefs()).contextLine
+    await setAlertPrefs({ contextLine: 500_000 })
+    try {
+      const drawn = `document.querySelectorAll('.cc__bar').length === 3 && document.querySelectorAll('.cc__fill--over').length === 1 && document.querySelector('.cc__size--over')?.textContent === '726k' && [...document.querySelectorAll('.cc__fill')].map((e) => e.style.width).join(' ') === '100% 53% 36.4%'`
+      await waitPop(drawn, 'the bars toward 500k in the popover')
+      await shoot(theme, 'menubar-line', pop)
+      await waitFor(drawn, 'the bars toward 500k on Today')
+      await shoot(theme, 'connected-line')
+    } finally {
+      await setAlertPrefs({ contextLine: line })
+    }
     await inPop(`document.querySelector('[aria-label="Alert settings"]').click()`)
     await waitPop(`document.querySelector('.pop__back') && document.querySelectorAll('.pop__row').length >= 5`, 'the settings view')
     await shoot(theme, 'menubar-settings', pop)

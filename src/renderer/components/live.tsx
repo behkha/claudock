@@ -25,15 +25,21 @@ const ago = (ms: number): string => (ms < 60_000 ? 'just now' : `${waited(ms)} a
 
 /**
  * One session, named as Claude Code names it, with its folder beside it. Waiting: what it needs and for how long.
- * Working: the last thing it did, so the row moves while Claude works. Clicking it brings its terminal app forward.
+ * Working: the last thing it did, so the row moves while Claude works. The second line ends with the context the
+ * session carries, in tokens as Claude Code recorded them. With `line` set (the alert setting "A session's context
+ * reaches"), a thin bar under the row fills toward it; at or over the line the number turns strong and the bar is full
+ * and clay. The bar never means anything else, so there is none without a line. Clicking the row brings its terminal
+ * app forward.
  */
-export function SessionRow({ s, now }: { s: LiveSession; now: number }): JSX.Element {
+export function SessionRow({ s, now, line = null }: { s: LiveSession; now: number; line?: number | null }): JSX.Element {
   const toast = useToast()
   const show = (): void => void api.sessions.show(s.id).catch((e: Error) => toast(e.message, { kind: 'error' }))
   const what = s.status === 'waiting' ? waitText(s) : s.status === 'working' && s.activity ? `${activityText(s.activity.tool)} ${ago(now - s.activity.at)}` : null
   const label = s.title ?? s.name
   // beside the title: the profile (when the list holds several) and the folder
   const where = [s.profile, s.title ? s.name : null].filter(Boolean).join(' · ')
+  const size = s.context === null ? null : formatTokens(s.context)
+  const over = line !== null && s.context !== null && s.context >= line
   return (
     <li>
       <button
@@ -41,7 +47,7 @@ export function SessionRow({ s, now }: { s: LiveSession; now: number }): JSX.Ele
         className={cx('cc__row', `cc__row--${s.status}`)}
         onClick={show}
         title={s.cwd ?? undefined}
-        aria-label={`${label}${where ? ` in ${where}` : ''}, ${s.status === 'waiting' ? `waiting ${waited(now - s.since)}` : s.status}${what ? `: ${what}` : ''}`}
+        aria-label={`${label}${where ? ` in ${where}` : ''}, ${s.status === 'waiting' ? `waiting ${waited(now - s.since)}` : s.status}${what ? `: ${what}` : ''}${size ? `, context ${size} tokens` : ''}`}
       >
         <span className="cc__dot" aria-hidden />
         <span className="cc__name">
@@ -50,6 +56,12 @@ export function SessionRow({ s, now }: { s: LiveSession; now: number }): JSX.Ele
         </span>
         <span className="cc__when">{s.status === 'waiting' ? waited(now - s.since) : s.status}</span>
         {what ? <span className="cc__what">{what}</span> : null}
+        {size ? <span className={cx('cc__size', over && 'cc__size--over')}>{size}</span> : null}
+        {line !== null && s.context !== null ? (
+          <span className="cc__bar" aria-hidden>
+            <span className={cx('cc__fill', over && 'cc__fill--over')} style={{ width: `${Math.min(1, s.context / line) * 100}%` }} />
+          </span>
+        ) : null}
       </button>
     </li>
   )
