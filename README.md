@@ -14,13 +14,13 @@ See inside your `~/.claude`. Claudock is a free desktop app that lists every ski
 
 Claudock opens the Claude Code config folder (`~/.claude`, or wherever `CLAUDE_CONFIG_DIR` points) and the MCP servers in `~/.claude.json`, with one screen for each part:
 
-- **Today:** what each running Claude Code session is doing and which one waits for you, your limits as Claude Code reports them (5-hour and weekly today, and any window it adds), today's sessions and this week's tokens, and **Share**: your messages, sessions, longest session, peak hour, top model and 26 weeks of activity from Claude Code's own `stats-cache.json`, as a card to copy, save or post on X. The card never shows project names or prompts.
-- **Configure:** `settings.json` and `settings.local.json` as a form or raw JSON with history, `CLAUDE.md` and `rules/`, hooks, permissions
+- **Today:** what each running Claude Code session is doing, which one waits for you and how much context each one carries (in tokens, as Claude Code recorded them), your limits as Claude Code reports them (5-hour and weekly today, and any window it adds), today's sessions and this week's tokens, and **Share**: your messages, sessions, longest session, peak hour, top model and 26 weeks of activity from Claude Code's own `stats-cache.json`, as a card to copy, save or post on X. The card never shows project names or prompts.
+- **Configure:** `settings.json` and `settings.local.json` as a form or raw JSON with history, `CLAUDE.md` and `rules/`, hooks, permissions, and under **Permissions › Projects** every rule Claude Code saved in your projects when you answered "don't ask again": the ones that hold a password or token are flagged, shown with the secret covered, and can be removed there
 - **Extend:** skills (turn on or off, edit, duplicate), agents, commands, plugins, mods (what each one draws, hooks and reaches; keep the ones Claude drafts), MCP servers, and **Team**: tick the skills, agents, commands, hooks and MCP servers your team should have and Claudock writes them as a Claude Code plugin and marketplace into a git repo you choose, after checking that no token, home-folder path or script only you have goes with them. You commit and push; teammates install it with one `claude plugin` command (or get it in a project you connect) and Claude Code keeps it up to date. Their Claudock shows what each update changed.
 - **Your data:** every session, kept after Claude Code's 30-day cleanup deletes it, with full-text search, resume from any folder and Markdown export; projects, memory, plans, prompt history
 - **Maintain:** disk use per folder with cleanup suggestions, plus snapshots and `.bak` files you can diff and restore
 
-**Menu bar** (the tray on Windows and Linux): the highest of your limits (5-hour, weekly, or whichever window Claude Code reports), and a clay mark while a Claude Code session waits for you. Click it for the waiting sessions, every limit, today's tokens and the alert settings. On macOS, closing the window keeps Claudock running there; quit from its menu. On Windows the tray icon is off until you turn it on in View › Show in Tray.
+**Menu bar** (the tray on Windows and Linux): the highest of your limits (5-hour, weekly, or whichever window Claude Code reports), and a clay mark while a Claude Code session waits for you. Click it for the running sessions with their context size, every limit, today's tokens and the alert settings. Alerts are off until you turn them on: a session that waits, a limit at a percentage you pick, a session whose context reaches a size you pick (once you pick one, each row shows a bar toward it), and a saved rule that holds a secret. On macOS, closing the window keeps Claudock running there; quit from its menu. On Windows the tray icon is off until you turn it on in View › Show in Tray.
 
 ⌘K (Ctrl+K on Windows and Linux) searches skills, agents, rules, hooks, sessions, memory and settings keys.
 
@@ -32,9 +32,10 @@ Claude Code keeps its config in dozens of JSON, JSONL and Markdown files, and re
 - For `~/.claude.json` it re-reads the file right before writing and changes only the key you edited, so it doesn't overwrite what Claude Code wrote in the meantime.
 - Deletes go to the OS Trash.
 - It never reads `.credentials.json` or `sessions/*.key`. They show up as locked rows.
+- A secret in a saved rule is covered before it reaches the window, never copied and never sent anywhere. Removing a rule from a project's `.claude/settings.json` or `settings.local.json` takes out that one rule after a snapshot and leaves every other byte. To say whether git tracks or ignores that file, Claudock runs two read-only git commands (`git ls-files --error-unmatch` and `git check-ignore`) and no other.
 - Team mode writes only into the git repo you picked and, when you connect a project, two keys of its `.claude/settings.json`. It changes or removes only files it wrote there itself (removals go to the Trash), never writes a token, and never runs git or Claude Code.
 
-What it doesn't do: it doesn't run, update or sign in to Claude Code, and it doesn't sync settings between machines. It works on the config folder and `~/.claude.json`; the only files it writes elsewhere are Team mode's, in the places you pick. If you only change a setting now and then, Claude Code's own `/config` and `/permissions` commands are enough.
+What it doesn't do: it doesn't run, update or sign in to Claude Code, and it doesn't sync settings between machines. It works on the config folder and `~/.claude.json`; the only files it writes elsewhere are Team mode's, in the places you pick, and a project's rule file when you remove a rule from it. If you only change a setting now and then, Claude Code's own `/config` and `/permissions` commands are enough.
 
 At launch Claudock downloads Anthropic's public settings docs (code.claude.com) and the Claude Code JSON schema to power the JSON editor's suggestions. It asks json.schemastore.org and the schema's GitHub mirror (raw.githubusercontent.com) at the same time and uses whichever answers first. It downloads Anthropic's public pricing page (platform.claude.com) and Claude Code's model configuration page for the model list in Settings and the prices on the share card. It also asks api.github.com for the latest Claudock release, to tell you when there's a newer one. It sends nothing about your config. `CLAUDOCK_OFFLINE=1` turns all of this off.
 
@@ -103,7 +104,7 @@ Either way the app reads and writes `~/.claude`, or the folder in `CLAUDE_CONFIG
 
 ## Status
 
-Beta (v0.3.0), actively maintained. Bug reports are welcome in [Issues](https://github.com/behkha/claudock/issues).
+Beta (v0.4.0), actively maintained. Bug reports are welcome in [Issues](https://github.com/behkha/claudock/issues).
 
 ## License
 

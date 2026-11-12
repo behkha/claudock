@@ -1,17 +1,15 @@
 Claudock is an unofficial desktop app for your Claude Code setup: settings, hooks, skills, MCP servers, memory and sessions in one window, without hand-editing the files in `~/.claude`.
 
-## What's new in 0.3.0
+## What's new in 0.4.0
 
-- **Team.** Share one Claude Code setup with your team. Tick the skills, agents, commands, hooks and MCP servers the team should have, and Claudock writes them as a Claude Code plugin and marketplace into a git repo folder you pick. Teammates install it with one command and need only Claude Code, which then keeps them up to date by itself. Claudock never runs git and never sends anything: you commit and push.
-- **A check before anything is written.** A token in an MCP server's settings, or a hook that runs a script from your home folder, stops the write until it is fixed. The token becomes a question each teammate answers once (or a variable), and the script is copied into the plugin. Every file is then listed before the one button that writes them.
-- **Changes from both sides.** The repo is the source. Team shows what changed in your folder, in the repo, or in both, and can take the repo's version of a skill, agent or command into your own folder, with a snapshot in Backups.
-- **Connect a project.** Two keys in a project's `.claude/settings.json` point it at the team's marketplace. Disconnect takes them out again and leaves the rest of the file as it was.
-- **What an update changed.** On a teammate's side, Team shows what the last update added, changed and removed, and what the shared setup adds to every session in approximate tokens.
-- **Every limit Claude Code reports.** The menu bar, the popover, Today and the alerts show each limit window Claude Code sends, not only the 5-hour and weekly ones.
-- **Models and prices from their source.** The model list in Settings and the prices on the week card are read from Anthropic's own pages at launch, with a bundled copy for offline. Settings also offers the model ids found in your own transcripts.
-- **Easier to read and to use from the keyboard.** Darker secondary text, quieter rows for things that are off, a sidebar that keeps the open screen in view, larger hit areas, and names and roles for screen readers in the diff view, the profile menu, the Context table and the popover.
+- **How large each session is.** Every running Claude Code session shows the context it carries, on Today and in the menu bar popover, in tokens as Claude Code recorded them. A session that large re-reads all of it on every turn, which is where a weekly limit goes. It works for sessions in the Claude desktop app too, and it is never a "% full": Claudock does not know the model's window.
+- **A size you pick, and one alert.** In the popover's alert settings, "A session's context reaches" offers 150k, 300k, 500k and 750k, each saying about how many times a day it would have alerted in your own last 14 days. Once you pick one, each row gets a thin bar that fills toward it, and Claudock alerts once when a session passes it. It is ready again after the session falls below half of it. Off until you choose.
+- **Every rule your projects saved.** Answering a permission prompt with "don't ask again" makes Claude Code save the whole command as a rule inside the project. Permissions › Projects lists every such rule across the projects Claude Code knows, in one table.
+- **Secrets in saved rules, flagged.** If the command carried a password or a token, the rule does too. Those rules are flagged and listed first, with the secret covered. The sheet says which file holds the rule and whether git tracks or ignores that file, and **Remove rule** takes that one rule out of the file after a snapshot you can restore from Backups. **Not a secret** clears a flag for that exact rule.
+- **Rules that run any script.** A filter finds the rules that let Claude run any Python, Node or shell script. They are choices you made, so they are never flagged.
+- **A chip, and an alert you switch on.** Today shows how many rules are waiting for a look, and so does Permissions in the sidebar. "A saved rule holds a secret" in the alert settings alerts when a new one appears. Off until you turn it on.
 
-CLAUDE.md, rules, model, permissions and environment variables stay yours: a Claude Code plugin cannot carry them, and Team says so on each.
+Removing the rule does not change the secret: change it where it was issued. Claudock covers a secret before showing it, never copies it and never sends it anywhere. To read the git line it runs two read-only git commands on the rule file and no other.
 
 ## Download
 
@@ -36,4 +34,4 @@ xattr -dr com.apple.quarantine /Applications/Claudock.app
 
 **Linux.** For the AppImage: `chmod +x Claudock-*.AppImage`, then run it. For the `.deb`: `sudo apt install ./Claudock-*.deb`.
 
-Claudock reads and writes `~/.claude` (or `CLAUDE_CONFIG_DIR`). It saves a snapshot of every file before changing it, and you can restore it from **Backups**. Team also writes into the team folder you pick and two keys in a connected project's `.claude/settings.json`, and nowhere else.
+Claudock reads and writes `~/.claude` (or `CLAUDE_CONFIG_DIR`). It saves a snapshot of every file before changing it, and you can restore it from **Backups**. Team also writes into the team folder you pick and two keys in a connected project's `.claude/settings.json`, and Permissions › Projects takes a rule out of a project's `.claude/settings.json` or `settings.local.json` when you remove it there. Nowhere else.
