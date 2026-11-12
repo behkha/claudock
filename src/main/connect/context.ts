@@ -70,3 +70,77 @@ export function startedIn(text: string): number | null {
   }
   return null
 }
+
+/* ------------------------------------------------------------------ how often a line would have alerted */
+
+/** A reply at which a session's context reached a line. */
+export interface Crossing {
+  t: number
+  key: string
+}
+
+/**
+ * Each time the context in `rs` (one session, in order) reaches `line`: the first reply at or over it, and again only
+ * after a reply under half of it. The same rule as the alert, without a starting point: this counts what happened.
+ */
+export function crossings(rs: readonly ContextReading[], line: number): Crossing[] {
+  const out: Crossing[] = []
+  let armed = true
+  for (const r of rs) {
+    if (r.context < line / 2) armed = true
+    if (armed && r.context >= line) {
+      armed = false
+      out.push({ t: r.t, key: r.key })
+    }
+  }
+  return out
+}
+
+/** A local day, as a key. */
+export const dayKey = (ms: number): string => {
+  const d = new Date(ms)
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`
+}
+
+/** One transcript, as the stats keep it: the days it has replies on and its crossings per line. */
+export interface TranscriptCrossings {
+  days: string[]
+  byLine: Record<number, Crossing[]>
+}
+
+/** What one transcript adds to the stats, counting only replies from `since` on (earlier ones still set the state). */
+export function transcriptCrossings(rs: readonly ContextReading[], lines: readonly number[], since: number): TranscriptCrossings {
+  const days = new Set<string>()
+  for (const r of rs) if (r.t >= since) days.add(dayKey(r.t))
+  return { days: [...days], byLine: Object.fromEntries(lines.map((l) => [l, crossings(rs, l).filter((c) => c.t >= since)])) }
+}
+
+/** Fewer days with sessions than this say nothing about a usual day. */
+export const MIN_STAT_DAYS = 3
+
+/**
+ * For each line, the median number of crossings a day over the days that had sessions; null with fewer than
+ * `MIN_STAT_DAYS` such days. A reply repeated in another file (a resumed session) counts once.
+ */
+export function crossingsPerDay(files: Iterable<TranscriptCrossings>, lines: readonly number[]): { line: number; perDay: number | null }[] {
+  const days = new Set<string>()
+  const counts = new Map(lines.map((l) => [l, new Map<string, number>()]))
+  const seen = new Map(lines.map((l) => [l, new Set<string>()]))
+  for (const f of files) {
+    for (const d of f.days) days.add(d)
+    for (const l of lines) {
+      for (const c of f.byLine[l] ?? []) {
+        if (c.key && seen.get(l)!.has(c.key)) continue
+        if (c.key) seen.get(l)!.add(c.key)
+        const perDay = counts.get(l)!
+        perDay.set(dayKey(c.t), (perDay.get(dayKey(c.t)) ?? 0) + 1)
+      }
+    }
+  }
+  return lines.map((line) => {
+    if (days.size < MIN_STAT_DAYS) return { line, perDay: null }
+    const sorted = [...days].map((d) => counts.get(line)!.get(d) ?? 0).sort((a, b) => a - b)
+    const mid = sorted.length >> 1
+    return { line, perDay: sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2 }
+  })
+}

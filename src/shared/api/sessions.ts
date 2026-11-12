@@ -80,6 +80,16 @@ export interface AlertPrefs {
 /** The sizes offered for `AlertPrefs.contextLine`. */
 export const CONTEXT_LINES: readonly number[] = [150_000, 300_000, 500_000, 750_000]
 
+/**
+ * How often each offered line would have alerted: for each of `CONTEXT_LINES`, the median number of times a day a
+ * session's context reached it over the last 14 days of the open profile's transcripts (the main conversations; a
+ * session counts again only after falling below half the line). `perDay` is null with fewer than 3 days of sessions.
+ * From the user's own transcripts; nothing is estimated.
+ */
+export interface ContextLineStats {
+  lines: { line: number; perDay: number | null }[]
+}
+
 export interface SessionsApi {
   get(): Promise<SessionsState>
   /** Bring the session's terminal app forward (macOS, when known), else Claudock's own window. */
@@ -87,6 +97,8 @@ export interface SessionsApi {
   alertPrefs(): Promise<AlertPrefs>
   /** Change some alert settings; returns all of them. */
   setAlertPrefs(patch: Partial<AlertPrefs>): Promise<AlertPrefs>
+  /** "About n a day" beside each choice of "A session's context reaches". */
+  contextLineStats(): Promise<ContextLineStats>
 }
 
 export interface SessionsEvents {

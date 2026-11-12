@@ -4,6 +4,8 @@ import fsp from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { SCREENS, type ScreenId } from '@shared/nav'
+import { CONTEXT_LINES } from '@shared/api/sessions'
+import { formatTokens } from '@shared/limits'
 import { formatRange } from '@shared/wrapped'
 import { app } from 'electron'
 import { connectDir, folderKey } from './connect/folder'
@@ -11,10 +13,10 @@ import { archiveRootOf, list as archiveList, markdownOf, search as archiveSearch
 import { listContext } from './domains/context'
 import { impl as team } from './domains/team'
 import { GROUP_MS, isPaused } from './connect/sessionModel'
-import { postedAlerts } from './alerts'
+import { postedAlertTexts, postedAlerts } from './alerts'
 import { transcriptUsage } from './domains/limits'
 import { checkRecaps, openRecap, weekIn } from './domains/overviewShare'
-import { alertPrefs, currentAlertPrefs, setAlertPrefs } from './domains/sessions'
+import { alertPrefs, contextLineStats, currentAlertPrefs, setAlertPrefs } from './domains/sessions'
 import { popoverForShots } from './menubar'
 import { countHooks } from './domains/settings'
 import { emit } from './ipcx'
@@ -46,7 +48,7 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
     console.log(`RENDERER_GONE ${details.reason}`)
   })
 
-  const { js, jsOn, settle, click, waitFor, playStatusLine, hookSteps, playSessions } = driver(win)
+  const { js, jsOn, settle, click, waitFor, playStatusLine, playHook, hookSteps, playSessions } = driver(win)
 
   /**
    * Capture and save `<theme>-<what>.png`. A pixel near the bottom-right corner must match the background the DOM has
@@ -207,9 +209,12 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
 
   /**
    * The menu bar popover, on the fixture: connect, one status line run and three sessions -> the popover with the
-   * waiting session first and both limits (shot `menubar`) -> its settings view (shot `menubar-settings`). In light
-   * only, the limit alert at 80%: a reading of 85% posts exactly one alert, a second one at 90% none. Then Disconnect,
-   * with settings.json byte for byte as before. The popover is never shown; it is captured like the main window.
+   * waiting session first, each row's context size and both limits (shot `menubar`) -> a line at 500k, the bars in the
+   * popover and on Today (shots `menubar-line`, `connected-line`) -> its settings view, where each size offered says
+   * how often it would have alerted (shot `menubar-settings`). In light only, the limit alert at 80%: a reading of 85%
+   * posts exactly one alert, a second one at 90% none; and the context alert at 500k: the working session's transcript
+   * grows to 507k and then 520k, which posts exactly one alert (the session already over the line posts none). Then
+   * Disconnect, with settings.json byte for byte as before. The popover is never shown; it is captured like the main window.
    */
   async function menubarFlow(theme: 'light' | 'dark'): Promise<void> {
     const file = path.join(configDir(), 'settings.json')
@@ -220,7 +225,8 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
     await waitFor(`!document.querySelector('dialog[open]') && [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Disconnect')`, 'the connection')
     await js(`document.querySelectorAll('.toast__close').forEach((b) => b.click())`)
     await playStatusLine()
-    const [a] = await playSessions(await hookSteps())
+    const steps = await hookSteps()
+    const [a, b] = await playSessions(steps)
     const pop = await popoverForShots()
     const inPop = (code: string): Promise<unknown> => jsOn(pop, code)
     const waitPop = (cond: string, what: string): Promise<unknown> =>
@@ -249,7 +255,34 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
       await setAlertPrefs({ contextLine: line })
     }
     await inPop(`document.querySelector('[aria-label="Alert settings"]').click()`)
-    await waitPop(`document.querySelector('.pop__back') && document.querySelectorAll('.pop__row').length >= 5`, 'the settings view')
+    await waitPop(`document.querySelector('.pop__back') && document.querySelectorAll('.pop__row').length >= 6`, 'the settings view')
+    // "A session's context reaches": the closed control reads the size alone; the list, as it opens, adds how often each
+    // size would have alerted in this profile's own last 14 days
+    const stats = await contextLineStats()
+    const want = ['Off', ...CONTEXT_LINES.map((l) => { const n = stats.lines.find((x) => x.line === l)?.perDay; return n == null ? formatTokens(l) : `${formatTokens(l)} · about ${Math.round(n)} a day` })]
+    if (!want.some((t) => t.includes('about'))) throw new Error('menubar: the fixture has too few days of sessions for "about n a day"')
+    const select = `[...document.querySelectorAll('.pop__row')].find((r) => r.textContent.startsWith("A session's context reaches"))?.querySelector('select')`
+    const listed = await jsOn<{ open: string[]; closed: string[] }>(
+      pop,
+      `(async () => {
+        const texts = (sel) => [...sel.options].map((o) => o.textContent)
+        const t = Date.now()
+        while (Date.now() - t < 15000) {
+          const sel = ${select}
+          if (sel) {
+            sel.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+            const open = texts(sel)
+            sel.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
+            await new Promise((r) => setTimeout(r, 50))
+            if (open.some((x) => x.includes('about'))) return { open, closed: texts(sel) }
+          }
+          await new Promise((r) => setTimeout(r, 100))
+        }
+        throw new Error('menubar: the size choices never said how often they would have alerted')
+      })()`
+    )
+    if (JSON.stringify(listed.open) !== JSON.stringify(want)) throw new Error(`menubar: the size choices read ${JSON.stringify(listed.open)}, not ${JSON.stringify(want)}`)
+    if (JSON.stringify(listed.closed) !== JSON.stringify(['Off', ...CONTEXT_LINES.map(formatTokens)])) throw new Error(`menubar: the closed size control reads ${JSON.stringify(listed.closed)}`)
     await shoot(theme, 'menubar-settings', pop)
     await inPop(`document.querySelector('.pop__back').click()`)
     if (theme === 'light') {
@@ -268,6 +301,47 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
       }
       const posted = postedAlerts().slice(alerts).filter((t) => t.includes('limit'))
       if (posted.length !== 1 || posted[0] !== '5-hour limit at 85%') throw new Error(`menubar: expected one alert "5-hour limit at 85%", got ${JSON.stringify(posted)}`)
+
+      // the context alert, on the shot's own copy: with the line at 500k the waiting session (726k) is where it starts;
+      // the working one's transcript grows to 507k (one alert) and on to 520k (no second one)
+      if (process.env.CLAUDOCK_READONLY !== '1' && configDir().includes(`${path.sep}.shots${path.sep}.tmp-`)) {
+        const transcript = path.join(configDir(), 'projects', b.cwd.replace(/[^A-Za-z0-9]/g, '-'), `${b.id}.jsonl`)
+        const bytes = await fsp.readFile(transcript)
+        const { atime, mtime } = await fsp.stat(transcript)
+        const last = bytes.toString('utf8').split('\n').findLast((l) => l.includes('"type":"assistant"') && l.includes('"usage"'))
+        if (!last) throw new Error("menubar: the working session's transcript has no reply")
+        const tool = (): Promise<void> => playHook(steps.get('tool') as string, { session_id: b.id, cwd: b.cwd, transcript_path: '', permission_mode: 'default', hook_event_name: 'PostToolUse', tool_name: 'Read', tool_response: {} })
+        const grow = async (context: number, n: number): Promise<void> => {
+          const line = JSON.parse(last) as { message: { id: string; usage: Record<string, number> }; requestId: string; uuid: string; timestamp: string }
+          line.message.id = `msg_shot_context_${n}`
+          line.requestId = `req_shot_context_${n}`
+          line.uuid = `00000000-0000-4000-8000-00000000000${n}`
+          line.timestamp = new Date().toISOString()
+          line.message.usage = { ...line.message.usage, input_tokens: 10, cache_creation_input_tokens: 1990, cache_read_input_tokens: context - 2000 }
+          await fsp.appendFile(transcript, JSON.stringify(line) + '\n')
+          await tool()
+          await waitFor(`${SIZES} === '726k ${formatTokens(context)} 182k'`, `the working session at ${formatTokens(context)}`)
+          await sleep(500)
+        }
+        const title = await js<string>(`document.querySelector('.cc__row--working .cc__name').firstChild.textContent`)
+        const before = postedAlertTexts().length
+        await setAlertPrefs({ contextLine: 500_000 })
+        try {
+          await sleep(300)
+          await grow(507_000, 1)
+          await grow(520_000, 2)
+        } finally {
+          await setAlertPrefs({ contextLine: was.contextLine })
+          await fsp.writeFile(transcript, bytes)
+          await fsp.utimes(transcript, atime, mtime)
+          await tool()
+        }
+        await waitFor(`${SIZES} === '726k 265k 182k'`, 'the working session back at 265k')
+        const said = postedAlertTexts().slice(before).filter((t) => t.title.includes('context'))
+        if (said.length !== 1 || said[0].title !== `${title} is at 500k context` || !new RegExp(`^${path.basename(b.cwd)} · .+ in$`).test(said[0].body)) {
+          throw new Error(`menubar: expected one alert "${title} is at 500k context", got ${JSON.stringify(said)}`)
+        }
+      }
     }
     await click('Disconnect')
     await waitFor(`document.querySelector('dialog[open] .diff')`, 'the Disconnect dialog')

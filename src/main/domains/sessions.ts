@@ -3,9 +3,10 @@ import { execFile } from 'node:child_process'
 import fs from 'node:fs'
 import fsp from 'node:fs/promises'
 import path from 'node:path'
-import type { AlertPrefs, HooksStatus, LiveSession, SessionsApi, SessionsState } from '@shared/api/sessions'
+import readline from 'node:readline'
+import { CONTEXT_LINES, type AlertPrefs, type ContextLineStats, type HooksStatus, type LiveSession, type SessionsApi, type SessionsState } from '@shared/api/sessions'
 import { connectDir, connectDirFor, connectSerial, folderKey, removeOwn, writeOwn } from '../connect/folder'
-import { contextIn, startedIn } from '../connect/context'
+import { contextIn, crossingsPerDay, readingOf, startedIn, transcriptCrossings, type ContextReading, type TranscriptCrossings } from '../connect/context'
 import { HOOKS, hookCommand, hookEntry, hookScript } from '../connect/hookScript'
 import { AlertRule, SESSION_FILE_RE, applyLines, isGone, normalizeAlertPrefs, sortLive, toLiveSessions, transitions, type SessionFold } from '../connect/sessionModel'
 import { hasHooks, type HookGroup } from '../connect/settingsHooks'
@@ -456,8 +457,81 @@ export async function setAlertPrefs(patch: Partial<AlertPrefs>): Promise<AlertPr
   return prefs
 }
 
+/* ------------------------------------------------------------------ how often each line would have alerted */
+
+const STATS_MS = 14 * 86_400_000
+/** Transcripts read at once for the stats. */
+const STATS_AT_ONCE = 4
+/** Per profile folder: each main transcript's crossings, kept while the file's size and time stay the same. */
+const statFiles = new Map<string, Map<string, { size: number; mtimeMs: number; found: TranscriptCrossings }>>()
+const statRuns = new Map<string, Promise<ContextLineStats>>()
+
+/** Every reply's context in one transcript, in order, each message once. Only lines that can hold usage are parsed. */
+async function readingsOf(abs: string): Promise<ContextReading[]> {
+  const out: ContextReading[] = []
+  const rl = readline.createInterface({ input: fs.createReadStream(abs, { encoding: 'utf8' }), crlfDelay: Infinity })
+  for await (const line of rl) {
+    const r = readingOf(line)
+    if (!r || !Number.isFinite(r.t)) continue
+    const last = out[out.length - 1]
+    if (last && r.key && last.key === r.key) out[out.length - 1] = r
+    else out.push(r)
+  }
+  return out
+}
+
+/**
+ * "About n a day" for each line offered, from the open profile's main transcripts changed in the last 14 days
+ * (projects/<project>/<session>.jsonl; sub-agents have their own context and are left out). A file is read once and
+ * again only when it changed; calls made while a read runs share it.
+ */
+export function contextLineStats(): Promise<ContextLineStats> {
+  const dir = configDir()
+  const k = folderKey(dir)
+  let run = statRuns.get(k)
+  if (!run) {
+    run = readStats(dir, k).finally(() => statRuns.delete(k))
+    statRuns.set(k, run)
+  }
+  return run
+}
+
+async function readStats(dir: string, k: string): Promise<ContextLineStats> {
+  const since = Date.now() - STATS_MS
+  let files = statFiles.get(k)
+  if (!files) statFiles.set(k, (files = new Map()))
+  const root = path.join(dir, 'projects')
+  const found: { abs: string; size: number; mtimeMs: number }[] = []
+  for (const p of await fsp.readdir(root, { withFileTypes: true }).catch(() => [])) {
+    if (!p.isDirectory()) continue
+    for (const f of await fsp.readdir(path.join(root, p.name), { withFileTypes: true }).catch(() => [])) {
+      if (!f.isFile() || !f.name.endsWith('.jsonl')) continue
+      const abs = path.join(root, p.name, f.name)
+      const st = await fsp.lstat(abs).catch(() => null)
+      if (st?.isFile() && st.mtimeMs >= since) found.push({ abs, size: st.size, mtimeMs: st.mtimeMs })
+    }
+  }
+  const live = new Set(found.map((f) => f.abs))
+  for (const abs of files.keys()) if (!live.has(abs)) files.delete(abs)
+  const queue = found.filter((f) => {
+    const had = files.get(f.abs)
+    return !had || had.size !== f.size || had.mtimeMs !== f.mtimeMs
+  })
+  const worker = async (): Promise<void> => {
+    for (let f = queue.shift(); f; f = queue.shift()) {
+      try {
+        files.set(f.abs, { size: f.size, mtimeMs: f.mtimeMs, found: transcriptCrossings(await readingsOf(f.abs), CONTEXT_LINES, since) })
+      } catch {
+        files.delete(f.abs)
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: STATS_AT_ONCE }, worker))
+  return { lines: crossingsPerDay([...files.values()].map((f) => f.found), CONTEXT_LINES) }
+}
+
 export function register(ipcMain: IpcMain): void {
-  const impl: SessionsApi = { get: currentSessions, show, alertPrefs, setAlertPrefs }
+  const impl: SessionsApi = { get: currentSessions, show, alertPrefs, setAlertPrefs, contextLineStats }
   defineDomain(ipcMain, 'sessions', impl)
   void ready()
   registered = true

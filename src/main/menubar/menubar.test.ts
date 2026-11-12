@@ -4,6 +4,7 @@ import type { LimitsState, LiveLimits } from '@shared/api/limits'
 import type { AlertPrefs, LiveSession, SessionsState } from '@shared/api/sessions'
 import { normalizeAlertPrefs } from '../connect/sessionModel.ts'
 import { glance } from './glance.ts'
+import { ContextAlertRule, runningFor } from './contextAlert.ts'
 import { LimitAlertRule } from './limitAlert.ts'
 import { autostartEntry, execArg, inNpxCache, launchAgent, unstablePath } from './loginFiles.ts'
 
@@ -167,6 +168,85 @@ test('limit alert: readings a minute or two apart in their reset time are the sa
   const r = new LimitAlertRule()
   r.update(reading(85, null, NOW + 2 * H), prefs(), NOW)
   assert.deepEqual(r.update(reading(86, null, NOW + 2 * H + 90_000), prefs(), NOW), [])
+})
+
+/* ------------------------------------------------------------------ context alert */
+
+const K = 1000
+const lined = (over: Partial<AlertPrefs> = {}): AlertPrefs => ({ ...normalizeAlertPrefs(undefined), contextLine: 500 * K, ...over })
+/** A running session carrying `context` tokens, begun 78 minutes ago. */
+const sized = (name: string, context: number | null, over: Partial<LiveSession> = {}): LiveSession => ({ ...session(name, 'working'), context, started: NOW - 78 * 60_000, ...over })
+
+test('context alert: the first reading is the starting point, then one alert when a session reaches the line', () => {
+  const r = new ContextAlertRule()
+  // already over the line when Claudock starts: no alert, now or as it grows
+  assert.deepEqual(r.update([sized('big', 726 * K), sized('web', 450 * K, { title: 'Migrate settings form' })], lined(), NOW), [])
+  assert.deepEqual(r.update([sized('big', 730 * K), sized('web', 480 * K, { title: 'Migrate settings form' })], lined(), NOW), [])
+  const a = r.update([sized('big', 731 * K), sized('web', 507 * K, { title: 'Migrate settings form' })], lined(), NOW)
+  assert.deepEqual(a, [{ title: 'Migrate settings form is at 500k context', body: 'web · 1 h 18 min in', id: 'web' }])
+  assert.deepEqual(r.update([sized('big', 731 * K), sized('web', 520 * K)], lined(), NOW), [])
+  // a session with no name of its own is called by its folder; exactly at the line counts
+  const b = new ContextAlertRule()
+  b.update([sized('docs', 499_999)], lined(), NOW)
+  assert.deepEqual(titles(b.update([sized('docs', 500 * K)], lined(), NOW)), ['docs is at 500k context'])
+})
+
+test('context alert: ready again only after the session falls below half the line', () => {
+  const r = new ContextAlertRule()
+  r.update([sized('web', 400 * K)], lined(), NOW)
+  assert.equal(r.update([sized('web', 510 * K)], lined(), NOW).length, 1)
+  // a dip that stays above half, then over again: quiet
+  assert.deepEqual(r.update([sized('web', 300 * K)], lined(), NOW), [])
+  assert.deepEqual(r.update([sized('web', 505 * K)], lined(), NOW), [])
+  // compacted to 96k (under 250k), and it grows past the line again
+  assert.deepEqual(r.update([sized('web', 96 * K)], lined(), NOW), [])
+  assert.equal(r.update([sized('web', 501 * K)], lined(), NOW).length, 1)
+  // a session over the line at the start is ready after falling below half too
+  const big = new ContextAlertRule()
+  big.update([sized('big', 726 * K)], lined(), NOW)
+  big.update([sized('big', 480 * K)], lined(), NOW)
+  assert.deepEqual(big.update([sized('big', 510 * K)], lined(), NOW), [])
+  big.update([sized('big', 96 * K)], lined(), NOW)
+  assert.equal(big.update([sized('big', 510 * K)], lined(), NOW).length, 1)
+})
+
+test('context alert: off and paused raise nothing; what was skipped stays skipped', () => {
+  const off = new ContextAlertRule()
+  off.update([sized('web', 400 * K)], lined({ contextLine: null }), NOW)
+  assert.deepEqual(off.update([sized('web', 900 * K)], lined({ contextLine: null }), NOW), [])
+  // the line is picked while the session is already over it: that is where it starts
+  assert.deepEqual(off.update([sized('web', 905 * K)], lined(), NOW), [])
+
+  const paused = new ContextAlertRule()
+  paused.update([sized('web', 400 * K)], lined({ pausedUntil: NOW + H }), NOW)
+  assert.deepEqual(paused.update([sized('web', 510 * K)], lined({ pausedUntil: NOW + H }), NOW), [])
+  assert.deepEqual(paused.update([sized('web', 520 * K)], lined(), NOW + 2 * H), [])
+})
+
+test('context alert: a session that is gone is forgotten, and one with no reply yet starts at its first reading', () => {
+  const r = new ContextAlertRule()
+  r.update([sized('web', 400 * K)], lined(), NOW)
+  r.update([], lined(), NOW)
+  // the same id again (a session resumed later): its first reading is a starting point, not a crossing
+  assert.deepEqual(r.update([sized('web', 510 * K)], lined(), NOW), [])
+  const fresh = new ContextAlertRule()
+  fresh.update([sized('new', null)], lined(), NOW)
+  assert.deepEqual(fresh.update([sized('new', 600 * K)], lined(), NOW), [])
+})
+
+test('context alert: with several profiles the body leads with the profile', () => {
+  const r = new ContextAlertRule()
+  r.update([sized('web', 400 * K, { profile: 'Work' }), sized('api', 100 * K, { profile: 'Default' })], lined(), NOW)
+  const a = r.update([sized('web', 507 * K, { profile: 'Work' }), sized('api', 100 * K, { profile: 'Default' })], lined(), NOW)
+  assert.deepEqual(a, [{ title: 'web is at 500k context', body: 'Work · web · 1 h 18 min in', id: 'web' }])
+})
+
+test('context alert: how long a session has run', () => {
+  assert.equal(runningFor(NOW - 3 * 60_000, NOW), '3 min in')
+  assert.equal(runningFor(NOW - 2 * H, NOW), '2 h in')
+  assert.equal(runningFor(NOW - 27 * H, NOW), '1 d 3 h in')
+  assert.equal(runningFor(NOW - 30_000, NOW), '')
+  assert.equal(runningFor(null, NOW), '')
 })
 
 /* ------------------------------------------------------------------ open at login */

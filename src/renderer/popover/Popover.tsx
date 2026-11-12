@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { ChevronLeft, Settings } from 'lucide-react'
 import type { MenubarState } from '@shared/api/menubar'
 import type { Glance } from '@shared/api/profiles'
-import type { AlertPrefs } from '@shared/api/sessions'
+import { CONTEXT_LINES, type AlertPrefs, type ContextLineStats } from '@shared/api/sessions'
 import { formatCount } from '@shared/format'
 import { LIMITS_STALE_MS, formatTokens, limitRows, limitsLine } from '@shared/limits'
 import { Button } from '@/components/Button'
@@ -25,6 +26,7 @@ const TICK_MS = 30_000
 const PAUSE_MS = 3_600_000
 const REMINDERS = [null, 5, 10, 15, 30]
 const LIMIT_LINES = [null, 70, 80, 90, 95]
+const SIZES = [null, ...CONTEXT_LINES]
 
 const time = (ms: number): string => new Date(ms).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
 
@@ -214,6 +216,13 @@ function SettingsView({
 }): JSX.Element {
   const back = useRef<HTMLButtonElement>(null)
   useEffect(() => back.current?.focus(), [])
+  // how often each size would have alerted, from the open profile's own last 14 days
+  const [stats, setStats] = useState<ContextLineStats>()
+  useEffect(() => void api.sessions.contextLineStats().then(setStats, () => undefined), [])
+  const aDay = (size: number): string | null => {
+    const n = stats?.lines.find((l) => l.line === size)?.perDay
+    return n == null ? null : `about ${Math.round(n)} a day`
+  }
   const open = glance?.profiles.find((p) => p.open)
   const sessionAlerts = open?.hooks !== 'unsupported'
   const limitAlerts = open?.limits.step !== 'unsupported'
@@ -236,9 +245,12 @@ function SettingsView({
           {limitAlerts ? (
             <>
               <Choice label="Limit reaches" value={prefs.limitPercent} choices={LIMIT_LINES} unit="%" onChange={(v) => onChange({ limitPercent: v })} />
-              <Switch label="Limit resets" checked={prefs.limitReset} onChange={(v) => onChange({ limitReset: v })} />
             </>
           ) : null}
+          {sessionAlerts ? (
+            <Choice label="A session's context reaches" value={prefs.contextLine} choices={SIZES} format={formatTokens} detail={aDay} onChange={(v) => onChange({ contextLine: v })} />
+          ) : null}
+          {limitAlerts ? <Switch label="Limit resets" checked={prefs.limitReset} onChange={(v) => onChange({ limitReset: v })} /> : null}
           <Switch label="Sound" checked={prefs.sound} onChange={(v) => onChange({ sound: v })} />
         </div>
       ) : null}
@@ -271,24 +283,59 @@ function Choice({
   label,
   value,
   choices,
-  unit,
+  unit = '',
+  format = (c) => `${c}${unit}`,
+  detail,
   onChange
 }: {
   label: string
   value: number | null
   choices: (number | null)[]
-  unit: string
+  unit?: string
+  /** How a choice reads: "80%", "500k". */
+  format?: (c: number) => string
+  /** More about a choice, shown in the open list only ("about 3 a day"); null = nothing known. */
+  detail?: (c: number) => string | null
   onChange: (v: number | null) => void
 }): JSX.Element {
   // a value set elsewhere (prefs.json) that isn't one of the choices is still shown
   const all = choices.includes(value) ? choices : [...choices, value]
+  // The list is the system's own, built from the options as they are when it opens: the details go in just before
+  // that and come out when a choice is made or the control is left, so the closed control reads "500k". Its width is
+  // held meanwhile, or the longer options would widen it under the open list.
+  const [listed, setListed] = useState(false)
+  const open = (el: HTMLSelectElement): void => {
+    if (!detail || listed) return
+    el.style.width = `${el.offsetWidth}px`
+    flushSync(() => setListed(true))
+  }
+  const close = (el: HTMLSelectElement): void => {
+    el.style.width = ''
+    setListed(false)
+  }
+  const text = (c: number): string => {
+    const more = listed ? detail?.(c) : null
+    return more ? `${format(c)} · ${more}` : format(c)
+  }
   return (
     <label className="pop__row">
       <span>{label}</span>
-      <select className="pop__select" value={value === null ? '' : String(value)} onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}>
+      <select
+        className="pop__select"
+        value={value === null ? '' : String(value)}
+        onMouseDown={(e) => open(e.currentTarget)}
+        onKeyDown={(e) => {
+          if ([' ', 'Enter', 'ArrowDown', 'ArrowUp'].includes(e.key)) open(e.currentTarget)
+        }}
+        onBlur={(e) => close(e.currentTarget)}
+        onChange={(e) => {
+          close(e.currentTarget)
+          onChange(e.target.value === '' ? null : Number(e.target.value))
+        }}
+      >
         {all.map((c) => (
           <option key={c ?? 'off'} value={c === null ? '' : String(c)}>
-            {c === null ? 'Off' : `${c}${unit}`}
+            {c === null ? 'Off' : text(c)}
           </option>
         ))}
       </select>

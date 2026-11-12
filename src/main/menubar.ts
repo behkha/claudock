@@ -4,9 +4,10 @@ import type { Glance as Profiles } from '@shared/api/profiles'
 import { isPaused } from './connect/sessionModel'
 import { postAlert } from './alerts'
 import { currentGlance, onGlanceChanged } from './domains/profiles'
-import { alertPrefs, currentAlertPrefs, setAlertPrefs } from './domains/sessions'
+import { alertPrefs, currentAlertPrefs, setAlertPrefs, show } from './domains/sessions'
 import { emit } from './ipcx'
 import { isOpenAtLogin, loginItemAvailable, openedAtLogin, setOpenAtLogin } from './loginItem'
+import { ContextAlertRule } from './menubar/contextAlert'
 import { glance, type Glance } from './menubar/glance'
 import { LimitAlertRule } from './menubar/limitAlert'
 import { loadPrefs, savePrefs } from './prefs'
@@ -21,7 +22,8 @@ import trayDot from '../../resources/trayDot.png?asset'
  * higher of the two limits, and while a session waits for you the mark turns clay with a dot (src/main/menubar/glance.ts).
  * Clicking it opens the popover, a small window drawn by src/renderer/popover; right-clicking it opens a short native
  * menu. Linux trays mostly show only a menu, so there the menu is all there is. The limit alerts run here too
- * (src/main/menubar/limitAlert.ts), on every new reading and once a minute, so a reset is noticed on time.
+ * (src/main/menubar/limitAlert.ts), on every new reading and once a minute, so a reset is noticed on time; and so does
+ * the context alert (src/main/menubar/contextAlert.ts), over every profile's running sessions.
  *
  * On macOS a template image follows the menu bar's own colour, including a light bar turned dark by the desktop
  * picture. A clay dot can't be a template, so while something waits the whole mark is drawn in clay, which reads on
@@ -49,6 +51,8 @@ let profiles: Profiles | undefined
 let last: Glance | null = null
 /** One limit alert rule per profile: each account has its own windows. */
 const rules = new Map<string, LimitAlertRule>()
+/** One context alert rule for every profile's sessions: a session id is its own. */
+const contextRule = new ContextAlertRule()
 
 const noop = (): void => undefined
 
@@ -207,6 +211,15 @@ function checkLimits(): void {
   }
 }
 
+/** A session whose context reached the line the user picked: the alert names it, and a click brings it forward. */
+function checkContext(): void {
+  if (!profiles) return
+  const prefs = currentAlertPrefs()
+  for (const a of contextRule.update(profiles.sessions, prefs, Date.now())) {
+    postAlert({ title: a.title, body: a.body }, { sound: prefs.sound, onClick: () => void show(a.id) })
+  }
+}
+
 /* ------------------------------------------------------------------ state */
 
 /** The menu bar item is shown (the pref, also in screenshot mode where no item is added). */
@@ -283,12 +296,14 @@ export async function startMenuBar(): Promise<void> {
     profiles = g
     render()
     checkLimits()
+    checkContext()
   }
   onGlanceChanged(update)
   void currentGlance().then(update, noop)
   setInterval(() => {
     render()
     checkLimits()
+    checkContext()
   }, TICK_MS)
   nativeTheme.on('updated', () => pop?.setBackgroundColor(background()))
   void menuBarState().then(() => changeListeners.forEach((cb) => cb()), noop)
