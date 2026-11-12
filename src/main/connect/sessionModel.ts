@@ -220,7 +220,9 @@ export function toLiveSessions(folds: readonly SessionFold[]): LiveSession[] {
         kind: f.status === 'waiting' ? (shownWait(f)?.kind ?? null) : null,
         tool: f.status === 'waiting' && shownWait(f)?.tool !== '?' ? (shownWait(f)?.tool ?? null) : null,
         message: f.status === 'waiting' ? (shownWait(f)?.message ?? null) : null,
-        activity: f.status === 'working' ? f.lastTool : null
+        activity: f.status === 'working' ? f.lastTool : null,
+        context: null,
+        started: null
       })
     )
   )
@@ -261,7 +263,7 @@ export function alertText(sessions: readonly LiveSession[], what: 'waiting' | 'r
   return { title, body: one ? waitText(sessions[0]) : list(names) }
 }
 
-export const DEFAULT_ALERT_PREFS: AlertPrefs = { pausedUntil: null, reminderMinutes: null, doneAlert: false, sound: false, limitPercent: null, limitReset: false }
+export const DEFAULT_ALERT_PREFS: AlertPrefs = { pausedUntil: null, reminderMinutes: null, doneAlert: false, sound: false, limitPercent: null, limitReset: false, contextLine: null }
 
 /** Alert prefs from untrusted input (prefs.json or the renderer), keeping `base` for anything missing or invalid. */
 export function normalizeAlertPrefs(raw: unknown, base: AlertPrefs = DEFAULT_ALERT_PREFS): AlertPrefs {
@@ -277,6 +279,9 @@ export function normalizeAlertPrefs(raw: unknown, base: AlertPrefs = DEFAULT_ALE
     out.limitPercent = r.limitPercent as number | null
   }
   if (typeof r.limitReset === 'boolean') out.limitReset = r.limitReset
+  if (r.contextLine === null || (typeof r.contextLine === 'number' && Number.isInteger(r.contextLine) && r.contextLine >= 1000 && r.contextLine <= 100_000_000)) {
+    out.contextLine = r.contextLine as number | null
+  }
   return out
 }
 

@@ -41,7 +41,9 @@ const session = (name: string, status: LiveSession['status']): LiveSession => ({
   activity: null,
   kind: status === 'waiting' ? 'permission' : null,
   tool: status === 'waiting' ? 'Bash' : null,
-  message: null
+  message: null,
+  context: null,
+  started: null
 })
 const sessions = (...list: LiveSession[]): SessionsState => ({ hooks: 'on', sessions: list, waiting: list.filter((s) => s.status === 'waiting').length })
 

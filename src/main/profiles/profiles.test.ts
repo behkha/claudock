@@ -88,6 +88,8 @@ const waiting = (name: string, profile?: string): LiveSession => ({
   kind: 'permission',
   tool: 'Bash',
   message: null,
+  context: null,
+  started: null,
   ...(profile ? { profile } : {})
 })
 

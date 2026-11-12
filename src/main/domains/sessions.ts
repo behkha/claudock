@@ -5,6 +5,7 @@ import fsp from 'node:fs/promises'
 import path from 'node:path'
 import type { AlertPrefs, HooksStatus, LiveSession, SessionsApi, SessionsState } from '@shared/api/sessions'
 import { connectDir, connectDirFor, connectSerial, folderKey, removeOwn, writeOwn } from '../connect/folder'
+import { contextIn, startedIn } from '../connect/context'
 import { HOOKS, hookCommand, hookEntry, hookScript } from '../connect/hookScript'
 import { AlertRule, SESSION_FILE_RE, applyLines, isGone, normalizeAlertPrefs, sortLive, toLiveSessions, transitions, type SessionFold } from '../connect/sessionModel'
 import { hasHooks, type HookGroup } from '../connect/settingsHooks'
@@ -24,6 +25,7 @@ import { findTranscript, ownSessionName, sessionTitle } from './projects'
  * Claude Code process has exited, and posts the "needs me" alert (the rule is `AlertRule` in
  * src/main/connect/sessionModel.ts; sessions already waiting at launch don't alert). Native notifications follow
  * Focus / Do Not Disturb by themselves. Sound, a reminder and a done alert are off unless prefs.json `alerts` says so.
+ * Each session also carries its context size, read from the end of its transcript (src/main/connect/context.ts).
  */
 
 const WIN = process.platform === 'win32'
@@ -94,6 +96,20 @@ async function readRange(abs: string, from: number, to: number): Promise<Buffer>
   }
 }
 
+/** A transcript's end is read this far back for its last reply, four times further each time none is found. */
+const CONTEXT_TAIL = 256 * 1024
+const CONTEXT_TAIL_MAX = 16 * 1024 * 1024
+const START_HEAD = 64 * 1024
+
+/** The context of the last reply in a transcript of `size` bytes, from its end: never the whole of a large file. */
+async function tailContext(abs: string, size: number): Promise<number | null> {
+  for (let bytes = CONTEXT_TAIL; ; bytes *= 4) {
+    const from = Math.max(0, size - bytes)
+    const found = contextIn((await readRange(abs, from, size)).toString('utf8'))
+    if (found !== null || from === 0 || bytes >= CONTEXT_TAIL_MAX) return found
+  }
+}
+
 /**
  * One profile's sessions: its settings.json says whether the hooks are in, and its connect folder holds what they wrote.
  * Every profile is watched at once, so the menu bar and the alerts cover them all; the window shows the open one's.
@@ -113,6 +129,10 @@ class Watch {
   private readonly reads = new Map<string, FileRead>()
   /** First prompts by session id: they never change, so each transcript's head is read once. */
   private readonly firstPrompts = new Map<string, string>()
+  /** Context by session id, with the transcript's size and time it was read at: a file that has not changed is not read again. */
+  private readonly contexts = new Map<string, { size: number; mtimeMs: number; value: number | null }>()
+  /** When each session began: its transcript's first line never changes. */
+  private readonly starts = new Map<string, number>()
   private watcher: fs.FSWatcher | null = null
   private watching = false
   private soon: NodeJS.Timeout | null = null
@@ -232,26 +252,49 @@ class Watch {
 
   /**
    * Each session's own name from its transcript (cached there), else its first prompt, so rows say which session, not
-   * only which folder.
+   * only which folder; and its context size and start from the same file.
    */
   private async withNames(list: LiveSession[]): Promise<LiveSession[]> {
     const ids = new Set(list.map((s) => s.id))
-    for (const id of this.firstPrompts.keys()) if (!ids.has(id)) this.firstPrompts.delete(id)
+    for (const m of [this.firstPrompts, this.contexts, this.starts]) for (const id of m.keys()) if (!ids.has(id)) m.delete(id)
     const root = path.join(this.dir, 'projects')
     return Promise.all(
       list.map(async (s) => {
         const abs = await findTranscript(s.id, s.cwd, root).catch(() => null)
-        if (!abs) return s
+        // a transcript that went away: the session keeps the size it had
+        if (!abs) return { ...s, context: this.contexts.get(s.id)?.value ?? null, started: this.starts.get(s.id) ?? null }
+        const sized = { ...s, ...(await this.measure(s.id, abs)) }
         const own = await ownSessionName(abs)
-        if (own) return { ...s, title: own }
+        if (own) return { ...sized, title: own }
         let first = this.firstPrompts.get(s.id)
         if (first === undefined) {
           first = await sessionTitle(abs)
           if (first) this.firstPrompts.set(s.id, first)
         }
-        return { ...s, title: first || null }
+        return { ...sized, title: first || null }
       })
     )
+  }
+
+  /** The session's context (its transcript's last reply) and when it began. A read that fails keeps the last value. */
+  private async measure(id: string, abs: string): Promise<{ context: number | null; started: number | null }> {
+    const had = this.contexts.get(id)
+    let context = had?.value ?? null
+    try {
+      const st = await fsp.stat(abs)
+      if (!had || had.size !== st.size || had.mtimeMs !== st.mtimeMs) {
+        // a transcript with no reply yet in what was read keeps what was known (a done session keeps its last value)
+        context = (await tailContext(abs, st.size)) ?? context
+        this.contexts.set(id, { size: st.size, mtimeMs: st.mtimeMs, value: context })
+      }
+      if (!this.starts.has(id)) {
+        const began = startedIn((await readRange(abs, 0, Math.min(st.size, START_HEAD))).toString('utf8'))
+        if (began !== null) this.starts.set(id, began)
+      }
+    } catch {
+      /* unreadable right now: what was known stays */
+    }
+    return { context, started: this.starts.get(id) ?? null }
   }
 
   /**
@@ -408,6 +451,8 @@ export async function setAlertPrefs(patch: Partial<AlertPrefs>): Promise<AlertPr
   await ready()
   prefs = normalizeAlertPrefs(patch, prefs)
   await savePrefs({ alerts: prefs })
+  // Today's rows draw their bar toward the line set in the popover
+  emit('sessions:alertPrefs', prefs)
   return prefs
 }
 

@@ -389,12 +389,14 @@ Short sentences. No emoji in commit messages.
         ]
       })
     let recentCount = 0
+    /** What a session carries before its first prompt. */
+    const START_CONTEXT = 73_000
 
     // the names Claude Code gives sessions (repeated custom-title and agent-name lines); every third session has none,
     // so its first prompt shows instead
     const names = ['Auth token refresh race', 'Rate limits for the public API', null, 'Billing module split', 'Idempotent webhook retries', null, 'Slow orders query']
     let named = 0
-    function recentSession(project: Project, endMs: number, { running = false, subagent = false, minStart }: { running?: boolean; subagent?: boolean; minStart: number }): string {
+    function recentSession(project: Project, endMs: number, { running = false, subagent = false, minStart, context }: { running?: boolean; subagent?: boolean; minStart: number; context?: number }): string {
       const sessionId = uuid()
       const model = modelFor()
       const idx = recentCount
@@ -405,7 +407,11 @@ Short sentences. No emoji in commit messages.
       const specs: Spec[] = [{ type: 'user', message: { role: 'user', content: pick(recentPrompts) }, extra: {}, gap: 0 }]
       for (let i = 0; i < n; i++) {
         const last = i === n - 1
-        const usage = shaped(usageAt(i, n, crStart, crEnd), { oneHour: true, fast, searches: i === 1 && idx % 3 === 0 ? 1 : 0 })
+        const drawn = usageAt(i, n, crStart, crEnd)
+        // a session with a set size grows to it reply by reply (no draws, so nothing else in the fixture moves): its
+        // last reply carries exactly `context` tokens of input, cache writes and cache reads
+        if (context) drawn.cache_read_input_tokens = Math.max(0, Math.round(START_CONTEXT + (context - START_CONTEXT) * (n > 1 ? i / (n - 1) : 1)) - drawn.input_tokens - drawn.cache_creation_input_tokens)
+        const usage = shaped(drawn, { oneHour: true, fast, searches: i === 1 && idx % 3 === 0 ? 1 : 0 })
         const blocks: Loose[] = []
         if (rnd() < 0.34) {
           if (rnd() < 0.4) blocks.push({ type: 'thinking', thinking: 'Working out where the change belongs.', signature: hex(32) })
@@ -448,10 +454,11 @@ Short sentences. No emoji in commit messages.
     }
 
     const plan = []
-    // last 5 hours: one running (last line ~2 minutes ago), three finished
-    plan.push({ end: now - 2 * MIN, running: true, minStart: now - 5 * HOUR + 5 * MIN })
-    plan.push({ end: now - int(25, 45) * MIN, subagent: true, minStart: now - 5 * HOUR + 5 * MIN })
-    plan.push({ end: now - int(80, 120) * MIN, minStart: now - 5 * HOUR + 5 * MIN })
+    // last 5 hours: one running (last line ~2 minutes ago), three finished. The three newest are the ones the hooks play
+    // as running (npm run fixture:hooks, npm run shot), so each carries a context size: one over 500k, two under
+    plan.push({ end: now - 2 * MIN, running: true, minStart: now - 5 * HOUR + 5 * MIN, context: 726_000 })
+    plan.push({ end: now - int(25, 45) * MIN, subagent: true, minStart: now - 5 * HOUR + 5 * MIN, context: 265_000 })
+    plan.push({ end: now - int(80, 120) * MIN, minStart: now - 5 * HOUR + 5 * MIN, context: 182_000 })
     plan.push({ end: now - int(190, 230) * MIN, minStart: now - 5 * HOUR + 5 * MIN })
     // earlier today, more than 5 hours ago; in the small hours there is no room, so they sit a few hours back
     const latest = now - 5 * HOUR - 15 * MIN

@@ -30,6 +30,13 @@ export interface LiveSession {
   message: string | null
   /** While working: the last tool it finished (subagents' included) and when, so the row moves as Claude works. */
   activity: { tool: string; at: number } | null
+  /**
+   * The context the session carries: the input and cached tokens of its latest reply, as Claude Code recorded them in
+   * the transcript (sub-agents not counted). Null until a reply is recorded. Tokens, never a share of a window.
+   */
+  context: number | null
+  /** When the session began (its transcript's first line), when known. */
+  started: number | null
   /** The profile's name, in lists that hold several profiles' sessions (the menu bar popover). */
   profile?: string
 }
@@ -63,7 +70,15 @@ export interface AlertPrefs {
   limitPercent: number | null
   /** Alert when a limit resets, only if Claude Code reported 100% in that window. Off by default. */
   limitReset: boolean
+  /**
+   * Alert once when a session's context reaches this many tokens, and draw each running row's bar toward it; null = off
+   * (the default). The rule is `ContextAlertRule` in src/main/menubar/contextAlert.ts.
+   */
+  contextLine: number | null
 }
+
+/** The sizes offered for `AlertPrefs.contextLine`. */
+export const CONTEXT_LINES: readonly number[] = [150_000, 300_000, 500_000, 750_000]
 
 export interface SessionsApi {
   get(): Promise<SessionsState>
@@ -77,4 +92,6 @@ export interface SessionsApi {
 export interface SessionsEvents {
   /** A session changed status, appeared or went away, or the hooks were added or removed. */
   'sessions:changed': SessionsState
+  /** The alert settings changed (from the menu bar popover, or a pause from the menu). */
+  'sessions:alertPrefs': AlertPrefs
 }
