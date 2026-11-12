@@ -75,6 +75,11 @@ export interface AlertPrefs {
    * (the default). The rule is `ContextAlertRule` in src/main/menubar/contextAlert.ts.
    */
   contextLine: number | null
+  /**
+   * Alert when a rule saved in a project starts holding a secret (the saved-rules check, Permissions › Projects). Off
+   * by default. The rule is `RuleAlertRule` in src/main/permissions/alert.ts.
+   */
+  ruleSecret: boolean
 }
 
 /** The sizes offered for `AlertPrefs.contextLine`. */

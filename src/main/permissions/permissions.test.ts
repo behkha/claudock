@@ -1,6 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { MASK, maskText, secretsInText } from '../../shared/secrets.ts'
+import { normalizeAlertPrefs } from '../connect/sessionModel.ts'
+import { RuleAlertRule } from './alert.ts'
 import { classifyRule, isBroad } from './classify.ts'
 import { gitArgs, gitStateOf } from './git.ts'
 import { buildRows, projectName, ruleId, rulesIn, type RuleFileRead } from './rows.ts'
@@ -237,4 +239,34 @@ test('a rule file shown in Backups has its secrets covered, in JSON and in text 
   const quoted = JSON.stringify({ permissions: { allow: ['Bash(mysql --password="fake pass words" shop)'] } })
   assert.equal(maskRuleFile(quoted).includes('fake pass words'), false)
   assert.equal(maskRuleFile(`{ broken "Bash(API_TOKEN=${GH} npm run sync)"`).includes(GH), false)
+})
+
+/* ------------------------------------------------------------------ the saved-rule alert */
+
+test('rule alert: what is on disk at the first read never alerts; a rule flagged later alerts once', () => {
+  const on = { ...normalizeAlertPrefs(undefined), ruleSecret: true }
+  const r = new RuleAlertRule()
+  const a = { id: 'a', projectName: 'shop-api' }
+  const b = { id: 'b', projectName: 'docs-site' }
+  assert.deepEqual(r.update([a], on, 1000), [])
+  assert.deepEqual(r.update([a], on, 2000), [])
+  assert.deepEqual(r.update([a, b], on, 3000), [{ title: 'A saved rule holds a secret', body: 'docs-site' }])
+  assert.deepEqual(r.update([a, b], on, 4000), [])
+  // removed and saved again, or marked "Not a secret" and flagged again: the same rule does not alert twice
+  assert.deepEqual(r.update([a], on, 5000), [])
+  assert.deepEqual(r.update([a, b], on, 6000), [])
+})
+
+test('rule alert: off by default, and nothing while paused; what was skipped stays skipped', () => {
+  const off = normalizeAlertPrefs(undefined)
+  assert.equal(off.ruleSecret, false)
+  const r = new RuleAlertRule()
+  r.update([], off, 1000)
+  assert.deepEqual(r.update([{ id: 'a', projectName: 'web' }], off, 2000), [])
+  // switched on afterwards: the rule that came while it was off is not news
+  const on = { ...off, ruleSecret: true }
+  assert.deepEqual(r.update([{ id: 'a', projectName: 'web' }], on, 3000), [])
+  assert.deepEqual(r.update([{ id: 'a', projectName: 'web' }, { id: 'b', projectName: 'web' }], { ...on, pausedUntil: 9000 }, 4000), [])
+  assert.deepEqual(r.update([{ id: 'a', projectName: 'web' }, { id: 'b', projectName: 'web' }], on, 10_000), [])
+  assert.equal(r.update([{ id: 'c', projectName: 'web' }], on, 11_000).length, 1)
 })

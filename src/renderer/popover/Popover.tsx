@@ -251,6 +251,7 @@ function SettingsView({
             <Choice label="A session's context reaches" value={prefs.contextLine} choices={SIZES} format={formatTokens} detail={aDay} onChange={(v) => onChange({ contextLine: v })} />
           ) : null}
           {limitAlerts ? <Switch label="Limit resets" checked={prefs.limitReset} onChange={(v) => onChange({ limitReset: v })} /> : null}
+          <Switch label="A saved rule holds a secret" checked={prefs.ruleSecret} onChange={(v) => onChange({ ruleSecret: v })} />
           <Switch label="Sound" checked={prefs.sound} onChange={(v) => onChange({ sound: v })} />
         </div>
       ) : null}

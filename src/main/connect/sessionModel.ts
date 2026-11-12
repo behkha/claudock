@@ -263,7 +263,7 @@ export function alertText(sessions: readonly LiveSession[], what: 'waiting' | 'r
   return { title, body: one ? waitText(sessions[0]) : list(names) }
 }
 
-export const DEFAULT_ALERT_PREFS: AlertPrefs = { pausedUntil: null, reminderMinutes: null, doneAlert: false, sound: false, limitPercent: null, limitReset: false, contextLine: null }
+export const DEFAULT_ALERT_PREFS: AlertPrefs = { pausedUntil: null, reminderMinutes: null, doneAlert: false, sound: false, limitPercent: null, limitReset: false, contextLine: null, ruleSecret: false }
 
 /** Alert prefs from untrusted input (prefs.json or the renderer), keeping `base` for anything missing or invalid. */
 export function normalizeAlertPrefs(raw: unknown, base: AlertPrefs = DEFAULT_ALERT_PREFS): AlertPrefs {
@@ -282,6 +282,7 @@ export function normalizeAlertPrefs(raw: unknown, base: AlertPrefs = DEFAULT_ALE
   if (r.contextLine === null || (typeof r.contextLine === 'number' && Number.isInteger(r.contextLine) && r.contextLine >= 1000 && r.contextLine <= 100_000_000)) {
     out.contextLine = r.contextLine as number | null
   }
+  if (typeof r.ruleSecret === 'boolean') out.ruleSecret = r.ruleSecret
   return out
 }
 

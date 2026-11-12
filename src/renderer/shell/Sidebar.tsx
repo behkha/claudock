@@ -28,6 +28,9 @@ export function Sidebar(): JSX.Element {
     refreshCounts()
   })
 
+  // the saved-rules check found a rule to check, or one fewer: Permissions shows how many
+  useEvent('permissions:rules', () => refreshCounts())
+
   // the open screen's item stays in view however you got there (the palette, a link on another screen): the list is
   // taller than the window at its default size
   const nav = useRef<HTMLElement>(null)

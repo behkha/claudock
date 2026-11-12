@@ -92,4 +92,7 @@ export interface PermissionsApi {
   setNotSecret(id: string, value: boolean): Promise<ProjectRules>
 }
 
-export interface PermissionsEvents {}
+export interface PermissionsEvents {
+  /** The number of rules to check changed (a rule file changed, a rule was removed or marked "Not a secret"). */
+  'permissions:rules': { toCheck: number }
+}

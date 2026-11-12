@@ -256,7 +256,7 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
       await setAlertPrefs({ contextLine: line })
     }
     await inPop(`document.querySelector('[aria-label="Alert settings"]').click()`)
-    await waitPop(`document.querySelector('.pop__back') && document.querySelectorAll('.pop__row').length >= 6`, 'the settings view')
+    await waitPop(`document.querySelector('.pop__back') && document.querySelectorAll('.pop__row').length >= 7 && [...document.querySelectorAll('.pop__row')].some((r) => r.textContent === 'A saved rule holds a secret' && r.querySelector('[role=switch]')?.getAttribute('aria-checked') === 'false')`, 'the settings view, the saved-rule alert off')
     // "A session's context reaches": the closed control reads the size alone; the list, as it opens, adds how often each
     // size would have alerted in this profile's own last 14 days
     const stats = await contextLineStats()
@@ -667,6 +667,46 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
     await waitFor(`${chip('To check')}.textContent === 'To check6' && ${rows} === 6`, 'the rule flagged again')
     if ((JSON.parse(await fsp.readFile(kept, 'utf8')) as { dismissed: string[] }).dismissed.length !== 0) throw new Error('rules: Undo left the rule marked')
     await waitFor(`!document.querySelector('.toast')`, 'the toast gone')
+
+    // Today's chip and the sidebar count, and the alert: off by default, so a rule saved now alerts nobody; switched
+    // on, a rule saved after that alerts exactly once, however often the files are read again
+    emit('system:navigate', { screen: 'today' })
+    const chipText = `[...document.querySelectorAll('.today__chip')].map((c) => c.textContent).find((t) => t.includes('to check'))`
+    const navCount = `[...document.querySelectorAll('.nav-item')].find((b) => b.querySelector('.nav-item__label')?.textContent === 'Permissions')?.querySelector('.nav-item__count')?.textContent`
+    await waitFor(`${chipText} === '6 rules to check' && ${navCount} === '6'`, "Today's chip and the sidebar count at 6")
+    await shoot(theme, 'today-rules')
+    const docsFile = path.join(os.homedir(), 'docs-site', '.claude', 'settings.local.json')
+    const docsBefore = await fsp.readFile(docsFile)
+    const docsTimes = await fsp.stat(docsFile)
+    const save = async (rule: string): Promise<void> => {
+      const o = JSON.parse(await fsp.readFile(docsFile, 'utf8')) as { permissions: { allow: string[] } }
+      o.permissions.allow.push(rule)
+      await fsp.writeFile(docsFile, JSON.stringify(o, null, 2) + '\n')
+      await projectRules()
+    }
+    const was = await alertPrefs()
+    const said = postedAlertTexts().length
+    try {
+      if (was.ruleSecret) throw new Error('rules: the alert is on by default')
+      // a rule that alerted once never alerts again, so each pass saves its own
+      await save(`Bash(STRIPE_SECRET_KEY=fake-stripe-key-${theme} npm run seed)`)
+      await waitFor(`${chipText} === '7 rules to check' && ${navCount} === '7'`, 'the chip and the count at 7')
+      await setAlertPrefs({ ruleSecret: true })
+      await save(`Bash(SENTRY_AUTH_TOKEN=fake-sentry-token-${theme} npm run release)`)
+      await projectRules()
+      await waitFor(`${chipText} === '8 rules to check'`, 'the chip at 8')
+    } finally {
+      await setAlertPrefs({ ruleSecret: was.ruleSecret })
+      await fsp.writeFile(docsFile, docsBefore)
+      await fsp.utimes(docsFile, docsTimes.atime, docsTimes.mtime)
+      await projectRules()
+    }
+    const posted = postedAlertTexts().slice(said)
+    if (JSON.stringify(posted) !== JSON.stringify([{ title: 'A saved rule holds a secret', body: 'docs-site' }])) throw new Error(`rules: expected one alert for the rule saved after the switch, got ${JSON.stringify(posted)}`)
+    await waitFor(`${chipText} === '6 rules to check'`, 'the chip back at 6')
+    // the chip opens Projects on To check
+    await js(`[...document.querySelectorAll('.today__chip')].find((c) => c.textContent.includes('to check')).click()`)
+    await waitFor(`${chip('To check')}?.getAttribute('aria-pressed') === 'true' && ${rows} === 6`, 'Projects on To check, from the chip')
 
     // no project with rules: the copy's global state file without its projects, then put back byte for byte
     const state = globalStateFile()

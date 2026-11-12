@@ -29,6 +29,11 @@ export default function TodayScreen({ selectId }: ScreenProps): JSX.Element {
   const today = useApi(() => api.today.get(), [])
   const wrapped = useApi(() => api.overview.wrapped(), [])
   const found = useFindings()
+  // rules saved in projects that hold a secret (Permissions › Projects › To check): a chip while there are any
+  const rules = useApi(() => api.permissions.projectRules(), [])
+  const [toCheck, setToCheck] = useState(0)
+  useEffect(() => setToCheck(rules.data?.toCheck ?? 0), [rules.data])
+  useEvent('permissions:rules', (p) => setToCheck(p.toCheck))
   /** The Share dialog, on a week (null: this one). */
   const [sharing, setSharing] = useState<{ week: string | null } | null>(null)
   const [live, setLive] = useState<Set<string>>(new Set())
@@ -80,6 +85,12 @@ export default function TodayScreen({ selectId }: ScreenProps): JSX.Element {
                 <button type="button" className="chip chip--button today__chip" onClick={() => navigate('storage')}>
                   <span className="today__chipdot" aria-hidden />
                   {look}
+                </button>
+              ) : null}
+              {toCheck > 0 ? (
+                <button type="button" className="chip chip--button today__chip" onClick={() => navigate('permissions', 'projects:to-check')}>
+                  <span className="today__chipdot" aria-hidden />
+                  {toCheck === 1 ? '1 rule to check' : `${formatCount(toCheck)} rules to check`}
                 </button>
               ) : null}
               <Button

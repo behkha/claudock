@@ -4,13 +4,17 @@ import path from 'node:path'
 import type { GitState, PermissionsApi, PermissionsData, ProjectRules, RuleFile, RuleList } from '@shared/api/permissions'
 import type { SettingsFileName } from '@shared/api/settings'
 import { folderKey } from '../connect/folder'
-import { defineDomain } from '../ipcx'
-import { configDir, globalStateFile, installKind, samePath, userDataDir } from '../paths'
+import { postAlert } from '../alerts'
+import { defineDomain, emit } from '../ipcx'
+import { configDir, globalStateFile, installKind, openConfigDir, samePath, userDataDir } from '../paths'
+import { RuleAlertRule } from '../permissions/alert'
 import { gitState } from '../permissions/git'
-import { RULE_FILES, buildRows, projectName, ruleId, rulesIn, type RuleFileRead, type SavedRule } from '../permissions/rows'
+import { RULE_FILES, buildRows, flagged, projectName, ruleId, rulesIn, type RuleFileRead, type SavedRule } from '../permissions/rows'
 import { removeRuleFromText } from '../permissions/ruleFile'
 import { snapshotOutside } from '../safeWrite'
 import { devAllowed, readText, writeOne, type WriteGuard } from '../team/write'
+import { mainWindow, showMainWindow } from '../windows'
+import { currentAlertPrefs } from './sessions'
 import { assertSettingsFile, isPlainObject, readSettingsObject, updateSettingsObject, type JsonObject } from './settings'
 
 /**
@@ -238,13 +242,14 @@ async function plainRuleFile(project: string, file: RuleFile): Promise<{ abs: st
  * hold rules. `dismissed`: the ids marked "Not a secret".
  */
 async function scanProjectRules(dismissed: ReadonlySet<string> = new Set()): Promise<ProjectRules> {
-  const scan = scanOf(configDir())
+  const dir = configDir()
+  const scan = scanOf(dir)
   const reads: RuleFileRead[] = []
   const seen = new Set<string>()
   let unreadable = 0
   for (const project of await knownProjects()) {
     // the home folder as a project: its .claude is this profile's own folder, which "This profile" already shows
-    if (samePath(path.join(project, '.claude'), configDir())) continue
+    if (samePath(path.join(project, '.claude'), dir)) continue
     for (const file of RULE_FILES) {
       const at = await plainRuleFile(project, file)
       if (!at || seen.has(at.abs)) continue
@@ -270,7 +275,45 @@ async function scanProjectRules(dismissed: ReadonlySet<string> = new Set()): Pro
   }
   for (const abs of scan.files.keys()) if (!seen.has(abs)) scan.files.delete(abs)
   scan.saved = new Map(reads.flatMap((f) => f.rules.map((rule) => [ruleId(f.projectPath, f.file, rule.list, rule.rule), { projectPath: f.projectPath, file: f.file, rule }] as const)))
-  return buildRows(reads, dismissed, unreadable)
+  const rows = buildRows(reads, dismissed, unreadable)
+  noteRules(dir, rows)
+  return rows
+}
+
+/* ------------------------------------------------------------------ the count and the alert */
+
+/** Per profile folder: the alert rule (its first read is the starting point) and the count last sent to the window. */
+const alertRules = new Map<string, RuleAlertRule>()
+const sentCounts = new Map<string, number>()
+const CHECK_MS = 60_000
+
+/** After every read of the rule files: tell the window when the number to check changed, and alert for a rule that is newly flagged. */
+function noteRules(dir: string, rows: ProjectRules): void {
+  const k = folderKey(dir)
+  let rule = alertRules.get(k)
+  if (!rule) alertRules.set(k, (rule = new RuleAlertRule()))
+  const prefs = currentAlertPrefs()
+  for (const a of rule.update(rows.rules.filter(flagged), prefs, Date.now())) postAlert(a, { sound: prefs.sound, onClick: openToCheck })
+  if (sentCounts.get(k) === rows.toCheck) return
+  sentCounts.set(k, rows.toCheck)
+  if (samePath(dir, openConfigDir())) emit('permissions:rules', { toCheck: rows.toCheck })
+}
+
+/** The alert was clicked: the window, on Permissions › Projects › To check. */
+function openToCheck(): void {
+  const had = mainWindow()
+  showMainWindow()
+  const w = mainWindow()
+  if (!w) return
+  const send = (): void => w.webContents.send('system:navigate', { screen: 'permissions', id: 'projects:to-check' })
+  if (had && !w.webContents.isLoading()) send()
+  else w.webContents.once('did-finish-load', send)
+}
+
+/** Sidebar count: the rules to check, when there are any. */
+export async function count(): Promise<number | undefined> {
+  const n = (await projectRules()).toCheck
+  return n > 0 ? n : undefined
 }
 
 /* ------------------------------------------------------------------ "Not a secret" */
@@ -383,4 +426,6 @@ export async function restoreRuleFile(folder: string, file: string, text: string
 
 export function register(ipcMain: IpcMain): void {
   defineDomain(ipcMain, 'permissions', impl)
+  // the saved-rules check, once a minute on the open profile: only files that changed are read again
+  setInterval(() => void projectRules().catch(() => undefined), CHECK_MS)
 }
