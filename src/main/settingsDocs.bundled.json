@@ -1,6 +1,6 @@
 {
  "format": 1,
- "builtAt": "2026-11-11T15:36:33.829Z",
+ "builtAt": "2026-11-12T12:09:41.108Z",
  "sources": [
   "https://code.claude.com/docs/en/settings-reference.md",
   "https://code.claude.com/docs/en/env-vars.md",
@@ -1705,6 +1705,28 @@
      {
       "value": false,
       "summary": "Remote Control stays available"
+     }
+    ]
+   },
+   "disableRemotePreviewScripts": {
+    "summary": "Turn off scripts in the desktop app's HTML previews in SSH and WSL sessions",
+    "typeText": "Boolean; only the JSON Boolean true takes effect",
+    "default": "unset, so the key has no effect",
+    "scope": "Managed",
+    "topic": "Remote, desktop, and notifications",
+    "url": "https://code.claude.com/docs/en/settings-reference#disableremotepreviewscripts",
+    "example": "{\n  \"disableRemotePreviewScripts\": true\n}",
+    "kinds": [
+     "boolean"
+    ],
+    "values": [
+     {
+      "value": true,
+      "summary": "HTML previews in SSH and WSL sessions don't run scripts"
+     },
+     {
+      "value": false,
+      "summary": "the key doesn't turn scripts off"
      }
     ]
    },
