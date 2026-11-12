@@ -1,9 +1,10 @@
 import type { ProjectRuleList } from '@shared/api/permissions'
-import { maskText, secretsInText } from '../../shared/secrets.ts'
+import { MASK, isCovered, maskText, secretSpans, secretsInText } from '../../shared/secrets.ts'
 
 /**
- * A rule file as text: taking one rule out of it without touching anything else, and covering the secrets in it before
- * it is shown. Pure, so `npm test` loads it as is.
+ * A rule file as text: taking one rule out of it without touching anything else, covering the secrets in it before it
+ * is stored as a snapshot or shown, and putting a covered snapshot back without losing a secret the file still holds.
+ * Pure, so `npm test` loads it as is.
  */
 
 /** Where one value of a JSON text is: `[start, end)`. */
@@ -19,15 +20,23 @@ interface ArrayAt {
   items: (Range & { value: string | null })[]
 }
 
+/** A string value in a JSON text (not a key): where it is, what it says, and the key it sits under (null inside a list). */
+interface StringAt extends Range {
+  value: string
+  key: string | null
+}
+
 class Scan {
   private i = 0
   /** The array at `want`, once found. */
   found: ArrayAt | null = null
+  /** Every string value, in order. */
+  readonly strings: StringAt[] = []
   private readonly text: string
   private readonly want: readonly string[]
 
   // plain fields, not parameter properties: Node's type stripping (npm test) can't run those
-  constructor(text: string, want: readonly string[]) {
+  constructor(text: string, want: readonly string[] = []) {
     this.text = text
     this.want = want
   }
@@ -58,7 +67,12 @@ class Scan {
   private value(path: readonly string[]): Range & { value: string | null } {
     const start = this.i
     const c = this.text[this.i]
-    if (c === '"') return this.string()
+    if (c === '"') {
+      const s = this.string()
+      const key = path[path.length - 1]
+      this.strings.push({ ...s, key: key === undefined || key === '#' ? null : key })
+      return s
+    }
     if (c === '{') {
       this.i++
       this.ws()
@@ -132,20 +146,74 @@ export function removeRuleFromText(text: string, list: ProjectRuleList, rule: st
   return out
 }
 
-/**
- * A rule file's text with every secret in it covered, for the diff in Backups: each string value is searched the way
- * a rule is, and the file is written out again with its own indentation. Text that is not JSON is covered as it stands.
- */
-export function maskRuleFile(text: string): string {
-  const cover = (s: string): string => maskText(s, secretsInText(s)).text
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(text.charCodeAt(0) === 0xfeff ? text.slice(1) : text)
-  } catch {
-    return cover(text)
+/** A string value of a rule file with its secrets covered: searched the way a rule is, and as a value under its key (`env`). */
+function coverValue(value: string, key: string | null): string {
+  if (isCovered(value)) return maskText(value, secretsInText(value)).text
+  const found = secretsInText(value)
+  if (found.length) return maskText(value, found).text
+  const spans = key === null ? [] : secretSpans(value, key, value.includes('://'))
+  let out = ''
+  let at = 0
+  for (const [s, e] of spans) {
+    out += value.slice(at, s) + MASK
+    at = e
   }
-  const walk = (v: unknown): unknown =>
-    typeof v === 'string' ? cover(v) : Array.isArray(v) ? v.map(walk) : typeof v === 'object' && v !== null ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, walk(x)])) : v
-  const indent = /\n([ \t]+)"/.exec(text)?.[1] ?? 2
-  return JSON.stringify(walk(parsed), null, indent) + (text.endsWith('\n') ? '\n' : '')
+  return out + value.slice(at)
+}
+
+/** Every string value of a JSON text, or null when it is not JSON. */
+function stringsOf(text: string): StringAt[] | null {
+  const scan = new Scan(text)
+  try {
+    scan.run()
+  } catch {
+    return null
+  }
+  return scan.strings
+}
+
+/**
+ * A rule file's text with every secret in it covered: what a snapshot stores and what Backups shows. Only the secrets
+ * change; every other byte stays (the keys, the indentation, the line ends), so a file with no secret is stored as it
+ * is. Covering covered text changes nothing. Text that is not JSON is covered as it stands.
+ */
+export function coverRuleFile(text: string): string {
+  const strings = stringsOf(text)
+  if (!strings) return maskText(text, secretsInText(text)).text
+  let out = text
+  for (let n = strings.length - 1; n >= 0; n--) {
+    const s = strings[n]
+    const covered = coverValue(s.value, s.key)
+    if (covered !== s.value) out = out.slice(0, s.start) + JSON.stringify(covered) + out.slice(s.end)
+  }
+  return out
+}
+
+/**
+ * The text to write when a covered snapshot is restored over `current` (null: the file is gone): the snapshot, with each
+ * covered value put back in full from the current file wherever the current file still holds a value that covers to the
+ * same text. So a secret the file still has is never replaced by dots. A value the file no longer holds (the rule that
+ * was removed for its secret) comes back covered: the secret itself was never stored. Throws when the snapshot holds
+ * covered values and the current file cannot be read as JSON to take them from.
+ */
+export function restoreCovered(snapshot: string, current: string | null): string {
+  if (!isCovered(snapshot)) return snapshot
+  const want = stringsOf(snapshot)
+  const have = current === null ? [] : stringsOf(current)
+  if (!want || !have) throw new Error('This snapshot holds covered secrets, and the file as it is now cannot be read as JSON to keep its own, so Claudock will not restore over it.')
+  // the current file's values that hold a secret, by what they look like covered; the same covered text twice is taken in order
+  const pool = new Map<string, string[]>()
+  for (const s of have) {
+    const covered = coverValue(s.value, s.key)
+    if (covered === s.value) continue
+    pool.set(covered, [...(pool.get(covered) ?? []), (current as string).slice(s.start, s.end)])
+  }
+  const puts: { at: StringAt; raw: string }[] = []
+  for (const s of want) {
+    const raw = isCovered(s.value) ? pool.get(s.value)?.shift() : undefined
+    if (raw !== undefined) puts.push({ at: s, raw })
+  }
+  let out = snapshot
+  for (const p of puts.reverse()) out = out.slice(0, p.at.start) + p.raw + out.slice(p.at.end)
+  return out
 }

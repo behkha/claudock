@@ -607,8 +607,9 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
    * invented secret, each covered (`permissions-projects`), "Runs any script" (`permissions-broad`), "All"
    * (`permissions-all`), the sheet of a flagged rule in the ignored file (`permissions-sheet`) and in the tracked one
    * (`permissions-sheet-tracked`), and no project with rules (`permissions-empty`). Remove rule must take exactly its own
-   * line out of the file and leave a snapshot that Backups names by the file's real path, shows with the token covered
-   * (`backups-rule`) and restores byte for byte; Not a secret must keep the rule's id only and leave the file alone, and
+   * line out of the file and leave a snapshot that holds no secret in full, which Backups names by the file's real path,
+   * shows with the token covered (`backups-rule`) and restores byte for byte except that the removed token comes back
+   * covered (the file's other secrets stay in full); Not a secret must keep the rule's id only and leave the file alone, and
    * Undo flags it again. Fails if a fixture secret reaches the window, in the rows the main process sends or in the page's text.
    */
   async function rulesFlow(theme: 'light' | 'dark'): Promise<void> {
@@ -656,6 +657,12 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
     await click('Remove rule', dialog)
     await waitFor(`!${dialog} && ${chip('To check')}.textContent === 'To check5' && ${rows} === 23`, 'the rule removed')
     if ((await fsp.readFile(ruleFile, 'utf8')) !== fileBefore.replace(`${line}\n`, '')) throw new Error('rules: Remove rule changed more than its own line')
+    // the snapshot it took holds the file with every secret covered: no fixture secret anywhere in Claudock's snapshots
+    const snapshots = path.join(userDataDir(), 'snapshots')
+    for (const rel of await fsp.readdir(snapshots, { recursive: true })) {
+      const abs = path.join(snapshots, String(rel))
+      if ((await fsp.stat(abs)).isFile() && SECRETS.test(await fsp.readFile(abs, 'utf8'))) throw new Error(`rules: the snapshot file ${rel} holds a fixture secret`)
+    }
     await waitFor(`!document.querySelector('.toast')`, 'the toast gone')
     emit('system:navigate', { screen: 'backups' })
     const snapRow = `[...document.querySelectorAll('.list-row')].find((r) => r.textContent.includes('Remove an allow rule from shop-api/.claude/settings.local.json'))`
@@ -667,8 +674,14 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
     await click('Restore this file')
     await click('Restore', dialog)
     await waitFor(`!${dialog}`, 'the restore')
-    if ((await fsp.readFile(ruleFile, 'utf8')) !== fileBefore) throw new Error('rules: the file restored from Backups is not byte for byte what it was')
+    // restored: byte for byte what it was, except that the removed rule's token comes back covered (it was never kept);
+    // the five secrets the file still held are there in full, not replaced by dots
+    const token = /ghp_[A-Za-z0-9]{20,}/.exec(line)?.[0] ?? ''
+    if (!token || (await fsp.readFile(ruleFile, 'utf8')) !== fileBefore.replace(token, 'ghp_••••••')) throw new Error('rules: the file restored from Backups is not what it was with the removed token covered')
     await waitFor(`!document.querySelector('.toast')`, 'the toast gone')
+    // the next checks start from the fixture's file again
+    await fsp.writeFile(ruleFile, fileBefore)
+    await projectRules()
 
     // Not a secret: the flag goes and only the rule's id is kept; Undo flags it again
     emit('system:navigate', { screen: 'permissions', id: 'projects:to-check' })

@@ -118,9 +118,11 @@ export async function snapshot(relPaths: string[], reason: string): Promise<Snap
  * Snapshot files of a folder outside the config folder (a project's `.claude`, before Permissions › Projects removes
  * a rule there): `names` are plain file names in `folder`. The manifest keeps `folder` as its `dir` and the profile it
  * was taken for, so Backups lists it for that profile, labelled by its real path, and a restore goes back to `folder`.
- * Links and missing files are skipped. Returns null if nothing was copied.
+ * What is stored is `cover(text)`, never the file as it is: a project's rule file can hold a secret (that is why a rule
+ * is removed from it), and a secret is never written into Claudock's own data. Links and missing files are skipped.
+ * Returns null if nothing was copied.
  */
-export async function snapshotOutside(folder: string, names: string[], reason: string): Promise<SnapshotInfo | null> {
+export async function snapshotOutside(folder: string, names: string[], reason: string, cover: (text: string) => string): Promise<SnapshotInfo | null> {
   const copied: string[] = []
   const { id, dir, at } = await uniqueSnapshotDir()
   for (const name of names) {
@@ -128,7 +130,7 @@ export async function snapshotOutside(folder: string, names: string[], reason: s
     const abs = path.join(folder, name)
     const st = await fsp.lstat(abs).catch(() => null)
     if (!st || !st.isFile()) continue
-    await fsp.copyFile(abs, path.join(dir, name))
+    await fsp.writeFile(path.join(dir, name), cover(await fsp.readFile(abs, 'utf8')))
     copied.push(name)
   }
   if (copied.length === 0) {

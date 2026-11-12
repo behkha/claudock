@@ -6,7 +6,7 @@ import { RuleAlertRule } from './alert.ts'
 import { classifyRule, isBroad } from './classify.ts'
 import { gitArgs, gitStateOf } from './git.ts'
 import { buildRows, projectName, ruleId, rulesIn, type RuleFileRead } from './rows.ts'
-import { maskRuleFile, removeRuleFromText } from './ruleFile.ts'
+import { coverRuleFile, removeRuleFromText, restoreCovered } from './ruleFile.ts'
 
 /* Every value below is invented for these tests. */
 const GH = 'ghp_FAKEDONOTUSE0123456789abcdefABCD'
@@ -232,13 +232,75 @@ test('remove a rule: a rule saved twice loses its first copy; a missing rule, li
   assert.equal(removeRuleFromText('{"other":{"allow":["Bash(a)"]},"permissions":{"allow":["Bash(b)"]}}', 'allow', 'Bash(a)'), null)
 })
 
-test('a rule file shown in Backups has its secrets covered, in JSON and in text that is not', () => {
-  const shown = maskRuleFile(FILE)
-  assert.equal(shown.includes('fake-token-value'), false)
-  assert.equal(shown, FILE.replace('fake-token-value', MASK).replace('["Bash(git push:*)", "Bash(npm test)"]', '[\n      "Bash(git push:*)",\n      "Bash(npm test)"\n    ]').replace('{ "A": "Bash(npm test)" }', '{\n    "A": "Bash(npm test)"\n  }'))
-  const quoted = JSON.stringify({ permissions: { allow: ['Bash(mysql --password="fake pass words" shop)'] } })
-  assert.equal(maskRuleFile(quoted).includes('fake pass words'), false)
-  assert.equal(maskRuleFile(`{ broken "Bash(API_TOKEN=${GH} npm run sync)"`).includes(GH), false)
+/* ------------------------------------------------------------------ a rule file as a snapshot stores it */
+
+const SECRET_FILE = `{
+  "permissions": {
+    "allow": [
+      "Bash(npm test)",
+      "Bash(API_TOKEN=${GH} npm run sync)",
+      "Bash(PGPASSWORD=correct-horse-fake psql -h db:*)",
+      "Bash(mysql --password=\\"fake pass words\\" shop)"
+    ],
+    "deny": ["Read(./.env)"]
+  },
+  "env": { "STRIPE_API_KEY": "fake-stripe-key-0000", "NODE_ENV": "production" }
+}
+`
+const SECRETS_IN_FILE = [GH, 'correct-horse-fake', 'fake pass words', 'fake-stripe-key-0000']
+
+test('a stored rule file: every secret covered, in rules and under a secret-like key; every other byte as it was', () => {
+  const stored = coverRuleFile(SECRET_FILE)
+  for (const secret of SECRETS_IN_FILE) assert.equal(stored.includes(secret), false, secret)
+  assert.equal(
+    stored,
+    SECRET_FILE.replace(GH, `ghp_${MASK}`).replace('correct-horse-fake', MASK).replace('fake pass words', MASK).replace('fake-stripe-key-0000', MASK)
+  )
+  // covering what is covered changes nothing, and a file with no secret is stored as it is
+  assert.equal(coverRuleFile(stored), stored)
+  assert.equal(coverRuleFile(FILE.replace('fake-token-value', '$TOKEN')), FILE.replace('fake-token-value', '$TOKEN'))
+  // text that is not JSON is covered as it stands
+  assert.equal(coverRuleFile(`{ broken "Bash(API_TOKEN=${GH} npm run sync)"`).includes(GH), false)
+})
+
+test('a covered rule is not a secret again: it holds the dots, not the value', () => {
+  const c = classifyRule(`Bash(API_TOKEN=ghp_${MASK} npm run sync)`)
+  assert.deepEqual([c.secret, c.text], [false, `Bash(API_TOKEN=ghp_${MASK} npm run sync)`])
+  assert.equal(classifyRule(`Bash(PGPASSWORD=${MASK} psql -h db:*)`).secret, false)
+  // another secret beside a covered one is still found
+  assert.deepEqual(found(`Bash(A_TOKEN=ghp_${MASK} B_SECRET=another-fake-value run)`), ['another-fake-value'])
+})
+
+test('restoring a stored rule file: a secret the file still holds stays in full; the removed rule comes back covered', () => {
+  const stored = coverRuleFile(SECRET_FILE)
+  // Remove rule took the token rule out; the other secrets are still in the file
+  const now = removeRuleFromText(SECRET_FILE, 'allow', `Bash(API_TOKEN=${GH} npm run sync)`) as string
+  const back = restoreCovered(stored, now)
+  assert.equal(back, SECRET_FILE.replace(GH, `ghp_${MASK}`))
+  for (const kept of ['correct-horse-fake', 'fake pass words', 'fake-stripe-key-0000']) assert.equal(back.includes(kept), true, kept)
+  assert.equal(back.includes(GH), false)
+  // nothing the file still holds was replaced by dots: every value of the current file is in what is written
+  for (const line of now.split('\n').filter((l) => l.includes('fake'))) assert.equal(back.includes(line.trim().replace(/,$/, '')), true, line)
+  // restoring over a file that changed nothing brings the whole file back byte for byte
+  assert.equal(restoreCovered(stored, SECRET_FILE), SECRET_FILE)
+  // a rule added since goes (the file becomes the snapshot), and the secrets still come from the current file
+  const added = now.replace('"Bash(npm test)",', '"Bash(npm test)",\n      "Bash(npm run lint)",')
+  assert.equal(restoreCovered(stored, added), SECRET_FILE.replace(GH, `ghp_${MASK}`))
+})
+
+test('restoring a stored rule file: the same covered text twice, a file that is gone, and a file that is not JSON', () => {
+  const two = '{"permissions":{"allow":["Bash(X_TOKEN=first-fake-value run)","Bash(X_TOKEN=second-fake-value run)"]}}'
+  const stored = coverRuleFile(two)
+  assert.equal(stored, `{"permissions":{"allow":["Bash(X_TOKEN=${MASK} run)","Bash(X_TOKEN=${MASK} run)"]}}`)
+  // each covered rule takes its own value back, in order; with one of them gone, the one left is not doubled
+  assert.equal(restoreCovered(stored, two), two)
+  assert.equal(restoreCovered(stored, '{"permissions":{"allow":["Bash(X_TOKEN=second-fake-value run)"]}}'), `{"permissions":{"allow":["Bash(X_TOKEN=second-fake-value run)","Bash(X_TOKEN=${MASK} run)"]}}`)
+  // the file is gone: nothing to keep, the snapshot goes back as stored
+  assert.equal(restoreCovered(stored, null), stored)
+  // a snapshot with nothing covered goes back as it is, whatever the file holds now
+  assert.equal(restoreCovered(FILE.replace('fake-token-value', '$TOKEN'), '{ broken'), FILE.replace('fake-token-value', '$TOKEN'))
+  // covered values and a file that cannot be read to keep its own: refused, not written over
+  assert.throws(() => restoreCovered(stored, '{ "permissions": broken'), /will not restore over it/)
 })
 
 /* ------------------------------------------------------------------ the saved-rule alert */

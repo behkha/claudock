@@ -7,7 +7,7 @@ import { exists, invalidateSizes, stat } from '../fsx'
 import { defineDomain } from '../ipcx'
 import { restoreRuleFile } from './permissions'
 import { GLOBAL_STATE_REL, assertWritable, configDir, globalStateFile, isSecret, isSecretReal, resolveInside } from '../paths'
-import { maskRuleFile } from '../permissions/ruleFile'
+import { coverRuleFile } from '../permissions/ruleFile'
 import {
   listOutsideSnapshots,
   listSnapshots,
@@ -197,7 +197,7 @@ async function compareFiles(backupAbs: string, backupMtimeMs: number | null, liv
 
 /**
  * A snapshot of a project's rule file (taken before Permissions › Projects removed a rule) against the file as it is
- * now. Both sides are shown with their secrets covered: the rule was removed for holding one.
+ * now. The snapshot is stored with its secrets covered, and the current file is shown the same way.
  */
 async function compareRuleFile(backupAbs: string, backupMtimeMs: number | null, folder: string, name: string): Promise<FileCompare> {
   const backup = await loadText(backupAbs)
@@ -207,8 +207,8 @@ async function compareRuleFile(backupAbs: string, backupMtimeMs: number | null, 
   return {
     liveRel: name,
     liveExists: live.exists,
-    backup: maskRuleFile(backup.text),
-    live: live.exists ? maskRuleFile(live.text) : '',
+    backup: coverRuleFile(backup.text),
+    live: live.exists ? coverRuleFile(live.text) : '',
     backupMtimeMs,
     binary: backup.binary || live.binary,
     tooLarge: backup.tooLarge || live.tooLarge,

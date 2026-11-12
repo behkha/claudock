@@ -71,8 +71,16 @@ export interface TextSecret {
 /** The start of each token shape that is public: it names the issuer, not the secret. */
 const SHAPE_PREFIX = /^(gh[pousr]_|github_pat_|glpat-|sk-|xox[abprs]-|AKIA|eyJ)/
 
-/** A value that is read from somewhere else when the command runs: `$NAME`, `${NAME}`, `$(…)`, `%NAME%`, a backtick command. */
-const isVariable = (v: string): boolean => /^\$|\$\{|\$\(|^`|^%[A-Za-z_][A-Za-z0-9_]*%$/.test(v)
+/** What covers a secret: never as many dots as it has characters, so its length is not shown either. */
+export const MASK = '••••••'
+/** A value that was covered already (it holds the dots, not the secret). */
+export const isCovered = (v: string): boolean => v.includes('•')
+
+/**
+ * A value that holds no secret of its own: read from somewhere else when the command runs (`$NAME`, `${NAME}`, `$(…)`,
+ * `%NAME%`, a backtick command), or already covered.
+ */
+const isVariable = (v: string): boolean => /^\$|\$\{|\$\(|^`|^%[A-Za-z_][A-Za-z0-9_]*%$/.test(v) || isCovered(v)
 
 /** The least a literal value under a secret's name is long. */
 const MIN_NAMED = 8
@@ -126,9 +134,6 @@ export function secretsInText(text: string): TextSecret[] {
   }
   return found.sort((a, b) => a.start - b.start)
 }
-
-/** What covers a secret: never as many dots as it has characters, so its length is not shown either. */
-export const MASK = '••••••'
 
 /**
  * `text` with every secret covered: the public start of a known token shape, then dots; dots alone for anything else.

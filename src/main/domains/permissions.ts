@@ -10,7 +10,7 @@ import { configDir, globalStateFile, installKind, openConfigDir, samePath, userD
 import { RuleAlertRule } from '../permissions/alert'
 import { gitState } from '../permissions/git'
 import { RULE_FILES, buildRows, flagged, projectName, ruleId, rulesIn, type RuleFileRead, type SavedRule } from '../permissions/rows'
-import { removeRuleFromText } from '../permissions/ruleFile'
+import { coverRuleFile, removeRuleFromText, restoreCovered } from '../permissions/ruleFile'
 import { snapshotOutside } from '../safeWrite'
 import { devAllowed, readText, writeOne, type WriteGuard } from '../team/write'
 import { mainWindow, showMainWindow } from '../windows'
@@ -388,9 +388,12 @@ async function ruleFileTarget(project: string, file: string): Promise<{ project:
   return { project: known, file: file as RuleFile, rel: `.claude/${file}` }
 }
 
-/** Write `<project>/.claude/<file>`: a snapshot of the current file first, never through a link, a temp file renamed over it. */
+/**
+ * Write `<project>/.claude/<file>`: a snapshot of the current file first (stored with every secret covered: a secret is
+ * never written into Claudock's own data), never through a link, a temp file renamed over it.
+ */
 async function writeRuleFile(t: { project: string; file: RuleFile; rel: string }, text: string, reason: string): Promise<{ snapshotId: string | null }> {
-  const snap = await snapshotOutside(path.join(t.project, '.claude'), [t.file], reason)
+  const snap = await snapshotOutside(path.join(t.project, '.claude'), [t.file], reason, coverRuleFile)
   await writeOne(t.project, t.rel, text, guard)
   return { snapshotId: snap?.id ?? null }
 }
@@ -416,12 +419,14 @@ async function removeProjectRule(id: unknown): Promise<ProjectRules> {
 
 /**
  * Put a project's rule file back from a snapshot (Backups): `folder` is the project's `.claude`, as the snapshot
- * recorded it. The same guarded write, so the version being replaced is snapshotted first.
+ * recorded it. The same guarded write, so the version being replaced is snapshotted first. The snapshot holds its
+ * secrets covered: a secret the file still has stays as it is (`restoreCovered`), and a rule that was removed for its
+ * secret comes back covered, since the secret itself was never kept.
  */
 export async function restoreRuleFile(folder: string, file: string, text: string, reason: string): Promise<{ snapshotId: string | null }> {
   if (path.basename(folder) !== '.claude') throw new Error('Not a rule file')
   const target = await ruleFileTarget(path.dirname(folder), file)
-  return oneAtATime(path.join(target.project, '.claude', target.file), () => writeRuleFile(target, text, reason))
+  return oneAtATime(path.join(target.project, '.claude', target.file), async () => writeRuleFile(target, restoreCovered(text, await readText(target.project, target.rel)), reason))
 }
 
 export function register(ipcMain: IpcMain): void {
