@@ -1,10 +1,10 @@
 {
  "format": 1,
- "builtAt": "2026-11-12T12:09:41.108Z",
+ "builtAt": "2026-11-25T10:39:22.958Z",
  "sources": [
   "https://code.claude.com/docs/en/settings-reference.md",
   "https://code.claude.com/docs/en/env-vars.md",
-  "https://raw.githubusercontent.com/SchemaStore/schemastore/master/src/schemas/json/claude-code-settings.json"
+  "https://json.schemastore.org/claude-code-settings.json"
  ],
  "root": {
   "summary": "Claude Code settings",
@@ -45,9 +45,9 @@
     ]
    },
    "agent": {
-    "summary": "Start every session as a named subagent with its prompt, tools, and model",
+    "summary": "Start sessions as a named subagent with its prompt, tools, and model",
     "typeText": "string, the name of a built-in or custom agent",
-    "default": "unset, so the main thread runs as Claude Code's default agent",
+    "default": "unset",
     "scope": "Any file",
     "topic": "Agents, sessions, and worktrees",
     "url": "https://code.claude.com/docs/en/settings-reference#agent",
@@ -59,7 +59,7 @@
    "agentPushNotifEnabled": {
     "summary": "Let Claude send a push notification to your phone when it decides to",
     "typeText": "Boolean",
-    "default": "false",
+    "default": "unset, so Claude Code uses the value saved to your account, or false if none is saved",
     "scope": "Any file",
     "topic": "Remote, desktop, and notifications",
     "url": "https://code.claude.com/docs/en/settings-reference#agentpushnotifenabled",
@@ -184,7 +184,7 @@
    "allowedMcpServers": {
     "summary": "Allowlist which MCP servers users can add",
     "typeText": "array of objects, each with exactly one key. Use serverName, a string limited to letters, numbers, hyphens, and underscores; serverCommand, an array of the command and its arguments matched exactly; or serverUrl, a URL pattern with * wildcards",
-    "default": "unset, so every server is allowed; an empty array blocks every server users add",
+    "default": "unset, so every server is allowed; an empty merged list blocks every server users add",
     "scope": "Any file",
     "topic": "MCP",
     "url": "https://code.claude.com/docs/en/settings-reference#allowedmcpservers",
@@ -274,6 +274,10 @@
       {
        "value": "anthropicAws",
        "summary": "Claude Platform on AWS"
+      },
+      {
+       "value": "anthropicGoogleCloud",
+       "summary": "Claude Models on Google Cloud (Anthropic managed)"
       },
       {
        "value": "mantle",
@@ -486,7 +490,7 @@
       "values": [
        {
         "value": true,
-        "summary": "Claude Code appends the claude.ai session link when it commits or opens a pull request from a cloud or Remote Control session"
+        "summary": "Claude Code tells Claude to add the link"
        },
        {
         "value": false,
@@ -521,7 +525,7 @@
    },
    "autoCompactWindow": {
     "summary": "Set how full the context gets before Claude Code compacts",
-    "typeText": "number of tokens, from 100000 to 1000000. Claude Code caps the value at your model's context window; the models overview lists each model's window",
+    "typeText": "number of tokens, at least 100000. Claude Code caps the value at your model's context window; the models overview lists each model's window",
     "default": "unset, so Claude Code picks a window tuned for your model",
     "scope": "Any file",
     "topic": "Memory and context",
@@ -1647,6 +1651,28 @@
      }
     ]
    },
+   "disableDirectMcpSkills": {
+    "summary": "Turn skills from MCP servers other than connectors on or off for your organization",
+    "typeText": "Boolean",
+    "default": "unset. These skills are off for Team and Enterprise members who sign in to claude.ai with /login. For other sign-ins, see MCP skill availability",
+    "scope": "Managed",
+    "topic": "MCP",
+    "url": "https://code.claude.com/docs/en/settings-reference#disabledirectmcpskills",
+    "example": "{\n  \"disableDirectMcpSkills\": false\n}",
+    "kinds": [
+     "boolean"
+    ],
+    "values": [
+     {
+      "value": true,
+      "summary": "Claude Code doesn't list or load skills from these servers"
+     },
+     {
+      "value": false,
+      "summary": "on Team and Enterprise plans, allows these skills"
+     }
+    ]
+   },
    "disabledMcpjsonServers": {
     "summary": "Reject specific servers from a project's.mcp.json",
     "typeText": "array of strings, the server names as they appear in.mcp.json",
@@ -1709,7 +1735,7 @@
     ]
    },
    "disableRemotePreviewScripts": {
-    "summary": "Turn off scripts in the desktop app's HTML previews in SSH and WSL sessions",
+    "summary": "Turn off scripts in the Browser pane's HTML previews in the desktop app's SSH and WSL sessions",
     "typeText": "Boolean; only the JSON Boolean true takes effect",
     "default": "unset, so the key has no effect",
     "scope": "Managed",
@@ -1722,7 +1748,7 @@
     "values": [
      {
       "value": true,
-      "summary": "HTML previews in SSH and WSL sessions don't run scripts"
+      "summary": "in SSH and WSL sessions, HTML previews in the Browser pane don't run scripts"
      },
      {
       "value": false,
@@ -1875,7 +1901,7 @@
    "enableAllProjectMcpServers": {
     "summary": "Approve every server in project.mcp.json files without a prompt",
     "typeText": "Boolean",
-    "default": "unset, so Claude Code asks you to approve each server",
+    "default": "unset, so interactive terminal sessions ask the same way",
     "scope": "Any file",
     "topic": "MCP",
     "url": "https://code.claude.com/docs/en/settings-reference#enableallprojectmcpservers",
@@ -1890,7 +1916,7 @@
      },
      {
       "value": false,
-      "summary": "Claude Code asks you to approve each server"
+      "summary": "interactive terminal sessions ask you to approve each pending server"
      }
     ]
    },
@@ -1982,6 +2008,18 @@
       "value": false,
       "summary": "Claude Code turns dynamic workflows off for you"
      }
+    ]
+   },
+   "enforceAnthropicSignIn": {
+    "summary": "Require a claude.ai login on Anthropic's API, or an Enterprise Admin Console sign-in",
+    "typeText": "Boolean",
+    "default": "unset",
+    "scope": "Managed",
+    "topic": "Authentication and providers",
+    "url": "https://code.claude.com/docs/en/settings-reference#enforceanthropicsignin",
+    "example": "{\n  \"forceLoginOrgUUID\": \"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx\",\n  \"enforceAnthropicSignIn\": true\n}",
+    "kinds": [
+     "boolean"
     ]
    },
    "enforceAvailableModels": {
@@ -2370,7 +2408,7 @@
     "scope": "Any file",
     "topic": "Model and responses",
     "url": "https://code.claude.com/docs/en/settings-reference#fallbackmodel",
-    "example": "{\n  \"fallbackModel\": [\"claude-sonnet-5\", \"claude-haiku-4-5\"]\n}",
+    "example": "{\n  \"fallbackModel\": [\"claude-sonnet-5\", \"claude-haiku-5-5\"]\n}",
     "kinds": [
      "array"
     ],
@@ -11114,7 +11152,7 @@
    "inputNeededNotifEnabled": {
     "summary": "Get a push notification when Claude is waiting on you",
     "typeText": "Boolean",
-    "default": "false",
+    "default": "unset, so Claude Code uses the value saved to your account",
     "scope": "Any file",
     "topic": "Remote, desktop, and notifications",
     "url": "https://code.claude.com/docs/en/settings-reference#inputneedednotifenabled",
@@ -11287,12 +11325,12 @@
    },
    "minimumVersion": {
     "summary": "Keep auto-updates from installing anything below a version",
-    "typeText": "string, a version number such as \"2.1.100\"; a value that isn't a valid version is ignored",
+    "typeText": "string, a version number such as \"2.1.323\"; a value that isn't a valid version is ignored",
     "default": "unset, so updates can install any version the channel offers",
     "scope": "Any file",
     "topic": "Updates and versioning",
     "url": "https://code.claude.com/docs/en/settings-reference#minimumversion",
-    "example": "{\n  \"autoUpdatesChannel\": \"stable\",\n  \"minimumVersion\": \"2.1.100\"\n}",
+    "example": "{\n  \"autoUpdatesChannel\": \"stable\",\n  \"minimumVersion\": \"2.1.323\"\n}",
     "kinds": [
      "string"
     ]
@@ -11376,7 +11414,7 @@
        "summary": "the highest effort level the model may run at"
       },
       "autoCompactWindow": {
-       "summary": "a number of tokens from 100000 to 1000000, or \"auto\" for the window tuned for the model. /autocompact saves here. For that model, the value takes precedence over a top-level autoCompactWindow in the same settings file. Requires Claude Code v2.1.288 or later"
+       "summary": "a token count of 100000 or more, or \"auto\" for the window tuned for the model. /autocompact saves here. For that model, the value takes precedence over a top-level autoCompactWindow in the same settings file. Requires Claude Code v2.1.288 or later"
       }
      }
     }
@@ -11423,7 +11461,7 @@
      },
      {
       "value": "merge",
-      "summary": "Claude Code applies the host-supplied settings under the admin tier through a restrictive-only filter"
+      "summary": "Claude Code applies the host-supplied settings under the admin tier through a filter that keeps restrictive keys"
      }
     ],
     "closedValues": true
@@ -11491,7 +11529,7 @@
       }
      },
      "ask": {
-      "summary": "Always prompt before listed tool uses",
+      "summary": "Prompt before listed tool uses",
       "typeText": "array of permission rule strings",
       "default": "unset",
       "scope": "Any file",
@@ -11523,7 +11561,7 @@
       "values": [
        {
         "value": "default",
-        "summary": "Claude Code runs only reads without asking"
+        "summary": "Claude Code runs file reads inside your working directories and some other actions without asking"
        },
        {
         "value": "acceptEdits",
@@ -12451,11 +12489,11 @@
      "autoAllowBashIfSandboxed": {
       "summary": "Run sandboxed commands without a permission prompt",
       "typeText": "Boolean",
-      "default": "true",
+      "default": "false. Before v2.1.324, the default was true",
       "scope": "Any file",
       "topic": "Sandbox settings",
       "url": "https://code.claude.com/docs/en/settings-reference#sandbox-autoallowbashifsandboxed",
-      "example": "{\n  \"sandbox\": {\n    \"enabled\": true,\n    \"autoAllowBashIfSandboxed\": false\n  }\n}",
+      "example": "{\n  \"sandbox\": {\n    \"enabled\": true,\n    \"autoAllowBashIfSandboxed\": true\n  }\n}",
       "kinds": [
        "boolean"
       ],
@@ -12754,7 +12792,7 @@
       ]
      },
      "failIfUnavailable": {
-      "summary": "Refuse to start when the sandbox can't, instead of running unsandboxed",
+      "summary": "Refuse to start when the sandbox can't, instead of running unsandboxed, except in an Anthropic-hosted environment",
       "typeText": "Boolean",
       "default": "false",
       "scope": "Any file",
@@ -13777,13 +13815,7 @@
     "closedValues": true
    },
    "subagentStatusLine": {
-    "summary": "Rewrite rows in the subagent task display with your own command",
-    "typeText": "object with type set to \"command\" and a command string",
-    "default": "unset, so Claude Code renders the default rows",
-    "scope": "Any file",
-    "topic": "Interface and terminal",
-    "url": "https://code.claude.com/docs/en/settings-reference#subagentstatusline",
-    "example": "{\n  \"subagentStatusLine\": {\n    \"type\": \"command\",\n    \"command\": \"jq -c '.tasks[] | {id, content: \\\"\\\\(.name): \\\\(.tokenCount) tokens\\\"}'\"\n  }\n}",
+    "summary": "Status line configuration for subagent sessions",
     "kinds": [
      "object"
     ],
@@ -13816,6 +13848,7 @@
     },
     "closed": true,
     "schemaOnly": [
+     "kinds",
      "closed"
     ]
    },
@@ -14662,6 +14695,22 @@
    "summary": "Microsoft Foundry resource name (for example, my-resource)"
   },
   {
+   "name": "ANTHROPIC_GOOGLE_CLOUD_BASE_URL",
+   "summary": "Override the Claude Models on Google Cloud (Anthropic managed) endpoint URL, for example when routing through an LLM gateway"
+  },
+  {
+   "name": "ANTHROPIC_GOOGLE_CLOUD_LOCATION",
+   "summary": "Google Cloud location that Claude Code puts in the Claude Models on Google Cloud (Anthropic managed) request URL"
+  },
+  {
+   "name": "ANTHROPIC_GOOGLE_CLOUD_PROJECT",
+   "summary": "Google Cloud project ID for Claude Models on Google Cloud (Anthropic managed)"
+  },
+  {
+   "name": "ANTHROPIC_GOOGLE_CLOUD_WORKSPACE_ID",
+   "summary": "Workspace ID for Claude Models on Google Cloud (Anthropic managed)"
+  },
+  {
    "name": "ANTHROPIC_MODEL",
    "summary": "Name of the model setting to use (see Model Configuration)"
   },
@@ -14811,7 +14860,7 @@
   },
   {
    "name": "CLAUDE_CODE_ARTIFACT_COMMENTS",
-   "summary": "Set to 0 to stop Claude reading and replying to comments on an artifact"
+   "summary": "Set to 0 to stop the Artifact tool from reading and replying to comments on an artifact"
   },
   {
    "name": "CLAUDE_CODE_ARTIFACT_COMMENTS_AUTOREACT",
@@ -14819,11 +14868,15 @@
   },
   {
    "name": "CLAUDE_CODE_ARTIFACT_PUBLISH_EDITS",
-   "summary": "Set to 0 to stop Claude from applying small changes to an artifact's file as part of publishing it"
+   "summary": "Set to 0 to stop Claude from applying small changes to an artifact's local file as part of publishing it"
   },
   {
    "name": "CLAUDE_CODE_ATTRIBUTION_HEADER",
    "summary": "Set to 0 to omit the attribution block, which carries the client version and a prompt fingerprint, from the start of the system prompt"
+  },
+  {
+   "name": "CLAUDE_CODE_AUTOMOUNT_ROOTS",
+   "summary": "Automount root folders for Claude Code to skip when it looks in the folders above your working directory for files such as CLAUDE.md, skills, and.mcp.json"
   },
   {
    "name": "CLAUDE_CODE_AUTO_BACKGROUND_WORKER_CHECKIN_SECONDS",
@@ -14831,7 +14884,7 @@
   },
   {
    "name": "CLAUDE_CODE_AUTO_COMPACT_WINDOW",
-   "summary": "Set the auto-compact window, how full the context gets before compaction, from 100000 to 1000000 tokens"
+   "summary": "Set the auto-compact window, which is how full the context gets before compaction, to a token count of 100000 or more"
   },
   {
    "name": "CLAUDE_CODE_AUTO_CONNECT_IDE",
@@ -14982,6 +15035,10 @@
    "summary": "Set to 1 to turn off the auto and bypassPermissions time limit and denials on critical-path removals"
   },
   {
+   "name": "CLAUDE_CODE_DISABLE_DEFERRED_TOOL_RESUME",
+   "summary": "Set to 1 to skip a deferred tool call when you resume or continue with -p"
+  },
+  {
    "name": "CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS",
    "summary": "Set to 1 to strip pre-release anthropic-beta request headers, the body fields that pair with them, and beta tool-schema fields such as defer_loading and eager_input_streaming from API requests"
   },
@@ -15023,7 +15080,7 @@
   },
   {
    "name": "CLAUDE_CODE_DISABLE_MCP_TASK_BACKGROUND",
-   "summary": "Set to 1 so that Claude waits for the result of an MCP task in an interactive session"
+   "summary": "Set to 1 so that Claude waits for the result of an MCP task in an interactive terminal session"
   },
   {
    "name": "CLAUDE_CODE_DISABLE_MODEL_ACCESS_FALLBACK",
@@ -15074,8 +15131,24 @@
    "summary": "Set to 1 to turn off the PowerShell tool check that denies the cmd built-ins rd, rmdir, del, and erase on a system path, such as a drive root or your home directory"
   },
   {
+   "name": "CLAUDE_CODE_DISABLE_PROXY_SCHEME_REPAIR",
+   "summary": "Set to 1 to have Claude Code stop at startup on a plain host:port in HTTPS_PROXY or https_proxy even when it starts with no terminal"
+  },
+  {
    "name": "CLAUDE_CODE_DISABLE_REFUSAL_FALLBACK",
    "summary": "Set to 1 to turn off the automatic model switch when a safety classifier flags a request, the behavior the switchModelsOnFlag setting controls"
+  },
+  {
+   "name": "CLAUDE_CODE_DISABLE_RESPONSE_COMPRESSION",
+   "summary": "Set to 1 to request uncompressed model responses if your proxy leaves compressed ones unfinished"
+  },
+  {
+   "name": "CLAUDE_CODE_DISABLE_SHELL_HEAD_START",
+   "summary": "Set to 1 to turn off the head start that can run your shell startup files while Claude writes the session's first Bash command, before that command's permission prompt"
+  },
+  {
+   "name": "CLAUDE_CODE_DISABLE_SHIP",
+   "summary": "Set to 1 to turn off /ship and /steward"
   },
   {
    "name": "CLAUDE_CODE_DISABLE_STRUCTURED_OUTPUTS",
@@ -15091,11 +15164,15 @@
   },
   {
    "name": "CLAUDE_CODE_DISABLE_THINKING",
-   "summary": "Set to 1 to omit the thinking parameter from API requests entirely"
+   "summary": "Set to 1 to omit the thinking parameter from the API requests for the main conversation's turns, subagent turns, and the compaction summary"
   },
   {
    "name": "CLAUDE_CODE_DISABLE_ULTRAREVIEW_TRUST_CHECK",
-   "summary": "Set to 1 so that claude ultrareview doesn't exit with Error: Workspace not trusted in a folder you haven't trusted when it can't ask you to trust it, such as in CI"
+   "summary": "Set to 1 so claude ultrareview doesn't exit with Error: Workspace not trusted when run without a terminal or with CI=true. claude ultrareview still asks when it can"
+  },
+  {
+   "name": "CLAUDE_CODE_DISABLE_ULTRATHINK",
+   "summary": "Set to 1 to turn the ultrathink keyword off"
   },
   {
    "name": "CLAUDE_CODE_DISABLE_UNKNOWN_MODEL_WINDOW_ENFORCEMENT",
@@ -15206,6 +15283,10 @@
    "summary": "Set to 1 to enable agent teams"
   },
   {
+   "name": "CLAUDE_CODE_EXPERIMENTAL_CODE_MODE",
+   "summary": "Set to 1 to start sessions in Code Mode, an experimental feature"
+  },
+  {
    "name": "CLAUDE_CODE_EXTRA_BODY",
    "summary": "JSON object to merge into the top level of model request bodies except on some requests outside the conversation, such as /model checks"
   },
@@ -15236,6 +15317,10 @@
   {
    "name": "CLAUDE_CODE_FORWARD_SUBAGENT_TEXT",
    "summary": "Set to 1 to emit subagent text and thinking blocks in claude -p --output-format stream-json output, the same behavior as the --forward-subagent-text flag"
+  },
+  {
+   "name": "CLAUDE_CODE_FULL_SIGN_IN_LINK",
+   "summary": "Set to 1 to print the full login URL"
   },
   {
    "name": "CLAUDE_CODE_GATEWAY_HINT_HEADERS",
@@ -15288,6 +15373,10 @@
   {
    "name": "CLAUDE_CODE_IDLE_COMPACT_MIN_TOKENS",
    "summary": "Context size, in tokens, at which idle compaction applies to a conversation (default: 200000)"
+  },
+  {
+   "name": "CLAUDE_CODE_LOOP_KEEPALIVE",
+   "summary": "Set to 1 to run one extra iteration of an interactive self-paced /loop when its second or later iteration ends with nothing scheduled"
   },
   {
    "name": "CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS",
@@ -15411,11 +15500,11 @@
   },
   {
    "name": "CLAUDE_CODE_OVERLOADED_RETRY_BASE_DELAY_MS",
-   "summary": "Starting delay in milliseconds, in place of the default 500, of the exponential backoff between automatic retries of a request that the API rejects with a 529 overloaded error"
+   "summary": "Starting delay in milliseconds of the backoff between retries of a request that the API rejects with a 529 overloaded error (default: 500)"
   },
   {
    "name": "CLAUDE_CODE_OVERLOADED_RETRY_MAX_DELAY_MS",
-   "summary": "Ceiling in milliseconds, in place of the default 32000, on the exponential backoff between automatic retries of a request that the API rejects with a 529 overloaded error"
+   "summary": "Ceiling in milliseconds on the backoff between retries of a request that the API rejects with a 529 overloaded error (default: 32000)"
   },
   {
    "name": "CLAUDE_CODE_PACKAGE_MANAGER_AUTO_UPDATE",
@@ -15435,7 +15524,7 @@
   },
   {
    "name": "CLAUDE_CODE_PLUGIN_DIR_WATCH",
-   "summary": "Controls whether Claude Code reloads a mod when the mod's files change"
+   "summary": "Controls whether a mod reloads when its files change"
   },
   {
    "name": "CLAUDE_CODE_PLUGIN_GIT_TIMEOUT_MS",
@@ -15498,6 +15587,10 @@
    "summary": "Set to 1 to start the session in restricted mode, the same as passing --restricted"
   },
   {
+   "name": "CLAUDE_CODE_RESUME_HINT_COMMAND",
+   "summary": "In a wrapper script that starts Claude Code, set this to the name you type to run the wrapper, such as mytool"
+  },
+  {
    "name": "CLAUDE_CODE_RESUME_INTERRUPTED_TURN",
    "summary": "Set to 1 to automatically resume if the previous session ended mid-turn"
   },
@@ -15515,7 +15608,7 @@
   },
   {
    "name": "CLAUDE_CODE_RETRY_WATCHDOG",
-   "summary": "Set to 1 for unattended sessions such as eval harnesses, CI jobs, or remote workers"
+   "summary": "Set to 1 for unattended sessions"
   },
   {
    "name": "CLAUDE_CODE_RETRY_WATCHDOG_MAX_WAIT_MS",
@@ -15559,7 +15652,7 @@
   },
   {
    "name": "CLAUDE_CODE_SIMPLE",
-   "summary": "Set to 1 to run with a minimal system prompt and only the Bash, file read, and file edit tools"
+   "summary": "Set to 1 to run with a minimal system prompt and the Bash, file read, and file edit tools"
   },
   {
    "name": "CLAUDE_CODE_SIMPLE_SYSTEM_PROMPT",
@@ -15568,6 +15661,10 @@
   {
    "name": "CLAUDE_CODE_SKIP_ANTHROPIC_AWS_AUTH",
    "summary": "Skip client-side authentication for Claude Platform on AWS, for gateways that sign requests themselves"
+  },
+  {
+   "name": "CLAUDE_CODE_SKIP_ANTHROPIC_GOOGLE_CLOUD_AUTH",
+   "summary": "Skip Google Cloud authentication for Claude Models on Google Cloud (Anthropic managed), for gateways that attach the credentials themselves"
   },
   {
    "name": "CLAUDE_CODE_SKIP_AWS_CRED_CACHE",
@@ -15614,6 +15711,18 @@
    "summary": "Maximum number of consecutive times a Stop or SubagentStop hook may block the turn from ending before Claude Code overrides it and ends the turn anyway (default: 8)"
   },
   {
+   "name": "CLAUDE_CODE_STRICT_INLINE_SHELL_RM_PROMPT",
+   "summary": "Set to 1 to flag more of the -c scripts that Claude Code can't check, including ones that name neither rm nor rmdir"
+  },
+  {
+   "name": "CLAUDE_CODE_SUBAGENT_EFFORT",
+   "summary": "The default effort level for subagents and workflow agents: low, medium, high, xhigh, or max"
+  },
+  {
+   "name": "CLAUDE_CODE_SUBAGENT_HISTORY",
+   "summary": "Set to 0 to remove the /tasks row where you reopen subagents that have ended"
+  },
+  {
    "name": "CLAUDE_CODE_SUBAGENT_MODEL",
    "summary": "The default model for subagents, agent team teammates, and workflow agents that aren't assigned a model another way"
   },
@@ -15639,7 +15748,7 @@
   },
   {
    "name": "CLAUDE_CODE_SYNC_SKILLS",
-   "summary": "Set to 1 in non-interactive mode with the -p flag to make Claude Code download the skills enabled for your claude.ai account in that run and wait for the list of them, up to CLAUDE_CODE_SYNC_SKILLS_WAIT_TIMEOUT_MS, before it runs the first query"
+   "summary": "Set to 1 to make Claude Code download the skills enabled for your claude.ai account"
   },
   {
    "name": "CLAUDE_CODE_SYNC_SKILLS_INSTALL_TIMEOUT_MS",
@@ -15694,6 +15803,10 @@
    "summary": "Use Claude Platform on AWS"
   },
   {
+   "name": "CLAUDE_CODE_USE_ANTHROPIC_GOOGLE_CLOUD",
+   "summary": "Use Claude Models on Google Cloud (Anthropic managed)"
+  },
+  {
    "name": "CLAUDE_CODE_USE_BEDROCK",
    "summary": "Use Amazon Bedrock"
   },
@@ -15727,7 +15840,7 @@
   },
   {
    "name": "CLAUDE_CODE_WEBFETCH_CACHE_TTL_MS",
-   "summary": "Set to the number of milliseconds WebFetch keeps each fetched URL's response cached"
+   "summary": "Set to the number of milliseconds WebFetch keeps each fetched page cached"
   },
   {
    "name": "CLAUDE_CODE_WEBFETCH_DEADLINE_MS",
@@ -15827,7 +15940,7 @@
   },
   {
    "name": "DISABLE_COMPACT",
-   "summary": "Set to 1 to disable all compaction: both automatic compaction and the manual /compact command"
+   "summary": "Set to 1 to disable all compaction, including /compact and the rewind menu's summarize options"
   },
   {
    "name": "DISABLE_COST_WARNINGS",
@@ -16184,6 +16297,10 @@
   {
    "name": "OTEL_RESOURCE_ATTRIBUTES",
    "summary": "Comma-separated key=value resource attributes attached to all telemetry"
+  },
+  {
+   "name": "OTEL_RESOURCE_INCLUDE_HOST",
+   "summary": "Set to 1 to add the machine's name and ID to OpenTelemetry resource attributes as host.name and host.id (default: excluded)"
   },
   {
    "name": "OTEL_TRACES_EXPORTER",

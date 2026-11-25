@@ -1,15 +1,12 @@
 Claudock is an unofficial desktop app for your Claude Code setup: settings, hooks, skills, MCP servers, memory and sessions in one window, without hand-editing the files in `~/.claude`.
 
-## What's new in 0.4.0
+## What's new in 0.5.0
 
-- **How large each session is.** Every running Claude Code session shows the context it carries, on Today and in the menu bar popover, in tokens as Claude Code recorded them. A session that large re-reads all of it on every turn, which is where a weekly limit goes. It works for sessions in the Claude desktop app too, and it is never a "% full": Claudock does not know the model's window.
-- **A size you pick, and one alert.** In the popover's alert settings, "A session's context reaches" offers 150k, 300k, 500k and 750k, each saying about how many times a day it would have alerted in your own last 14 days. Once you pick one, each row gets a thin bar that fills toward it, and Claudock alerts once when a session passes it. It is ready again after the session falls below half of it. Off until you choose.
-- **Every rule your projects saved.** Answering a permission prompt with "don't ask again" makes Claude Code save the whole command as a rule inside the project. Permissions › Projects lists every such rule across the projects Claude Code knows, in one table.
-- **Secrets in saved rules, flagged.** If the command carried a password or a token, the rule does too. Those rules are flagged and listed first, with the secret covered. The sheet says which file holds the rule and whether git tracks or ignores that file, and **Remove rule** takes that one rule out of the file. The snapshot kept in Backups holds the file with every secret covered, so restoring it brings the rule back without the secret. **Not a secret** clears a flag for that exact rule.
-- **Rules that run any script.** A filter finds the rules that let Claude run any Python, Node or shell script. They are choices you made, so they are never flagged.
-- **A chip, and an alert you switch on.** Today shows how many rules are waiting for a look, and so does Permissions in the sidebar. "A saved rule holds a secret" in the alert settings alerts when a new one appears. Off until you turn it on.
+- **What Claudock really takes on disk.** Storage opens with Claude Code's folder and Claudock's own data on one scale. Claudock keeps every session by linking Claude Code's transcripts, so Finder and cleaner apps count those bytes twice and Claudock can look many gigabytes large. The bar shows its real size, draws the linked part hatched, and shows Finder's number struck beside it. The chevron says what the real size holds.
+- **Old sessions, gone in one move.** Pick an age (14 days to a year) and see how many sessions were untouched that long and how much space they take. **See them** opens Sessions filtered to that age; **Move to Trash** moves Claude Code's files and Claudock's copies together, so the space is really freed. It never moves more than the dialog named.
+- **Auto delete.** A switch under the slider moves sessions untouched for 30, 60, 90, 180 or 365 days to the Trash by itself, once a day while Claudock runs. Off until you turn it on; turning it on first shows what would go now. Each profile has its own.
 
-Removing the rule does not change the secret: change it where it was issued. Claudock covers a secret before showing it, never copies it and never sends it anywhere. To read the git line it runs two read-only git commands on the rule file and no other.
+Everything goes to the Trash, so you can put a session back from there.
 
 ## Download
 
