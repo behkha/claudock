@@ -3,14 +3,16 @@ import crypto from 'node:crypto'
 import fsp from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import type { ArchiveApi, ArchiveList, ArchiveStatus, ArchivedSession, SearchHit } from '@shared/api/archive'
+import { AUTO_DELETE_DAYS, AUTO_DELETE_DEFAULT_DAYS, type ArchiveApi, type ArchiveList, type ArchiveStatus, type ArchivedSession, type AutoDelete, type AutoDeleteRun, type SearchHit } from '@shared/api/archive'
 import type { TranscriptEntry } from '@shared/api/projects'
 import { formatDateTime } from '@shared/format'
 import { hold, holdTree, unhold, type HoldMode } from '../archive/hold'
 import { emptyFacts, foldLine, keyOf, matchSession, queryTerms, resumeCommand, splitKey, titleOf, toMarkdown, type Facts } from '../archive/model'
 import { folderKey } from '../connect/folder'
+import { forgetDiskCost } from '../diskCost'
+import { dirSize } from '../fsx'
 import { defineDomain, emit } from '../ipcx'
-import { configDir, installKind, isSecret, onConfigDirChanged, openConfigDir, samePath, userDataDir, usesHomeState, writesAllowed } from '../paths'
+import { configDir, inConfigDir, installKind, isSecret, onConfigDirChanged, openConfigDir, samePath, userDataDir, usesHomeState, writesAllowed } from '../paths'
 import { startCommand } from '../profiles/model'
 import { placeNewFile, trash as trashInConfig } from '../safeWrite'
 import { NO_CAPS, entriesFromLine, iterLines, parseLine } from '../transcripts/parse'
@@ -57,6 +59,8 @@ interface Stored {
   dir: string
   on: boolean
   sessions: Record<string, Meta>
+  /** Auto delete (Storage's age card); missing = off. */
+  auto?: AutoDelete
 }
 
 interface Folder {
@@ -85,6 +89,22 @@ const rootOf = archiveRootOf
 const isMeta = (m: unknown): m is Meta =>
   !!m && typeof m === 'object' && typeof (m as Meta).bytes === 'number' && typeof (m as Meta).parsed === 'number' && typeof (m as Meta).gone === 'boolean'
 
+const isRun = (r: unknown): r is AutoDeleteRun =>
+  !!r &&
+  typeof r === 'object' &&
+  Number.isFinite((r as AutoDeleteRun).at) &&
+  Number.isFinite((r as AutoDeleteRun).sessions) &&
+  Number.isFinite((r as AutoDeleteRun).bytes)
+
+/** Auto delete as index.json holds it; anything unreadable is off. */
+function autoOf(a: unknown): AutoDelete | null {
+  if (!a || typeof a !== 'object') return null
+  const { on, days, last } = a as Partial<AutoDelete>
+  if (typeof days !== 'number' || !(AUTO_DELETE_DAYS as readonly number[]).includes(days)) return null
+  const run = isRun(last) ? { at: last.at, sessions: last.sessions, bytes: last.bytes, error: typeof last.error === 'string' ? last.error : null } : null
+  return { on: on === true, days, last: run }
+}
+
 async function folder(dir: string): Promise<Folder> {
   const k = folderKey(dir)
   const had = folders.get(k)
@@ -96,7 +116,7 @@ async function folder(dir: string): Promise<Folder> {
     if (raw.v === 1 && raw.sessions && typeof raw.sessions === 'object') {
       const sessions: Record<string, Meta> = {}
       for (const [key, m] of Object.entries(raw.sessions)) if (splitKey(key) && isMeta(m)) sessions[key] = { ...emptyFacts(), ...m }
-      state = { v: 1, dir, on: raw.on !== false, sessions }
+      state = { v: 1, dir, on: raw.on !== false, sessions, ...(autoOf(raw.auto) ? { auto: autoOf(raw.auto) as AutoDelete } : {}) }
     }
   } catch {
     /* new, or unreadable: the sweep rebuilds it from the files */
@@ -219,7 +239,8 @@ async function trashTogether(f: Folder, name: string, files: string[]): Promise<
       await fsp.rename(from, to)
       moved.push([from, to])
     }
-    await shell.trashItem(bin)
+    // screenshots work on a temp copy: what they take away is not worth a place in this Mac's Trash
+    await (SHOT ? fsp.rm(bin, { recursive: true }) : shell.trashItem(bin))
   } catch (e) {
     for (const [from, to] of moved.reverse()) {
       await fsp.mkdir(path.dirname(from), { recursive: true }).catch(() => undefined)
@@ -388,6 +409,8 @@ function sweep(f: Folder): Promise<void> {
   const run = async (): Promise<void> => {
     try {
       if (await holding) progress(f, true)
+      // auto delete goes once every transcript is held, so a session written since the last sweep is seen as new
+      if (autoDue(f)) await autoRun(f).catch(() => undefined)
       const read = reading.then(() => readAll(f))
       reading = read.catch(() => undefined)
       if (await read) {
@@ -679,7 +702,167 @@ async function trash(key: string): Promise<void> {
     await forget(f, k)
     await save(f)
   })
+  forgetDiskCost()
   progress(f, true)
+}
+
+/* ------------------------------------------------------------------ by age (Storage) */
+
+/** The ages Storage offers, in days; a step without sessions isn't shown. */
+const AGE_STEPS = [14, 30, 60, 90, 180, 365]
+const DAY_MS = 86_400_000
+
+/** A session's transcript plus its folder of sub-agent transcripts: Claude Code's while it has them, else the archive's. */
+async function sessionBytes(f: Folder, p: string, sid: string, m: Meta): Promise<number> {
+  const side = m.gone ? heldSide(f, p, sid) : liveSide(f, p, sid)
+  return m.bytes + ((await isDir(side)) ? (await dirSize(side)).bytes : 0)
+}
+
+/** Sessions by how long Claude Code hasn't written them (`mtimeMs`, the age Claude Code's own cleanup goes by). */
+async function ages(): ReturnType<ArchiveApi['ages']> {
+  const f = await folder(configDir())
+  if (!f.sweeping && Date.now() - f.lastSweep > FRESH_MS) void sweep(f).catch(() => undefined)
+  if (f.held) await Promise.race([f.held, new Promise((r) => setTimeout(r, LIST_WAIT_MS))])
+  const now = Date.now()
+  const old: Array<{ age: number; bytes: number }> = []
+  for (const [key, m] of Object.entries(f.state.sessions)) {
+    const age = now - m.mtimeMs
+    const k = splitKey(key)
+    if (!k || age < AGE_STEPS[0] * DAY_MS) continue
+    old.push({ age, bytes: await sessionBytes(f, k.projectId, k.sessionId, m) })
+  }
+  const steps = AGE_STEPS.map((days) => {
+    const hit = old.filter((o) => o.age >= days * DAY_MS)
+    return { days, sessions: hit.length, bytes: hit.reduce((n, o) => n + o.bytes, 0) }
+  }).filter((s) => s.sessions > 0)
+  return { steps, readOnly: !mayArchive(f.dir), at: now, auto: { ...(f.state.auto ?? autoOff()) } }
+}
+
+/**
+ * Move every session untouched for `days` days to the Trash. Claude Code's file and folder go one by one (so Finder can
+ * put each back), then what only the archive has goes as one item; the archive's links go with them, or nothing is freed.
+ * A session written since the screen counted it stays.
+ */
+async function trashOlderThan(days: number, at: number, count: number): Promise<{ sessions: number; bytes: number }> {
+  if (!AGE_STEPS.includes(days)) throw new Error('Invalid age')
+  if (!Number.isFinite(at) || at > Date.now() || !Number.isInteger(count) || count < 0) throw new Error('Invalid request')
+  const f = await folder(configDir())
+  assertMayArchive(f)
+  return moveOlderThan(f, days, at, count)
+}
+
+/**
+ * The one way sessions leave by age, from the screen and from auto delete: `trashOlderThan`'s rule on folder `f` (any
+ * profile, not only the open one). Refuses when more than `count` would go.
+ */
+async function moveOlderThan(f: Folder, days: number, at: number, count: number): Promise<{ sessions: number; bytes: number }> {
+  // the age as the screen counted it: a session that only crossed the line since then waits for the next look
+  const cutoff = at - days * DAY_MS
+  try {
+    // Claude Code's files are moved in this profile's folder, whichever profile is open
+    return await inConfigDir(f.dir, () =>
+      locked(f, async () => {
+        const going: Array<{ key: string; p: string; sid: string; m: Meta; live: boolean }> = []
+        for (const [key, m] of Object.entries(f.state.sessions)) {
+          if (m.mtimeMs > cutoff) continue
+          const k = splitKey(key)
+          if (!k) continue
+          const p = projectDirName(k.projectId)
+          const sid = sessionFileId(k.sessionId)
+          const live = await fsp.stat(liveFile(f, p, sid)).catch(() => null)
+          if (live && live.mtimeMs > cutoff) continue
+          going.push({ key, p, sid, m, live: live !== null })
+        }
+        // never more than the dialog named (a first sweep that finished after the screen counted, say)
+        if (going.length > count) throw new Error(`${going.length} sessions are that old now, not ${count}. Look again before moving them.`)
+        const done: Array<{ key: string; p: string; sid: string }> = []
+        let bytes = 0
+        let failed: unknown = null
+        try {
+          for (const g of going) {
+            const size = await sessionBytes(f, g.p, g.sid, g.m)
+            if (g.live) await trashInConfig(path.join('projects', g.p, `${g.sid}.jsonl`))
+            if (await isDir(liveSide(f, g.p, g.sid))) await trashInConfig(path.join('projects', g.p, g.sid))
+            done.push(g)
+            bytes += size
+          }
+        } catch (e) {
+          failed = e
+        }
+        // what went from Claude Code's folder: the archive lets go of it too, even when a later one failed
+        if (done.length > 0) {
+          try {
+            await discard(f, done, `Claude Code sessions older than ${days} days`)
+            for (const d of done) await forget(f, d.key)
+          } catch (e) {
+            failed ??= e
+          }
+          await save(f)
+        }
+        if (failed) throw failed
+        return { sessions: done.length, bytes }
+      })
+    )
+  } finally {
+    forgetDiskCost()
+    progress(f, true)
+  }
+}
+
+/* ------------------------------------------------------------------ auto delete */
+
+const AUTO_EVERY_MS = DAY_MS
+const autoOff = (): AutoDelete => ({ on: false, days: AUTO_DELETE_DEFAULT_DAYS, last: null })
+
+/**
+ * One auto delete run on `f`: sessions untouched for its age go the way `moveOlderThan` moves them, and the run is kept
+ * (what went, or the error) for the Storage screen. `cap`/`at` are what a dialog named; the daily run has no cap.
+ */
+async function autoRun(f: Folder, at = Date.now(), cap = Number.MAX_SAFE_INTEGER): Promise<void> {
+  const a = f.state.auto
+  if (!a?.on || !mayArchive(f.dir)) return
+  let run: AutoDeleteRun
+  try {
+    run = { at: Date.now(), ...(await moveOlderThan(f, a.days, at, cap)), error: null }
+  } catch (e) {
+    run = { at: Date.now(), sessions: 0, bytes: 0, error: (e as Error).message || String(e) }
+  }
+  await locked(f, async () => {
+    // turned off or changed meanwhile: the run still happened, so it is kept
+    f.state.auto = { ...(f.state.auto ?? a), last: run }
+    await save(f)
+  })
+  if (samePath(f.dir, openConfigDir())) emit('archive:autoDeleted', { ...(f.state.auto as AutoDelete) })
+}
+
+/** The daily run is due: on, allowed here, and nothing ran in the last 24 hours. */
+const autoDue = (f: Folder): boolean => {
+  const a = f.state.auto
+  return !!a?.on && mayArchive(f.dir) && (!a.last || Date.now() - a.last.at >= AUTO_EVERY_MS)
+}
+
+async function setAutoDelete(on: boolean, days: number, at?: number, count?: number): Promise<AutoDelete> {
+  if (typeof on !== 'boolean' || !(AUTO_DELETE_DAYS as readonly number[]).includes(days)) throw new Error('Invalid request')
+  const f = await folder(configDir())
+  assertMayArchive(f)
+  const was = f.state.auto ?? autoOff()
+  // more would go than before: only with what the dialog named, and it goes now
+  const widens = on && (!was.on || days < was.days)
+  if (widens && (typeof at !== 'number' || !Number.isFinite(at) || at > Date.now() || !Number.isInteger(count) || (count as number) < 0)) {
+    throw new Error('Invalid request')
+  }
+  await locked(f, async () => {
+    f.state.auto = { on, days, last: f.state.auto?.last ?? null }
+    await save(f)
+  })
+  if (widens) await autoRun(f, at, count)
+  return { ...(f.state.auto as AutoDelete) }
+}
+
+/** Screenshots only: run auto delete on the open profile now, whenever it last ran. */
+export async function autoDeleteNow(): Promise<void> {
+  if (!SHOT) throw new Error('Only in screenshot mode')
+  await autoRun(await folder(configDir()))
 }
 
 async function setOn(on: boolean, trashArchived = false): Promise<ArchiveStatus> {
@@ -691,6 +874,7 @@ async function setOn(on: boolean, trashArchived = false): Promise<ArchiveStatus>
     else await stop(f, trashArchived === true)
     await save(f)
   })
+  forgetDiskCost()
   progress(f, true)
   return statusOf(f)
 }
@@ -723,6 +907,9 @@ export function register(ipcMain: IpcMain): void {
     resume,
     exportMarkdown,
     trash,
+    ages,
+    trashOlderThan,
+    setAutoDelete,
     setOn,
     async reveal() {
       const f = await folder(configDir())
@@ -746,7 +933,10 @@ export function register(ipcMain: IpcMain): void {
       if (n) await save(f)
       return n > 0
     })
-    if (changed) progress(f, true)
+    if (changed) {
+      forgetDiskCost()
+      progress(f, true)
+    }
   })
   onConfigDirChanged(() => void folder(openConfigDir()).then((f) => sweep(f), () => undefined))
   setTimeout(() => void sweepAll(), FIRST_SWEEP_MS)

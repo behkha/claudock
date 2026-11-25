@@ -3,12 +3,15 @@ import { File as FileIcon, Folder, FolderOpen, Lock, RefreshCw, Trash2 } from 'l
 import type { StorageEntry } from '@shared/api/storage'
 import { formatBytes, formatCount, formatDateTime, formatRelative, tildify } from '@shared/format'
 import { Badge, Button, Card, ConfirmDialog, EmptyState, IconButton, PageLayout, Spinner, useToast } from '@/components'
-import { api, isMac, useApi } from '@/lib/api'
+import { api, isMac, useApi, useEvent } from '@/lib/api'
 import { cx } from '@/lib/cx'
 import { useNav, type ScreenProps } from '@/lib/nav'
+import { AgeCard } from './AgeCard'
 import { FindingsList } from './Findings'
+import { DiskLedger } from './Ledger'
 import { useFindings } from './useFindings'
 import { useFolder } from './useFolder'
+import './ledger.css'
 import './storage.css'
 
 const SHOW_LIMIT = 300
@@ -30,6 +33,9 @@ export default function StorageScreen({ selectId }: ScreenProps): JSX.Element {
   const [busy, setBusy] = useState(false)
   const folder = useFolder(rel)
   const found = useFindings()
+  const [force, setForce] = useState(0)
+  const cost = useApi(() => api.storage.diskCost(force > 0), [force])
+  const ages = useApi(() => api.archive.ages(), [force])
 
   // arriving with a path (from Today's chip, a finding or the palette): open that folder, or the folder holding a file
   useEffect(() => {
@@ -85,7 +91,11 @@ export default function StorageScreen({ selectId }: ScreenProps): JSX.Element {
   const reloadAll = (): void => {
     folder.reload()
     found.rescan()
+    setForce((n) => n + 1)
   }
+
+  // auto delete moved sessions (the daily run, or the switch): count again
+  useEvent('archive:autoDeleted', () => reloadAll())
 
   async function confirmTrash(): Promise<void> {
     if (!trashing) return
@@ -134,6 +144,18 @@ export default function StorageScreen({ selectId }: ScreenProps): JSX.Element {
         </nav>
       }
     >
+      {rel === '' ? <DiskLedger cost={cost.data} home={home} fm={fm} /> : null}
+      {rel === '' && cost.data && ages.data ? (
+        <AgeCard
+          steps={ages.data.steps}
+          at={ages.data.at}
+          total={cost.data.config.bytes + cost.data.data.keptBytes}
+          readOnly={ages.data.readOnly}
+          auto={ages.data.auto}
+          onTrashed={reloadAll}
+        />
+      ) : null}
+
       {scoped.length > 0 || (found.scanning && rel === '') || found.error ? (
         <Card title="Suggestions" description="Cleanups found in your real files." className="stor__sugg">
           <FindingsList findings={scoped} scanning={found.scanning && rel === ''} error={found.error} compact onChanged={reloadAll} />

@@ -20,6 +20,8 @@ Claudock opens the Claude Code config folder (`~/.claude`, or wherever `CLAUDE_C
 - **Your data:** every session, kept after Claude Code's 30-day cleanup deletes it, with full-text search, resume from any folder and Markdown export; projects, memory, plans, prompt history
 - **Maintain:** disk use per folder with cleanup suggestions, plus snapshots and `.bak` files you can diff and restore
 
+**Storage** shows what Claude Code's folder and Claudock really take on disk (Finder counts the session archive's links twice), moves sessions untouched for an age you pick to the Trash, and can do that by itself once a day.
+
 **Menu bar** (the tray on Windows and Linux): the highest of your limits (5-hour, weekly, or whichever window Claude Code reports), and a clay mark while a Claude Code session waits for you. Click it for the running sessions with their context size, every limit, today's tokens and the alert settings. Alerts are off until you turn them on: a session that waits, a limit at a percentage you pick, a session whose context reaches a size you pick (once you pick one, each row shows a bar toward it), and a saved rule that holds a secret. On macOS, closing the window keeps Claudock running there; quit from its menu. On Windows the tray icon is off until you turn it on in View › Show in Tray.
 
 ⌘K (Ctrl+K on Windows and Linux) searches skills, agents, rules, hooks, sessions, memory and settings keys.

@@ -3,6 +3,7 @@ import path from 'node:path'
 import type { StorageApi, StorageEntry, StorageSize } from '@shared/api/storage'
 import { formatBytes } from '@shared/format'
 import type { DirSize } from '@shared/types'
+import { diskCost, forgetDiskCost } from '../diskCost'
 import { dirSize, listDir } from '../fsx'
 import { defineDomain, emit } from '../ipcx'
 import { configDir, resolveInside } from '../paths'
@@ -57,6 +58,10 @@ const scans = new Map<string, AbortController>()
 const BATCH_MS = 120
 
 const impl: StorageApi = {
+  diskCost(force) {
+    return diskCost(async () => (await sizeOf(configDir(), { force: force === true })).bytes, force === true)
+  },
+
   async children(rel) {
     const abs = absOf(rel)
     const entries = await listDir(abs)
@@ -126,6 +131,7 @@ const impl: StorageApi = {
   async trash(rel) {
     if (rel === '') throw new Error('Refusing to trash the config folder')
     await trash(rel)
+    forgetDiskCost()
   }
 }
 

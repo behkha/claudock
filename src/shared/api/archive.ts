@@ -62,6 +62,33 @@ export interface SearchHit {
   count: number
 }
 
+/** Sessions Claude Code hasn't written for at least `days` days, with their sub-agent folders. */
+export interface AgeStep {
+  days: number
+  sessions: number
+  bytes: number
+}
+
+/** The ages auto delete offers, in days (all of them, unlike the slider). */
+export const AUTO_DELETE_DAYS = [30, 60, 90, 180, 365] as const
+export const AUTO_DELETE_DEFAULT_DAYS = 90
+
+/** One auto delete run: what it moved to the Trash, or why it stopped. */
+export interface AutoDeleteRun {
+  at: number
+  sessions: number
+  bytes: number
+  error: string | null
+}
+
+/** Auto delete, per profile, kept in Claudock's own data (the archive's index.json), never in Claude Code's folder. */
+export interface AutoDelete {
+  on: boolean
+  days: number
+  /** null before the first run. */
+  last: AutoDeleteRun | null
+}
+
 export interface ArchiveApi {
   /** Every session of the open profile, newest first, after a quick look for new ones. */
   list(): Promise<ArchiveList>
@@ -78,6 +105,20 @@ export interface ArchiveApi {
   exportMarkdown(key: string): Promise<{ path: string } | null>
   /** Move the session to the Trash: Claude Code's file and the archive's. */
   trash(key: string): Promise<void>
+  /** Sessions by how long they've been untouched, at the steps that have any (14, 30, 60, 90, 180, 365 days). */
+  ages(): Promise<{ steps: AgeStep[]; readOnly: boolean; at: number; auto: AutoDelete }>
+  /**
+   * Move every session untouched for `days` days or more to the Trash: Claude Code's file and folder and the archive's
+   * copy or link, together, or the space isn't freed. Ages count from `at` (what `ages` answered); a session written
+   * since stays, and it refuses when more than `count` (what the dialog named) would go. Returns what went.
+   */
+  trashOlderThan(days: number, at: number, count: number): Promise<{ sessions: number; bytes: number }>
+  /**
+   * Turn auto delete on or off, or change its age. Turning it on, or a younger age, moves what is that old to the Trash
+   * now, never more than `count` sessions counted at `at` (what the dialog named); both are required then. At most once
+   * a day after that, while Claudock runs, sessions untouched for `days` days go the way `trashOlderThan` moves them.
+   */
+  setAutoDelete(on: boolean, days: number, at?: number, count?: number): Promise<AutoDelete>
   /** Start or stop archiving this profile. Stopping can also move the sessions only the archive has to the Trash. */
   setOn(on: boolean, trashArchived?: boolean): Promise<ArchiveStatus>
   /** Show the profile's archive folder in Finder / Explorer. */
@@ -87,4 +128,6 @@ export interface ArchiveApi {
 export interface ArchiveEvents {
   /** The open profile's sessions changed (new, deleted by Claude Code, read for search). */
   'archive:changed': ArchiveStatus
+  /** Auto delete ran in the open profile (Storage counts again). */
+  'archive:autoDeleted': AutoDelete
 }

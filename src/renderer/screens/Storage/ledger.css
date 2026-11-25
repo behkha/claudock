@@ -1,0 +1,248 @@
+/* Storage: the folder ledger (both folders on one scale) and the age card under it. Tokens only. */
+.ledger__body {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 20px 14px;
+}
+.ledger__row {
+  display: grid;
+  grid-template-columns: 170px 1fr 104px 28px;
+  align-items: center;
+  gap: 14px;
+  min-height: 52px;
+  border-bottom: var(--hair) solid var(--border);
+}
+.ledger__name {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+  min-width: 0;
+}
+.ledger__name small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: var(--fs-caption);
+  color: var(--text-3);
+}
+.ledger__bar {
+  display: flex;
+  height: 14px;
+  border-radius: 4px;
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+.ledger__seg {
+  display: block;
+  height: 100%;
+}
+.ledger__seg--cc {
+  background: var(--oat);
+  /* dark Oat sits close to the card: a hairline keeps the bar and its swatch visible */
+  box-shadow: inset 0 0 0 var(--hair) var(--border-strong);
+}
+.ledger__seg--real {
+  background: var(--accent);
+}
+/* the archive's links to Claude Code's files: drawn, but hatched, because they take no extra space */
+.ledger__seg--link {
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--text) 18%, transparent) 0 2px, transparent 2px 6px);
+  box-shadow: inset 0 0 0 var(--hair) var(--border-strong);
+}
+.ledger__size {
+  text-align: right;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+.ledger__finder {
+  display: block;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.ledger__finder s {
+  color: var(--text-2);
+}
+.ledger__more {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-2);
+}
+.ledger__more:hover:not(:disabled),
+.ledger__more--open {
+  background: var(--hover);
+}
+.ledger__more svg {
+  transition: transform 0.15s ease;
+}
+.ledger__more--open svg {
+  transform: rotate(180deg);
+}
+.ledger__more:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.ledger__break {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 12px 0 4px;
+  list-style: none;
+}
+.ledger__tile {
+  display: flex;
+  flex-direction: column;
+  padding: 9px 11px;
+  border-radius: var(--radius-control);
+  background: var(--surface-sunken);
+}
+.ledger__tile b {
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.ledger__tile span {
+  font-size: var(--fs-caption);
+  color: var(--text-2);
+}
+.ledger__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding-top: 10px;
+  font-size: var(--fs-caption);
+  color: var(--text-2);
+}
+.ledger__legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ledger__sw {
+  display: inline-block;
+  width: 12px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.ages__body {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 10px 24px;
+  padding: 16px 20px;
+}
+.ages__q {
+  margin: 0;
+  font-size: 15px;
+}
+.ages__q b,
+.ages__num {
+  font-variant-numeric: tabular-nums;
+}
+.ages__acts {
+  display: flex;
+  gap: 8px;
+}
+.ages__gauge {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ages__label {
+  font-size: var(--fs-caption);
+  color: var(--text-3);
+}
+.ages__range {
+  width: 100%;
+  height: 20px;
+  margin: 0;
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.ages__range::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--surface-sunken);
+  box-shadow: inset 0 0 0 var(--hair) var(--border-strong);
+}
+.ages__range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 0 var(--hair) var(--border-strong);
+}
+.ages__range:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.ages__ticks {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.ages__bar {
+  height: 16px;
+}
+.ages__bar .ledger__seg {
+  transition: width 0.25s ease;
+}
+.ages__seg--goes {
+  background: var(--success);
+  opacity: 0.75;
+}
+.ages .ledger__legend {
+  padding-top: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ages__bar .ledger__seg,
+  .ledger__more svg {
+    transition: none;
+  }
+}
+
+.ages__auto {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 10px 20px;
+}
+.ages__body + .ages__auto {
+  border-top: var(--hair) solid var(--border);
+}
+.ages__autotext {
+  font-size: var(--fs-body);
+  color: var(--text);
+}
+.ages__sel {
+  display: inline-flex;
+  vertical-align: middle;
+  margin: 0 2px;
+}
+.ages__sel .field__control {
+  width: auto;
+  min-height: 28px;
+  padding: 3px 30px 3px 8px;
+  font-size: var(--fs-body);
+}
+.ages__last {
+  grid-column: 2;
+  font-size: var(--fs-caption);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}

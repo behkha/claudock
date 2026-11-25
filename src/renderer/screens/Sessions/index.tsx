@@ -5,11 +5,18 @@ import { formatBytes, formatCount, formatDate, formatRelative } from '@shared/fo
 import { Badge, Chip, ConfirmDialog, EmptyState, IconButton, ListDetailLayout, ListPane, ListRow, Toggle, useToast } from '@/components'
 import { api, useEvent } from '@/lib/api'
 import { useSelectId } from '@/lib/hooks'
-import type { ScreenProps } from '@/lib/nav'
+import { useNav, type ScreenProps } from '@/lib/nav'
 import { SessionDetail } from './SessionDetail'
 import './sessions.css'
 
-type Filter = 'all' | 'archived'
+type Filter = 'all' | 'archived' | 'older'
+
+const DAY_MS = 86_400_000
+/** Storage's age card opens Sessions with `older:<days>`: the sessions untouched that long (keys always hold a '/'). */
+const olderOf = (sel: string | undefined): number | null => {
+  const m = sel ? /^older:(\d+)$/.exec(sel) : null
+  return m ? Number(m[1]) : null
+}
 
 /** selectId = `<key>` or `<key>@<byte offset>` (a search hit); keys never hold an '@'. */
 function split(sel: string | undefined): [string | undefined, number | undefined] {
@@ -50,14 +57,28 @@ function Snippet({ hit }: { hit: SearchHit }): JSX.Element {
 
 export default function SessionsScreen({ selectId }: ScreenProps): JSX.Element {
   const toast = useToast()
-  const [selected, setSelected] = useSelectId(selectId)
+  const { seq } = useNav()
+  const asked = olderOf(selectId)
+  const [selected, setSelected] = useSelectId(asked === null ? selectId : undefined)
   const [key, focus] = split(selected)
   const [data, setData] = useState<ArchiveList | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [hits, setHits] = useState<SearchHit[] | null>(null)
   const [searching, setSearching] = useState(false)
-  const [filter, setFilter] = useState<Filter>('all')
+  const [filter, setFilter] = useState<Filter>(asked === null ? 'all' : 'older')
+  const [olderDays, setOlderDays] = useState<number | null>(asked)
+  // arriving from Storage again with another age
+  useEffect(() => {
+    // a session asked for by its key (the palette) shows in the full list
+    if (asked === null) {
+      if (selectId) setFilter((f) => (f === 'older' ? 'all' : f))
+      return
+    }
+    setOlderDays(asked)
+    setFilter('older')
+    setSelected(undefined)
+  }, [asked, selectId, seq, setSelected])
   const [menu, setMenu] = useState(false)
   const [stopping, setStopping] = useState(false)
   const [trashArchived, setTrashArchived] = useState(false)
@@ -128,8 +149,14 @@ export default function SessionsScreen({ selectId }: ScreenProps): JSX.Element {
           return s ? [{ s, hit: h }] : []
         })
       : (data?.sessions ?? []).map((s) => ({ s }))
-    return filter === 'archived' ? list.filter((r) => r.s.archived) : list
-  }, [data, hits, byKey, filter])
+    if (filter === 'archived') return list.filter((r) => r.s.archived)
+    if (filter === 'older' && olderDays !== null) {
+      // the age Storage counts by: when Claude Code last wrote the file
+      const cutoff = Date.now() - olderDays * DAY_MS
+      return list.filter((r) => r.s.mtimeMs <= cutoff)
+    }
+    return list
+  }, [data, hits, byKey, filter, olderDays])
 
   // open the newest session when nothing was asked for: an unknown key keeps showing "not found"
   useEffect(() => {
@@ -157,6 +184,11 @@ export default function SessionsScreen({ selectId }: ScreenProps): JSX.Element {
   const status = data?.status
   const current = key ? byKey.get(key) : undefined
   const archivedCount = status?.archived ?? 0
+  const olderCount = useMemo(() => {
+    if (olderDays === null || !data) return 0
+    const cutoff = Date.now() - olderDays * DAY_MS
+    return data.sessions.filter((s) => s.mtimeMs <= cutoff).length
+  }, [data, olderDays])
 
   async function turn(on: boolean, trashToo = false): Promise<void> {
     setBusy(true)
@@ -191,6 +223,11 @@ export default function SessionsScreen({ selectId }: ScreenProps): JSX.Element {
                 <Chip selected={filter === 'archived'} onClick={() => setFilter('archived')} disabled={archivedCount === 0 && filter !== 'archived'}>
                   Archived{archivedCount > 0 ? ` ${formatCount(archivedCount)}` : ''}
                 </Chip>
+                {olderDays !== null ? (
+                  <Chip selected={filter === 'older'} onClick={() => setFilter('older')}>
+                    Older than {olderDays} days · {formatCount(olderCount)}
+                  </Chip>
+                ) : null}
               </div>
             }
             loading={(!data && !error) || searching}
@@ -199,7 +236,7 @@ export default function SessionsScreen({ selectId }: ScreenProps): JSX.Element {
             empty={
               <EmptyState
                 icon={<MessagesSquare />}
-                title={hits ? 'No match' : filter === 'archived' ? 'Nothing archived yet' : 'No sessions yet'}
+                title={hits ? 'No match' : filter === 'archived' ? 'Nothing archived yet' : filter === 'older' ? `Nothing older than ${olderDays ?? 0} days` : 'No sessions yet'}
                 description={hits ? 'Try other words.' : undefined}
               />
             }

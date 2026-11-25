@@ -25,7 +25,39 @@ export interface StorageSize {
   files: number
 }
 
+/**
+ * What Claude Code's folder and Claudock's own data folder (userData) take on disk. Claudock's archive hard-links Claude
+ * Code's transcripts, so a file manager adding up each folder counts those bytes twice; `real` counts each file once and
+ * leaves out the files that are also in a Claude Code folder, like `du` does.
+ */
+export interface DiskCost {
+  /** The open profile's config folder. */
+  config: { path: string; bytes: number }
+  data: {
+    path: string
+    /** Disk Claudock's folder really takes: each file once, none that a Claude Code folder also has. */
+    real: number
+    /** Claude Code's files the archive links to: no extra disk. */
+    linked: number
+    /** What Finder / Explorer shows for the folder: every file's size added up. */
+    naive: number
+    /** The prompts and replies kept for search. */
+    searchText: number
+    /** Transcripts only the archive has (Claude Code deleted them, or a disk without links). */
+    keptSessions: number
+    keptBytes: number
+    /** The Claudock.app copy `npx claudock` keeps on macOS; null when there is none. */
+    app: number | null
+    snapshots: number
+    /** Everything else: Electron's caches, settings, indexes. */
+    other: number
+  }
+  at: number
+}
+
 export interface StorageApi {
+  /** Both folders measured; cached for a minute unless `force`. */
+  diskCost(force?: boolean): Promise<DiskCost>
   /** Direct children of `rel` ('' = the config dir). Fast: one readdir plus an lstat per child. */
   children(rel: string): Promise<StorageEntry[]>
   /** Recursive size of every child of `rel`. Streams `storage:sizes` (tagged with `scanId`); resolves when all are known. */

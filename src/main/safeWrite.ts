@@ -26,6 +26,7 @@ import {
 
 /* ------------------------------------------------------------------ serialisation */
 
+const SHOT = process.env.CLAUDOCK_SHOT === '1'
 const chains = new Map<string, Promise<unknown>>()
 /**
  * Serialise operations per target path so two writes to one file never interleave. Keys are case-folded on macOS and
@@ -513,6 +514,7 @@ export async function trash(rel: string): Promise<void> {
   const abs = resolveInside(rel)
   if (samePath(abs, configDir()) || samePath(abs, globalStateFile())) throw new Error('Refusing to trash this path')
   await assertNotSecretReal(abs)
-  await shell.trashItem(abs)
+  // screenshots work on a temp copy: what they take away is not worth a place in this Mac's Trash
+  await (SHOT ? fsp.rm(abs, { recursive: true }) : shell.trashItem(abs))
   invalidateSizes(path.dirname(abs))
 }

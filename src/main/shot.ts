@@ -9,7 +9,7 @@ import { formatTokens } from '@shared/limits'
 import { formatRange } from '@shared/wrapped'
 import { app } from 'electron'
 import { connectDir, folderKey } from './connect/folder'
-import { archiveRootOf, list as archiveList, markdownOf, search as archiveSearch, sweepNow } from './domains/archive'
+import { archiveRootOf, autoDeleteNow, list as archiveList, markdownOf, search as archiveSearch, sweepNow } from './domains/archive'
 import { listContext } from './domains/context'
 import { projectRules } from './domains/permissions'
 import { impl as team } from './domains/team'
@@ -549,6 +549,156 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
     await js(`document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}))`)
     // nothing of this flow in the shots after it
     await waitFor(`!document.querySelector('.palette') && !document.querySelector('.toast')`, 'the palette and the toast gone')
+  }
+
+  /**
+   * Storage's folder ledger and age card: the ledger's breakdown open (shot `storage-ledger`, Claudock's real size below
+   * the Finder sum, the archive's links hatched), "See them" opens Sessions on that age (shot `archive-older`, as many
+   * rows as the card counts), the confirm dialog (shot `storage-trash`). In dark it then moves them: every one of those
+   * sessions must be gone from Claude Code's folder, from the archive and from the list. Only on the shot's own copy.
+   */
+  async function diskFlow(theme: 'light' | 'dark'): Promise<void> {
+    if (process.env.CLAUDOCK_READONLY === '1' || !configDir().includes(`${path.sep}.shots${path.sep}.tmp-`)) return
+    await sweepNow()
+    emit('system:navigate', { screen: 'storage' })
+    await sleep(150)
+    await waitFor(`document.querySelector('.ledger__finder') && document.querySelector('.ages__q')`, 'the ledger with the Finder sum and the age card')
+    await js(`document.querySelector('.ledger__more').click()`)
+    await waitFor(`document.querySelectorAll('.ledger__tile').length >= 4`, 'the breakdown tiles')
+    await shoot(theme, 'storage-ledger')
+    const card = await js<string>(`document.querySelector('.ages__q').textContent`)
+    const m = /untouched for (\d+) days: ([\d,]+) session/.exec(card)
+    if (!m) throw new Error(`disk-cost: the age card reads "${card}"`)
+    const days = Number(m[1])
+    const count = Number(m[2].replace(/,/g, ''))
+
+    await click('See them', `document.querySelector('.ages')`)
+    await waitFor(`[...document.querySelectorAll('.chip')].some((c) => c.textContent.startsWith('Older than ${days} days'))`, 'the Sessions age chip')
+    await waitFor(`document.querySelectorAll('.ldl__list .list-row').length > 0`, 'the older sessions')
+    const shown = await js<number>(`document.querySelectorAll('.ldl__list .list-row').length`)
+    const chip = await js<string>(`[...document.querySelectorAll('.chip')].find((c) => c.textContent.startsWith('Older than')).textContent`)
+    if (!chip.endsWith(` ${count}`)) throw new Error(`disk-cost: the card counts ${count}, the Sessions chip reads "${chip}"`)
+    if (count <= 20 && shown !== count) throw new Error(`disk-cost: the card counts ${count}, Sessions lists ${shown}`)
+    await shoot(theme, 'archive-older')
+
+    emit('system:navigate', { screen: 'storage' })
+    await sleep(150)
+    await waitFor(`document.querySelector('.ages__q')`, 'the age card again')
+    await click(`Move ${count} to Trash`, `document.querySelector('.ages')`)
+    await waitFor(`document.querySelector('dialog[open]')`, 'the confirm dialog')
+    await shoot(theme, 'storage-trash')
+    if (theme === 'light') {
+      await click('Cancel', `document.querySelector('dialog[open]')`)
+      await waitFor(`!document.querySelector('dialog[open]')`, 'the dialog closed')
+      await autoFlow(theme)
+      return
+    }
+
+    const cutoff = Date.now() - days * 86_400_000
+    const going = (await archiveList()).sessions.filter((r) => r.mtimeMs <= cutoff)
+    if (going.length !== count) throw new Error(`disk-cost: the card counts ${count}, the archive ${going.length}`)
+    await click('Move to Trash', `document.querySelector('dialog[open]')`)
+    await waitFor(`!document.querySelector('dialog[open]')`, 'the sessions moved')
+    const root = archiveRootOf(configDir())
+    for (const r of going) {
+      for (const base of [configDir(), root]) {
+        const left = [path.join(base, 'projects', r.projectId, `${r.id}.jsonl`), path.join(base, 'projects', r.projectId, r.id)]
+        for (const f of left) if (await fsp.lstat(f).catch(() => null)) throw new Error(`disk-cost: ${path.relative(base, f)} is still there`)
+      }
+    }
+    const after = new Set((await archiveList()).sessions.map((r) => r.key))
+    if (going.some((r) => after.has(r.key))) throw new Error('disk-cost: a moved session is still listed')
+    await waitFor(`!document.querySelector('.toast')`, 'the toast gone')
+    await autoFlow(theme)
+  }
+
+  /**
+   * Auto delete, the row under the age card. Light: the row off (shot `storage-auto-off`) and the dialog turning it on
+   * asks (`storage-auto-confirm`), cancelled. Dark (after the age card moved everything old): three sessions made 120
+   * days old and one 60, the switch turned on at 90 days must name exactly three, move exactly those now (both Claude
+   * Code's files and the archive's) and keep the 60-day one (`storage-auto-on`); then one more made 100 days old goes in a
+   * forced run (the 24 h gate bypassed, screenshot mode only) and the last-run line counts it (`storage-auto-run`, and
+   * `storage-auto-on` again in light).
+   */
+  async function autoFlow(theme: 'light' | 'dark'): Promise<void> {
+    const sw = `document.querySelector('.ages__auto [role=switch]')`
+    const into = (): Promise<unknown> => js(`document.querySelector('.ages__auto').scrollIntoView({ block: 'center' })`)
+    if (theme === 'light') {
+      await waitFor(`${sw}?.getAttribute('aria-checked') === 'false'`, 'the auto delete switch, off')
+      if (await js<boolean>(`!!document.querySelector('.ages__last')`)) throw new Error('auto delete: a last run is shown before any run')
+      await into()
+      await shoot(theme, 'storage-auto-off')
+      await js(`${sw}.click()`)
+      await waitFor(`document.querySelector('dialog[open]')`, 'the auto delete dialog')
+      if ((await js<string>(`${sw}.getAttribute('aria-checked')`)) !== 'false') throw new Error('auto delete: the switch shows on before the dialog is confirmed')
+      await shoot(theme, 'storage-auto-confirm')
+      await click('Cancel', `document.querySelector('dialog[open]')`)
+      await waitFor(`!document.querySelector('dialog[open]') && ${sw}.getAttribute('aria-checked') === 'false'`, 'the switch still off')
+      return
+    }
+    const DAY = 86_400_000
+    const live = (r: { projectId: string; id: string }): string => path.join(configDir(), 'projects', r.projectId, `${r.id}.jsonl`)
+    // the oldest live sessions (later flows read the newest)
+    const rows = (await archiveList()).sessions.filter((r) => !r.archived).reverse()
+    if (rows.length < 8) throw new Error(`auto delete: only ${rows.length} live sessions left to age`)
+    const [a, b, c, young, later] = rows
+    const age = async (r: { projectId: string; id: string }, days: number): Promise<void> => {
+      const t = new Date(Date.now() - days * DAY)
+      await fsp.utimes(live(r), t, t)
+    }
+    for (const r of [a, b, c]) await age(r, 120)
+    await age(young, 60)
+    await sweepNow()
+    await click('Measure again')
+    await waitFor(`${sw}?.getAttribute('aria-checked') === 'false' && document.querySelector('.ages__q')`, 'the auto delete switch with old sessions')
+    await into()
+    await shoot(theme, 'storage-auto-off')
+
+    await js(`${sw}.click()`)
+    await waitFor(`document.querySelector('dialog[open]')`, 'the auto delete dialog')
+    const said = await js<string>(`document.querySelector('dialog[open]').textContent`)
+    if (!said.includes('3 sessions untouched for 90 days')) throw new Error(`auto delete: the dialog reads "${said}"`)
+    await shoot(theme, 'storage-auto-confirm')
+    await click('Turn on', `document.querySelector('dialog[open]')`)
+    await waitFor(`!document.querySelector('dialog[open]') && document.querySelector('.ages__last')?.textContent.includes(': 3 sessions,')`, 'the last run: 3 sessions')
+    const root = archiveRootOf(configDir())
+    const gone = async (r: { projectId: string; id: string }): Promise<boolean> => {
+      for (const base of [configDir(), root]) {
+        for (const f of [path.join(base, 'projects', r.projectId, `${r.id}.jsonl`), path.join(base, 'projects', r.projectId, r.id)]) {
+          if (await fsp.lstat(f).catch(() => null)) return false
+        }
+      }
+      return true
+    }
+    for (const r of [a, b, c]) if (!(await gone(r))) throw new Error(`auto delete: ${r.key} is still there`)
+    if (!(await fsp.lstat(live(young)).catch(() => null))) throw new Error('auto delete: a session 60 days old went at 90 days')
+    await waitFor(`!document.querySelector('.toast')`, 'no toast')
+    await into()
+    await shoot(theme, 'storage-auto-on')
+
+    // the daily run, forced: it ran a moment ago, so only screenshot mode may run it again now
+    await age(later, 100)
+    await sweepNow()
+    await click('Measure again')
+    await waitFor(`document.querySelector('.ages__q')?.textContent.includes('30 days: 2 sessions')`, 'the age card counting the 60- and 100-day sessions')
+    await autoDeleteNow()
+    // Storage counts again by itself after the run
+    await waitFor(
+      `document.querySelector('.ages__last')?.textContent.includes(': 1 session,') && document.querySelector('.ages__q')?.textContent.includes('30 days: 1 session')`,
+      'the last run: 1 session, and the age card counted again'
+    )
+    if (!(await gone(later))) throw new Error(`auto delete: ${later.key} is still there after the forced run`)
+    if (!(await fsp.lstat(live(young)).catch(() => null))) throw new Error('auto delete: the forced run took a session 60 days old')
+    const listed = new Set((await archiveList()).sessions.map((r) => r.key))
+    if ([a, b, c, later].some((r) => listed.has(r.key))) throw new Error('auto delete: a moved session is still listed')
+    await into()
+    await shoot(theme, 'storage-auto-run')
+    await setTheme('light', false)
+    await sleep(300)
+    await into()
+    await shoot('light', 'storage-auto-on')
+    await setTheme('dark', false)
+    await sleep(300)
   }
 
   /**
@@ -1142,6 +1292,9 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
       }
       if (opts.only.length === 0 || opts.only.includes('archive')) {
         await archiveFlow(theme).catch(fail)
+      }
+      if (opts.only.length === 0 || opts.only.includes('disk-cost')) {
+        await diskFlow(theme).catch(fail)
       }
       if (opts.only.length === 0 || opts.only.includes('context')) {
         await contextFlow(theme).catch(fail)

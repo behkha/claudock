@@ -46,6 +46,9 @@ export function openConfigDir(): string {
 /** Run `fn` (an IPC handler) on the folder open now, to the end of it, even if another profile opens meanwhile. */
 export const withConfigDir = <T>(fn: () => T): T => pinned.run(openConfigDir(), fn)
 
+/** Run `fn` on `dir` (a profile's folder that may not be the open one), to the end of it: what the archive's sweep does for each profile. */
+export const inConfigDir = <T>(dir: string, fn: () => T): T => pinned.run(path.resolve(dir), fn)
+
 /** Open another profile's folder. Modules that cache per folder clear themselves through `onConfigDirChanged`. */
 export function setConfigDir(dir: string): void {
   const next = path.resolve(dir)
