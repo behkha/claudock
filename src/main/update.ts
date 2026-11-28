@@ -225,40 +225,45 @@ export function clearUpdateForShot(): void {
 
 /**
  * The running version's notes, and whether they show by themselves: the first open of a version newer than the last
- * one seen. A first install records its version without showing; so does a downgrade. Screenshot mode and a git clone
- * never show them by themselves (CLAUDOCK_WHATS_NEW=1 does, in any build).
+ * one seen, once its notes are here. Notes that couldn't be fetched (offline, GitHub's rate limit, a release still in
+ * draft) leave the version unseen, so a later launch shows them. A first install records its version without showing;
+ * so does a downgrade. Screenshot mode and a git clone never show them by themselves (CLAUDOCK_WHATS_NEW=1 does, in any
+ * build).
  */
 export async function whatsNew(): Promise<WhatsNew> {
   const version = __APP_VERSION__
-  const forced = process.env.CLAUDOCK_WHATS_NEW === '1'
+  const cached = await versionNotes(version)
+  const notes = (cached?.notes ?? []).map((n) => ({ ...n, screen: noteScreen(`${n.title} ${n.text}`) }))
   let first = false
-  if (forced) first = true
+  if (process.env.CLAUDOCK_WHATS_NEW === '1') first = true
   else if (process.env.CLAUDOCK_SHOT !== '1' && installKind() !== 'dev') {
     const seen = (await loadPrefs()).seenVersion
     if (seen === null && !(await ranBefore())) await savePrefs({ seenVersion: version })
-    else if (seen === null || compareVersions(version, seen) > 0) first = true
+    else if (seen === null || compareVersions(version, seen) > 0) first = notes.length > 0
     else if (seen !== version) await savePrefs({ seenVersion: version })
   }
-  let cached = (await readNotes())[version]
-  // asked once per run: a release with no "What's new" isn't asked again on every click of the footer
-  if (!cached && !askedRelease && !offline() && (installKind() !== 'dev' || feedOverride())) {
-    askedRelease = true
-    const rel = await fetchRelease(version)
-    const notes = rel ? parseNotes(rel.body) : []
-    if (rel && notes.length) {
-      cached = { url: rel.url, notes }
-      await cacheNotes(version, rel.url, notes)
-    }
-  }
-  // the cache was written by the version that checked; this one's screens decide where a note links
-  const notes = (cached?.notes ?? []).map((n) => ({ ...n, screen: noteScreen(`${n.title} ${n.text}`) }))
   return { version, url: cached?.url ?? `${RELEASES_URL}/tag/v${version}`, notes, first, failure: await takeUpdateFailure() }
 }
 
-let askedRelease = false
+/** At most one request a minute for notes that aren't cached: the footer asks again on every click while they're missing. */
+const NOTES_RETRY_MS = 60_000
+let askedAt = 0
 
-/** The sheet was closed: it doesn't show by itself again for this version. */
+/** `version`'s notes: cached (the cache was written by the version that checked; this one's screens decide the links), else fetched. */
+async function versionNotes(version: string): Promise<{ url: string; notes: WhatsNewNote[] } | undefined> {
+  const cached = (await readNotes())[version]
+  if (cached || Date.now() - askedAt < NOTES_RETRY_MS || offline() || (installKind() === 'dev' && !feedOverride())) return cached
+  askedAt = Date.now()
+  const rel = await fetchRelease(version)
+  const notes = rel ? parseNotes(rel.body) : []
+  if (!rel || !notes.length) return undefined
+  await cacheNotes(version, rel.url, notes)
+  return { url: rel.url, notes }
+}
+
+/** The sheet was closed: it doesn't show by itself again for this version, unless it was closed with no notes in it. */
 export async function seenWhatsNew(): Promise<void> {
   if (process.env.CLAUDOCK_WHATS_NEW === '1' || process.env.CLAUDOCK_SHOT === '1') return
+  if (!(await readNotes())[__APP_VERSION__]) return
   await savePrefs({ seenVersion: __APP_VERSION__ })
 }
