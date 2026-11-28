@@ -1,12 +1,10 @@
 Claudock is an unofficial desktop app for your Claude Code setup: settings, hooks, skills, MCP servers, memory and sessions in one window, without hand-editing the files in `~/.claude`.
 
-## What's new in 0.5.0
+## What's new in 0.6.0
 
-- **What Claudock really takes on disk.** Storage opens with Claude Code's folder and Claudock's own data on one scale. Claudock keeps every session by linking Claude Code's transcripts, so Finder and cleaner apps count those bytes twice and Claudock can look many gigabytes large. The bar shows its real size, draws the linked part hatched, and shows Finder's number struck beside it. The chevron says what the real size holds.
-- **Old sessions, gone in one move.** Pick an age (14 days to a year) and see how many sessions were untouched that long and how much space they take. **See them** opens Sessions filtered to that age; **Move to Trash** moves Claude Code's files and Claudock's copies together, so the space is really freed. It never moves more than the dialog named.
-- **Auto delete.** A switch under the slider moves sessions untouched for 30, 60, 90, 180 or 365 days to the Trash by itself, once a day while Claudock runs. Off until you turn it on; turning it on first shows what would go now. Each profile has its own.
-
-Everything goes to the Trash, so you can put a session back from there.
+- **Update from inside Claudock.** When a newer version is out, the sidebar says so and shows what's in it. Update downloads it with its progress in the sidebar, and Restart to update puts it in place and opens it again. The download is checked against the release's checksum before anything changes; if macOS doesn't let Claudock replace itself, the version you had opens again and says why. With `npx claudock`, Update installs the new version in the background. This is the last version you install by hand.
+- **What's new, after every update.** The first time a new version opens, it lists what changed, with a button to the screen a note is about. Click the version at the bottom of the sidebar to see it again.
+- **Auto delete listens again.** In Storage, its switch turns off, and a new age sticks, without waiting for a run first.
 
 ## Download
 

@@ -1,6 +1,6 @@
 {
  "format": 1,
- "builtAt": "2026-11-25T10:39:22.958Z",
+ "builtAt": "2026-11-28T10:12:44.727Z",
  "sources": [
   "https://code.claude.com/docs/en/settings-reference.md",
   "https://code.claude.com/docs/en/env-vars.md",
@@ -1631,7 +1631,7 @@
    },
    "disableDesktopLocalSessions": {
     "summary": "Turn off Desktop Code sessions that run on the device, leaving SSH to other hosts and cloud",
-    "typeText": "Boolean; only the JSON Boolean true takes effect",
+    "typeText": "Boolean. Use the JSON Boolean true.",
     "default": "unset, so local sessions are available",
     "scope": "Managed",
     "topic": "Remote, desktop, and notifications",
@@ -1647,7 +1647,7 @@
      },
      {
       "value": false,
-      "summary": "local sessions stay available"
+      "summary": "local sessions stay available, though true in the other place can turn them off"
      }
     ]
    },
@@ -13505,7 +13505,7 @@
    "sshHostAllowlist": {
     "summary": "Limit which hosts Desktop SSH sessions can reach",
     "typeText": "array of hostname patterns",
-    "default": "unset, so any host is allowed",
+    "default": "unset, so any host is allowed. With a third-party provider, SSH sessions are off by default. To turn them on, see Enable SSH remote sessions.",
     "scope": "Managed",
     "topic": "Remote, desktop, and notifications",
     "url": "https://code.claude.com/docs/en/settings-reference#sshhostallowlist",
