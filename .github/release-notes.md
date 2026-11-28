@@ -2,7 +2,7 @@ Claudock is an unofficial desktop app for your Claude Code setup: settings, hook
 
 ## What's new in 0.6.0
 
-- **Update from inside Claudock.** When a newer version is out, the sidebar says so and shows what's in it. Update downloads it with its progress in the sidebar, and Restart to update puts it in place and opens it again. The download is checked against the release's checksum before anything changes; if macOS doesn't let Claudock replace itself, the version you had opens again and says why. With `npx claudock`, Update installs the new version in the background. This is the last version you install by hand.
+- **Update from inside Claudock.** When a newer version is out, the sidebar says so and shows what's in it. Update downloads it with its progress in the sidebar, and Restart to update puts it in place and opens it again. The download is checked against the release's checksum before anything changes; if macOS doesn't let Claudock replace itself, the version you had opens again and says why. With `npx claudock`, Update installs the new version in the background.
 - **What's new, after every update.** The first time a new version opens, it lists what changed, with a button to the screen a note is about. Click the version at the bottom of the sidebar to see it again.
 - **Auto delete listens again.** In Storage, its switch turns off, and a new age sticks, without waiting for a run first.
 
