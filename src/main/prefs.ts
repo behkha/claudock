@@ -15,10 +15,14 @@ interface Prefs {
   menuBar: boolean
   /** The first-run reveal was left (Connect, Not now, Continue, a navigation, or an error in it), so it never shows again (src/main/firstRun.ts). */
   revealed: boolean
+  /** The version whose What's new was last shown or skipped (src/main/update.ts); null before 0.6.0 and on a first install. */
+  seenVersion: string | null
 }
 
-const DEFAULTS: Prefs = { theme: 'system', alerts: DEFAULT_ALERT_PREFS, menuBar: process.platform !== 'win32', revealed: false }
+const DEFAULTS: Prefs = { theme: 'system', alerts: DEFAULT_ALERT_PREFS, menuBar: process.platform !== 'win32', revealed: false, seenVersion: null }
 let cache: Prefs | null = null
+/** prefs.json was there when first read: this copy ran before. */
+let existed = false
 
 const file = (): string => path.join(userDataDir(), 'prefs.json')
 
@@ -31,12 +35,20 @@ export async function loadPrefs(): Promise<Prefs> {
       ...(THEME_PREFS.includes(raw.theme as ThemePref) ? { theme: raw.theme as ThemePref } : {}),
       alerts: normalizeAlertPrefs(raw.alerts),
       ...(typeof raw.menuBar === 'boolean' ? { menuBar: raw.menuBar } : {}),
-      ...(raw.revealed === true ? { revealed: true } : {})
+      ...(raw.revealed === true ? { revealed: true } : {}),
+      ...(typeof raw.seenVersion === 'string' ? { seenVersion: raw.seenVersion } : {})
     }
+    existed = true
   } catch {
     cache = { ...DEFAULTS }
   }
   return cache
+}
+
+/** prefs.json existed before this run touched it: Claudock ran here before (an update, not a first install). */
+export async function ranBefore(): Promise<boolean> {
+  await loadPrefs()
+  return existed
 }
 
 export async function savePrefs(patch: Partial<Prefs>): Promise<Prefs> {

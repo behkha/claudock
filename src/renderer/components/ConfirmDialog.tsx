@@ -20,6 +20,8 @@ export interface ConfirmDialogProps {
   extra?: ReactNode
   /** No Cancel button; Esc and a click outside still call onCancel. */
   hideCancel?: boolean
+  /** Focus starts on the confirm button even when the body holds buttons or fields (the platform picks the first). */
+  focusConfirm?: boolean
 }
 
 /** Modal built on <dialog>: focus trap, Esc to cancel and aria-modal come from the platform. */
@@ -36,16 +38,21 @@ export function ConfirmDialog({
   onCancel,
   wide,
   extra,
-  hideCancel
+  hideCancel,
+  focusConfirm
 }: ConfirmDialogProps): JSX.Element {
   const ref = useRef<HTMLDialogElement>(null)
 
   useEffect(() => {
     const d = ref.current
     if (!d) return
-    if (open && !d.open) d.showModal()
+    if (open && !d.open) {
+      d.showModal()
+      // React's autoFocus ran while the dialog was still closed; showModal then focused the body's first control
+      if (focusConfirm) d.querySelector<HTMLElement>('.dialog__actions > :last-child')?.focus()
+    }
     if (!open && d.open) d.close()
-  }, [open])
+  }, [open, focusConfirm])
 
   return (
     <dialog

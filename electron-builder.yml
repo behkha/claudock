@@ -20,7 +20,11 @@ mac:
   target:
     - target: dmg
       arch: [arm64, x64]
-  # site/install.sh and site/install.ps1 download these file names; change them together.
+    # in-app update (src/main/updateInstall.ts) downloads the zip for its chip, checked against latest-mac.yml
+    - target: zip
+      arch: [arm64, x64]
+  # site/install.sh and site/install.ps1 download these file names, and src/main/updateFeed.ts picks the update by
+  # them; change them together.
   artifactName: ${productName}-${version}-${arch}.${ext}
 win:
   icon: build/icon.ico
@@ -31,6 +35,12 @@ win:
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
+# Where the update feeds (latest-mac.yml, latest.yml, latest-linux.yml, latest-linux-arm64.yml) point. They are written
+# with every build; .github/workflows/release.yml attaches them to the release beside the installers.
+publish:
+  provider: github
+  owner: behkha
+  repo: claudock
 linux:
   icon: build/icon.png
   target:

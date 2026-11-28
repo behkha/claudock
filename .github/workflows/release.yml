@@ -60,6 +60,8 @@ jobs:
           name: installers-${{ runner.os }}
           path: |
             dist/*.dmg
+            dist/*.zip
+            dist/latest*.yml
             dist/*.exe
             dist/*.AppImage
             dist/*.deb

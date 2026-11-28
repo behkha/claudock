@@ -7,7 +7,8 @@ import type { Platform } from '@shared/types'
 import { dirSize, exists } from '../fsx'
 import { defineDomain, emit } from '../ipcx'
 import { configDir, globalStateFile, assertNotSecretReal, installKind, isCustomConfigDir, isSecret, resolveInside, userDataDir, writesAllowed } from '../paths'
-import { checkUpdate } from '../update'
+import { checkUpdate, seenWhatsNew, whatsNew } from '../update'
+import { prepareUpdate, restartToUpdate, updateStatus } from '../updateInstall'
 import { currentTheme, setTheme } from '../theme'
 import { shouldReveal } from '../firstRun'
 import { loadPrefs, savePrefs } from '../prefs'
@@ -65,6 +66,29 @@ const impl: SystemApi = {
 
   async checkUpdate() {
     return checkUpdate()
+  },
+
+  async updateStatus() {
+    return updateStatus()
+  },
+
+  async installUpdate(version) {
+    if (typeof version !== 'string' || !/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(version)) throw new Error('Not a version')
+    const offered = await checkUpdate()
+    if (offered?.version !== version || !offered.installable) throw new Error(`${version} isn't the update on offer`)
+    await prepareUpdate(version)
+  },
+
+  async restartToUpdate() {
+    await restartToUpdate()
+  },
+
+  async whatsNew() {
+    return whatsNew()
+  },
+
+  async seenWhatsNew() {
+    await seenWhatsNew()
   },
 
   async reveal(p) {

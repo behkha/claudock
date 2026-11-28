@@ -218,6 +218,140 @@
   border-radius: 50%;
   background: var(--accent);
 }
+.update-trigger--ready {
+  background: none;
+}
+.update-trigger--ready:hover {
+  background: var(--selected);
+}
+.update-trigger--ready .update-trigger__dot {
+  background: var(--success);
+}
+.update-trigger:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+.sidebar__footer--plain {
+  padding: 6px 10px 8px;
+}
+.version-trigger {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: none;
+  color: var(--text-3);
+  font-size: var(--fs-caption);
+  text-align: left;
+}
+.version-trigger:hover {
+  background: var(--hover);
+  color: var(--text-2);
+}
+.update-prog {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 10px;
+}
+.update-prog__label {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--fs-caption);
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.update-prog__track {
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+.update-prog__fill {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+  transition: width 0.2s linear;
+}
+.update-prog__track--busy .update-prog__fill {
+  width: 35%;
+  animation: update-busy 1.4s ease-in-out infinite;
+}
+@keyframes update-busy {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(290%);
+  }
+}
+
+/* What's new (W1): the notes in the dialog, each with its screen's button */
+.dialog:has(.whatsnew) {
+  width: min(480px, calc(100vw - 48px));
+}
+.whatsnew {
+  display: flex;
+  flex-direction: column;
+  max-height: min(56vh, 460px);
+  /* the scroll box clips at its edge: 4px each side holds a button's focus ring (2px outline, 2px offset) */
+  margin: 4px -4px 0;
+  padding: 0 4px;
+  overflow-y: auto;
+  list-style: none;
+}
+.whatsnew__note {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 14px;
+  align-items: start;
+  padding: 12px 0;
+  border-top: var(--hair) solid var(--border);
+}
+.whatsnew__note b {
+  font-weight: 500;
+  color: var(--text);
+}
+.whatsnew__note p {
+  grid-column: 1;
+  margin: 0;
+  font-size: var(--fs-small);
+  line-height: 1.5;
+}
+.whatsnew__link {
+  grid-row: 1 / 3;
+  grid-column: 2;
+  align-self: center;
+  padding: 4px 9px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--surface-sunken);
+  color: var(--text);
+  font-size: var(--fs-caption);
+  white-space: nowrap;
+}
+.whatsnew__link:hover {
+  background: var(--selected);
+}
+@media (prefers-reduced-motion: reduce) {
+  .update-prog__fill {
+    transition: none;
+  }
+  .update-prog__track--busy .update-prog__fill {
+    width: 100%;
+    animation: none;
+    opacity: 0.5;
+  }
+}
 .update-pop {
   position: absolute;
   left: 10px;
@@ -235,7 +369,24 @@
   font-size: var(--fs-body);
 }
 .update-pop__title {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
   font-weight: 500;
+}
+.update-pop__title small {
+  font-weight: 400;
+  font-size: var(--fs-caption);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.update-pop__list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0 0 0 16px;
+  font-weight: 500;
+  font-size: var(--fs-small);
 }
 .update-pop__cmd {
   padding: 8px 10px;

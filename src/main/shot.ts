@@ -27,12 +27,16 @@ import { addLocalDays, midnightOf, mondayOf } from './share/week'
 import { setTheme } from './theme'
 import { sumActivity } from './today/activity'
 import { auditPage } from './shotAudit'
+import { cacheNotes, clearUpdateForShot, showUpdateForShot } from './update'
+import { showStatusForShot } from './updateInstall'
 import { driver, sleep, type Session } from './shotDrive'
+
+declare const __APP_VERSION__: string
 
 /**
  * Screenshot mode (CLAUDOCK_SHOT=1, driven by scripts/shot.mjs): visits every screen in light then dark through the
  * normal `system:navigate` / `system:theme` events, waits until each is loaded and painted in that theme, saves
- * `<dir>/<theme>-<screen>.png` (plus `connect`, the Connect sheet, `connected`, the Today card after connecting with one played status line run and three sessions played through the real hooks, which must post exactly one alert, `connected-hooks`, the Hooks screen then, where Claudock's hooks are one row and out of the counts, and `disconnect`, the confirm dialog that row's Disconnect… opens, which must leave settings.json byte for byte as it was, `profiles-add`, `profiles-menu` and `profiles-menubar`, profiles with a second folder added and removed again, `archive-search` and `archive-resume`, the Sessions screen with a session Claude Code deleted found and put back, `palette`, `settings-json`, `mods-draft`, the Mods screen with the fixture's draft selected, and `share-week` and `share`, the Today share dialog on the week (Max 20x beside the value, the prices it used open) and on all time, with `card-week.png` and `card.png`, the cards themselves, after checking the week against the limits scan and playing the Monday recap, and `reveal`, `reveal-connect`, `reveal-connected` and `reveal-empty`, the first-run reveal, and `context-off`, the Context screen with an MCP server and a skill switched off and a row's counted text open, which must leave settings.json byte for byte as it was once they are back on), prints renderer console errors as `CONSOLE_ERROR ...` and failed shots as
+ * `<dir>/<theme>-<screen>.png` (plus `connect`, the Connect sheet, `connected`, the Today card after connecting with one played status line run and three sessions played through the real hooks, which must post exactly one alert, `connected-hooks`, the Hooks screen then, where Claudock's hooks are one row and out of the counts, and `disconnect`, the confirm dialog that row's Disconnect… opens, which must leave settings.json byte for byte as it was, `profiles-add`, `profiles-menu` and `profiles-menubar`, profiles with a second folder added and removed again, `archive-search` and `archive-resume`, the Sessions screen with a session Claude Code deleted found and put back, `palette`, `settings-json`, `mods-draft`, the Mods screen with the fixture's draft selected, and `share-week` and `share`, the Today share dialog on the week (Max 20x beside the value, the prices it used open) and on all time, with `card-week.png` and `card.png`, the cards themselves, after checking the week against the limits scan and playing the Monday recap, and `reveal`, `reveal-connect`, `reveal-connected` and `reveal-empty`, the first-run reveal, and `update-pop`, `update-progress`, `update-restart` and `whatsnew`, the update in the sidebar's footer and What's new, and `context-off`, the Context screen with an MCP server and a skill switched off and a row's counted text open, which must leave settings.json byte for byte as it was once they are back on), prints renderer console errors as `CONSOLE_ERROR ...` and failed shots as
  * `SHOT_FAILED ...`, and exits 0 (clean) or 1 (errors).
  */
 export async function runShots(win: BrowserWindow, opts: { dir: string; only: string[] }): Promise<void> {
@@ -557,6 +561,47 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
    * rows as the card counts), the confirm dialog (shot `storage-trash`). In dark it then moves them: every one of those
    * sessions must be gone from Claude Code's folder, from the archive and from the list. Only on the shot's own copy.
    */
+  /**
+   * Update and What's new (U1 + W1), without a download: the footer offers the next minor version with three notes
+   * (`update-pop`, its popover open), then shows the phases main would send: downloading 41 of 98 MB
+   * (`update-progress`) and ready (`update-restart`). Then What's new for the running version, opened as the footer's
+   * version does (`whatsnew`); Done must close it and leave "Unofficial · vX" in the footer.
+   */
+  async function updateFlow(theme: 'light' | 'dark'): Promise<void> {
+    emit('system:navigate', { screen: 'today' })
+    await sleep(150)
+    const [maj, min] = __APP_VERSION__.split('.').map(Number)
+    const next = `${maj}.${min + 1}.0`
+    const notes = [
+      { title: 'Update from inside Claudock', text: 'Update downloads the new version, swaps the app and restarts it. No more release page or npx command.', screen: null },
+      { title: "What's new, after every update", text: 'This sheet. Open it again from the version in the sidebar.', screen: null },
+      { title: 'Auto delete listens again', text: 'In Storage, its switch turns off, and a new age sticks, without a run first.', screen: 'storage' as ScreenId }
+    ]
+    emit('system:update', await showUpdateForShot(next, notes, 98_400_000))
+    await waitFor(`document.querySelector('.update-trigger')`, 'the footer offering the update')
+    await js(`document.querySelector('.update-trigger').click()`)
+    await waitFor(`document.querySelectorAll('.update-pop__list li').length === 3 && document.querySelector('.update-pop small')?.textContent === '98 MB'`, 'the popover with three highlights and the size')
+    await shoot(theme, 'update-pop')
+    await js(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`)
+    showStatusForShot({ phase: 'downloading', version: next, received: 41_200_000, total: 98_400_000 })
+    await waitFor(`document.querySelector('.update-prog')?.textContent.includes('41 / 98 MB')`, 'the progress bar at 41 of 98 MB')
+    await sleep(300) // the bar's width transition
+    await shoot(theme, 'update-progress')
+    showStatusForShot({ phase: 'ready', version: next })
+    await waitFor(`document.querySelector('.update-trigger--ready')?.textContent.includes('Restart to update')`, 'Restart to update')
+    await shoot(theme, 'update-restart')
+    showStatusForShot({ phase: 'idle' })
+    clearUpdateForShot()
+    emit('system:update', null)
+    await waitFor(`document.querySelector('.version-trigger')`, 'the plain footer')
+    await cacheNotes(__APP_VERSION__, `https://github.com/behkha/claudock/releases/tag/v${__APP_VERSION__}`, notes)
+    await js(`document.querySelector('.version-trigger').click()`)
+    await waitFor(`document.querySelectorAll('dialog[open] .whatsnew__note').length === 3 && document.querySelector('dialog[open] .whatsnew__link')?.textContent === 'Open Storage'`, "What's new with three notes")
+    await shoot(theme, 'whatsnew')
+    await click('Done', `document.querySelector('dialog[open]')`)
+    await waitFor(`!document.querySelector('dialog[open]') && document.querySelector('.version-trigger')`, "the footer after What's new closed")
+  }
+
   async function diskFlow(theme: 'light' | 'dark'): Promise<void> {
     if (process.env.CLAUDOCK_READONLY === '1' || !configDir().includes(`${path.sep}.shots${path.sep}.tmp-`)) return
     await sweepNow()
@@ -699,6 +744,28 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
     await shoot('light', 'storage-auto-on')
     await setTheme('dark', false)
     await sleep(300)
+
+    // the switch turns off and the age changes, on and off, and each stays as picked (they used to snap back)
+    const sel = `document.querySelector('.ages__auto select')`
+    const pickAge = (d: number): Promise<unknown> =>
+      js(`(() => { const s = ${sel}; Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, '${d}'); s.dispatchEvent(new Event('change', { bubbles: true })) })()`)
+    const holds = async (on: boolean, days: number, what: string): Promise<void> => {
+      await sleep(800)
+      const now = await js<string>(`${sw}.getAttribute('aria-checked') + ' ' + ${sel}.value + ' ' + !!document.querySelector('dialog[open]')`)
+      if (now !== `${on} ${days} false`) throw new Error(`auto delete: ${what} reads "${now}"`)
+    }
+    await js(`${sw}.click()`)
+    await holds(false, 90, 'turned off')
+    await pickAge(180)
+    await holds(false, 180, '180 days while off')
+    await js(`${sw}.click()`)
+    await waitFor(`document.querySelector('dialog[open]')`, 'the dialog turning it on at 180 days')
+    await click('Turn on', `document.querySelector('dialog[open]')`)
+    await holds(true, 180, 'turned on at 180 days')
+    await pickAge(365)
+    await holds(true, 365, '365 days while on')
+    await js(`${sw}.click()`)
+    await holds(false, 365, 'turned off again')
   }
 
   /**
@@ -1292,6 +1359,9 @@ export async function runShots(win: BrowserWindow, opts: { dir: string; only: st
       }
       if (opts.only.length === 0 || opts.only.includes('archive')) {
         await archiveFlow(theme).catch(fail)
+      }
+      if (opts.only.length === 0 || opts.only.includes('update')) {
+        await updateFlow(theme).catch(fail)
       }
       if (opts.only.length === 0 || opts.only.includes('disk-cost')) {
         await diskFlow(theme).catch(fail)

@@ -17,6 +17,8 @@ Everything goes to the Trash, so you can put a session back from there.
 | Windows | `Claudock-Setup-….exe` |
 | Linux | `.AppImage` (any distribution) or `.deb` (Debian, Ubuntu), `x86_64`/`amd64` or `arm64` |
 
+The `.zip` and `latest*.yml` files are what Update in Claudock's sidebar downloads; you don't need them.
+
 ### First launch
 
 `npx claudock` and the install scripts skip these steps.

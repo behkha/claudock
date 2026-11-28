@@ -54,8 +54,38 @@ export interface UpdateInfo {
   version: string
   /** The release page on GitHub. */
   url: string
-  /** What updates this copy: the npm command, or null when the installer has to be downloaded from `url`. */
+  /** What updates this copy by hand: the npm command, or null when the installer has to be downloaded from `url`. */
   command: string | null
+  /** Update downloads and installs it from inside the app (src/main/updateInstall.ts); false: copy `command` or download. */
+  installable: boolean
+  /** Bytes Update downloads, when the release says (null for an npm copy). */
+  size: number | null
+  /** The lead-ins of the release's "What's new" notes, at most three. */
+  highlights: string[]
+}
+
+/** Where Update is: nothing under way, downloading (npm: installing, no byte counts), or ready to restart into `version`. */
+export type UpdateStatus =
+  | { phase: 'idle' }
+  | { phase: 'downloading'; version: string; received: number; total: number | null }
+  | { phase: 'ready'; version: string }
+
+/** One note of a release's "What's new": its bold lead-in, the rest, and the screen it is about (null: none fits). */
+export interface WhatsNewNote {
+  title: string
+  text: string
+  screen: ScreenId | null
+}
+
+/** The running version's notes. `notes` is empty when they couldn't be fetched: the sheet links to `url` then. */
+export interface WhatsNew {
+  version: string
+  url: string
+  notes: WhatsNewNote[]
+  /** The first open of this version after an update (never after a first install): the sheet shows by itself. */
+  first: boolean
+  /** Why the last Restart to update didn't install (the Mac swap), given once; null when it did or none ran. */
+  failure: string | null
 }
 
 export interface DirSize {

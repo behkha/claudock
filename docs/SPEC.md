@@ -10,7 +10,7 @@ Design source of truth: the "Claudock design options" canvas, Option A (three-pa
 - Routing: a small in-app router (state-based, no URL routing needed) or `react-router` memory router.
 - Editors: CodeMirror 6 (`@uiw/react-codemirror` or the raw packages) for JSON and Markdown, with light and dark themes made from our tokens.
 - Markdown preview: `react-markdown` + `remark-gfm`. Never use `dangerouslySetInnerHTML` on file content.
-- Packaging: electron-builder → macOS `dmg` (arm64 + x64), Windows `nsis`, Linux `AppImage` + `deb`.
+- Packaging: electron-builder → macOS `dmg` + `zip` (arm64 + x64; the zip and `latest-mac.yml` feed the in-app update), Windows `nsis`, Linux `AppImage` + `deb`, each with its `latest*.yml`.
 - No CSS framework. Plain CSS modules or one global stylesheet using the tokens below.
 
 ## Folder resolution (main process)

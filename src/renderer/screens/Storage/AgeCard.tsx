@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { AUTO_DELETE_DAYS, type AgeStep, type AutoDelete, type AutoDeleteRun } from '@shared/api/archive'
 import { formatBytes, formatCount, formatDate } from '@shared/format'
 import { Button, Card, ConfirmDialog, Select, Toggle, useToast } from '@/components'
@@ -156,7 +156,10 @@ function AutoRow({ steps, at, readOnly, auto, onFailed }: AutoRowProps): JSX.Ele
   // what the open dialog asks about; the switch and the select keep showing what is saved until it is confirmed
   const [asking, setAsking] = useState<{ on: boolean; days: number } | null>(null)
   const [busy, setBusy] = useState(false)
-  const shown = want ?? { on: auto.on, days: auto.days }
+  // what the main process holds: the last answer to setAutoDelete, or a newer count of the screen
+  const [saved, setSaved] = useState(auto)
+  useEffect(() => setSaved(auto), [auto])
+  const shown = want ?? { on: saved.on, days: saved.days }
   const goes = (d: number): AgeStep => steps.find((s) => s.days === d) ?? { days: d, sessions: 0, bytes: 0 }
 
   async function apply(next: { on: boolean; days: number }): Promise<void> {
@@ -164,7 +167,7 @@ function AutoRow({ steps, at, readOnly, auto, onFailed }: AutoRowProps): JSX.Ele
     setWant(next)
     try {
       const g = goes(next.days)
-      await api.archive.setAutoDelete(next.on, next.days, at, g.sessions)
+      setSaved(await api.archive.setAutoDelete(next.on, next.days, at, g.sessions))
     } catch (e) {
       toast((e as Error).message, { kind: 'error' })
       onFailed()
@@ -177,14 +180,14 @@ function AutoRow({ steps, at, readOnly, auto, onFailed }: AutoRowProps): JSX.Ele
 
   function pick(next: { on: boolean; days: number }): void {
     // turning on asks; a younger age asks when it moves more than the age before; turning off never asks
-    const more = next.on && (!auto.on || goes(next.days).sessions > goes(auto.days).sessions)
+    const more = next.on && (!saved.on || goes(next.days).sessions > goes(saved.days).sessions)
     if (more) setAsking(next)
     else void apply(next)
   }
 
   const g = goes((asking ?? shown).days)
   const age = AGE_LABEL((asking ?? shown).days)
-  const turningOn = !auto.on
+  const turningOn = !saved.on
   return (
     <div className="ages__auto">
       <Toggle checked={shown.on} aria-label="Auto delete" disabled={readOnly || busy} onChange={(on) => pick({ on, days: shown.days })} />
@@ -200,7 +203,7 @@ function AutoRow({ steps, at, readOnly, auto, onFailed }: AutoRowProps): JSX.Ele
         />{' '}
         to the Trash
       </div>
-      {shown.on && auto.on && auto.last ? <span className="ages__last">{lastLine(auto.last)}</span> : null}
+      {shown.on && saved.on && saved.last ? <span className="ages__last">{lastLine(saved.last)}</span> : null}
       <ConfirmDialog
         open={asking !== null}
         title={turningOn ? 'Turn on auto delete?' : `Move sessions untouched for ${age}?`}

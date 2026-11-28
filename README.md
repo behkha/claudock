@@ -39,7 +39,7 @@ Claude Code keeps its config in dozens of JSON, JSONL and Markdown files, and re
 
 What it doesn't do: it doesn't run, update or sign in to Claude Code, and it doesn't sync settings between machines. It works on the config folder and `~/.claude.json`; the only files it writes elsewhere are Team mode's, in the places you pick, and a project's rule file when you remove a rule from it. If you only change a setting now and then, Claude Code's own `/config` and `/permissions` commands are enough.
 
-At launch Claudock downloads Anthropic's public settings docs (code.claude.com) and the Claude Code JSON schema to power the JSON editor's suggestions. It asks json.schemastore.org and the schema's GitHub mirror (raw.githubusercontent.com) at the same time and uses whichever answers first. It downloads Anthropic's public pricing page (platform.claude.com) and Claude Code's model configuration page for the model list in Settings and the prices on the share card. It also asks api.github.com for the latest Claudock release, to tell you when there's a newer one. It sends nothing about your config. `CLAUDOCK_OFFLINE=1` turns all of this off.
+At launch Claudock downloads Anthropic's public settings docs (code.claude.com) and the Claude Code JSON schema to power the JSON editor's suggestions. It asks json.schemastore.org and the schema's GitHub mirror (raw.githubusercontent.com) at the same time and uses whichever answers first. It downloads Anthropic's public pricing page (platform.claude.com) and Claude Code's model configuration page for the model list in Settings and the prices on the share card. It also asks api.github.com for the latest Claudock release, to tell you when there's a newer one and what's in it, and reads that release's update file on github.com for the download's size; the download itself only starts when you click Update. It sends nothing about your config. `CLAUDOCK_OFFLINE=1` turns all of this off.
 
 ## Try it without touching your config
 
@@ -62,7 +62,7 @@ With Node.js 22.12 or later (you likely have it for Claude Code):
 npx claudock
 ```
 
-The first time, npm downloads Claudock and Electron (about 125 MB, under 2 minutes on a 10 Mbit/s connection), then opens the app. Nothing is code-signed, but files npm downloads aren't flagged by macOS Gatekeeper or Windows SmartScreen, so there's no warning to click through. To update, run `npx claudock@latest`; the app tells you in the sidebar when a newer release is out. On macOS, npx keeps a `Claudock.app` made from that Electron in Claudock's app data folder, so alerts, the Dock and the menu say Claudock and Open at login works.
+The first time, npm downloads Claudock and Electron (about 125 MB, under 2 minutes on a 10 Mbit/s connection), then opens the app. Nothing is code-signed, but files npm downloads aren't flagged by macOS Gatekeeper or Windows SmartScreen, so there's no warning to click through. When a newer release is out, the sidebar says so: Update installs it in the background and Restart starts it (or run `npx claudock@latest` yourself). On macOS, npx keeps a `Claudock.app` made from that Electron in Claudock's app data folder, so alerts, the Dock and the menu say Claudock and Open at login works.
 
 Or install the app with one line, also with no warning. On macOS and Linux:
 
