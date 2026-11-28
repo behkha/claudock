@@ -1,10 +1,10 @@
 Claudock is an unofficial desktop app for your Claude Code setup: settings, hooks, skills, MCP servers, memory and sessions in one window, without hand-editing the files in `~/.claude`.
 
-## What's new in 0.6.0
+## What's new in 0.6.1
 
-- **Update from inside Claudock.** When a newer version is out, the sidebar says so and shows what's in it. Update downloads it with its progress in the sidebar, and Restart to update puts it in place and opens it again. The download is checked against the release's checksum before anything changes; if macOS doesn't let Claudock replace itself, the version you had opens again and says why. With `npx claudock`, Update installs the new version in the background.
-- **What's new, after every update.** The first time a new version opens, it lists what changed, with a button to the screen a note is about. Click the version at the bottom of the sidebar to see it again.
-- **Auto delete listens again.** In Storage, its switch turns off, and a new age sticks, without waiting for a run first.
+- **What's new waits for its notes.** If the notes couldn't be downloaded the first time a new version opened (offline, or GitHub busy), this list came up empty and didn't come back. Now it shows on a later launch, once the notes are in.
+
+Coming from 0.5 or earlier? 0.6 added Update in the sidebar: from now on a new version downloads, installs and restarts from inside Claudock, and this list shows what changed.
 
 ## Download
 
